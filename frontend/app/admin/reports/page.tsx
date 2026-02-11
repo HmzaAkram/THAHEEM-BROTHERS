@@ -163,8 +163,9 @@ export default function ReportsPage() {
                   <Line
                     type="monotone"
                     dataKey="outstanding"
-                    stroke="var(--primary)"
-                    dot={{ fill: 'var(--primary)', r: 4 }}
+                    stroke="hsl(var(--primary))"
+                    strokeWidth={2}
+                    dot={{ fill: 'hsl(var(--primary))', r: 4 }}
                   />
                 </LineChart>
               </ResponsiveContainer>
@@ -255,13 +256,12 @@ export default function ReportsPage() {
                       </TableCell>
                       <TableCell className="text-right">
                         <span
-                          className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
-                            item.outstanding > 300000
+                          className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${item.outstanding > 300000
                               ? 'bg-red-100 text-red-800'
                               : item.outstanding > 100000
                                 ? 'bg-yellow-100 text-yellow-800'
                                 : 'bg-green-100 text-green-800'
-                          }`}
+                            }`}
                         >
                           {item.outstanding > 300000
                             ? 'High Risk'

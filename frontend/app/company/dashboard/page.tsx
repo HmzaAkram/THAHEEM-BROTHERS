@@ -170,9 +170,9 @@ export default function CompanyDashboard() {
                     <Line
                       type="monotone"
                       dataKey="amount"
-                      stroke="var(--primary)"
+                      stroke="hsl(var(--primary))"
                       strokeWidth={4}
-                      dot={{ fill: 'var(--primary)', r: 6, strokeWidth: 3, stroke: 'var(--background)' }}
+                      dot={{ fill: 'hsl(var(--primary))', r: 6, strokeWidth: 3, stroke: 'var(--background)' }}
                       activeDot={{ r: 8 }}
                       fill="url(#colorAmount)"
                     />
@@ -203,8 +203,8 @@ export default function CompanyDashboard() {
                       <p className="font-bold text-sm">PKR {bill.totalAmount.toLocaleString()}</p>
                       <span
                         className={`text-[10px] font-bold uppercase px-2 py-0.5 rounded-full inline-block mt-1 ${bill.status === 'Paid' ? 'bg-green-100 text-green-700' :
-                            bill.status === 'Partial' ? 'bg-yellow-100 text-yellow-700' :
-                              'bg-red-100 text-red-700'
+                          bill.status === 'Partial' ? 'bg-yellow-100 text-yellow-700' :
+                            'bg-red-100 text-red-700'
                           }`}
                       >
                         {bill.status}

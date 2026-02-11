@@ -9,8 +9,12 @@ export interface Company {
   email: string;
   phone: string;
   address: string;
+  password?: string; // Optional for now to avoid breaking existing logic immediately
+  status: 'Active' | 'Inactive';
   createdAt: string;
 }
+
+export type BillStatus = 'Paid' | 'Partial' | 'Unpaid';
 
 export interface BillItem {
   id: string;
@@ -19,8 +23,6 @@ export interface BillItem {
   rate: number;
   amount: number;
 }
-
-export type BillStatus = 'Paid' | 'Unpaid' | 'Partial';
 
 export interface Bill {
   id: string;
@@ -44,7 +46,7 @@ export interface Payment {
   amount: number;
   reference: string;
   method: string;
-  billId?: string; // Optional: link to specific bill
+  billId?: string;
   createdAt: string;
 }
 
@@ -65,6 +67,8 @@ interface DataContextType {
   bills: Bill[];
   payments: Payment[];
   addCompany: (company: Omit<Company, 'id' | 'createdAt'>) => void;
+  updateCompany: (id: string, data: Partial<Company>) => void;
+  deleteCompany: (id: string) => void;
   addBill: (bill: Omit<Bill, 'id' | 'createdAt' | 'paidAmount' | 'status'>) => void;
   addPayment: (payment: Omit<Payment, 'id' | 'createdAt'>) => void;
   getCompanyLedger: (companyId: string) => LedgerEntry[];
@@ -87,6 +91,8 @@ const INITIAL_COMPANIES: Company[] = [
     email: 'contact@thaheem.com',
     phone: '+92 300 1234567',
     address: 'Karachi, Pakistan',
+    password: 'password123',
+    status: 'Active',
     createdAt: '2026-01-01',
   },
   {
@@ -95,6 +101,8 @@ const INITIAL_COMPANIES: Company[] = [
     email: 'info@importtraders.com',
     phone: '+92 321 7654321',
     address: 'Lahore, Pakistan',
+    password: 'password123',
+    status: 'Active',
     createdAt: '2026-01-15',
   },
   {
@@ -103,6 +111,8 @@ const INITIAL_COMPANIES: Company[] = [
     email: 'ops@globalfreight.com',
     phone: '+92 333 9876543',
     address: 'Islamabad, Pakistan',
+    password: 'password123',
+    status: 'Active',
     createdAt: '2026-02-01',
   },
 ];
@@ -123,7 +133,7 @@ const INITIAL_BILLS: Bill[] = [
     status: 'Paid',
     createdAt: '2026-01-10',
   },
-   {
+  {
     id: 'b2',
     billNo: 'BILL-002',
     companyId: 'c2',
@@ -218,6 +228,16 @@ export function DataProvider({ children }: { children: ReactNode }) {
     setCompanies([...companies, newCompany]);
   };
 
+  const updateCompany = (id: string, data: Partial<Company>) => {
+    setCompanies(prev => prev.map(company =>
+      company.id === id ? { ...company, ...data } : company
+    ));
+  };
+
+  const deleteCompany = (id: string) => {
+    setCompanies(prev => prev.filter(company => company.id !== id));
+  };
+
   const addBill = (billData: Omit<Bill, 'id' | 'createdAt' | 'paidAmount' | 'status'>) => {
     const newBill: Bill = {
       ...billData,
@@ -246,7 +266,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
           let newStatus: BillStatus = 'Unpaid';
           if (newPaidAmount >= bill.totalAmount) newStatus = 'Paid';
           else if (newPaidAmount > 0) newStatus = 'Partial';
-          
+
           return { ...bill, paidAmount: newPaidAmount, status: newStatus };
         }
         return bill;
@@ -314,6 +334,8 @@ export function DataProvider({ children }: { children: ReactNode }) {
         bills,
         payments,
         addCompany,
+        updateCompany,
+        deleteCompany,
         addBill,
         addPayment,
         getCompanyLedger,

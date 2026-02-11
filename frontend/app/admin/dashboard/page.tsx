@@ -169,8 +169,8 @@ export default function AdminDashboard() {
                   <BarChart data={monthlyData} margin={{ top: 20, right: 30, left: 20, bottom: 5 }}>
                     <defs>
                       <linearGradient id="colorBills" x1="0" y1="0" x2="0" y2="1">
-                        <stop offset="5%" stopColor="var(--primary)" stopOpacity={0.8} />
-                        <stop offset="95%" stopColor="var(--primary)" stopOpacity={0.2} />
+                        <stop offset="5%" stopColor="hsl(var(--primary))" stopOpacity={0.8} />
+                        <stop offset="95%" stopColor="hsl(var(--primary))" stopOpacity={0.2} />
                       </linearGradient>
                       <linearGradient id="colorPayments" x1="0" y1="0" x2="0" y2="1">
                         <stop offset="5%" stopColor="#10b981" stopOpacity={0.8} />
@@ -240,8 +240,8 @@ export default function AdminDashboard() {
                     <div key={action.id} className="flex items-start justify-between group p-3 rounded-lg hover:bg-white/50 dark:hover:bg-slate-800/50 transition-all duration-200 border border-transparent hover:border-border/50 shadow-sm hover:shadow-md">
                       <div className="flex gap-4 items-center">
                         <div className={`p-2 rounded-full ring-2 ring-opacity-20 ${action.type === 'BILL' ? 'bg-blue-100 text-blue-600 ring-blue-500' :
-                            action.type === 'PAYMENT' ? 'bg-green-100 text-green-600 ring-green-500' :
-                              'bg-orange-100 text-orange-600 ring-orange-500'
+                          action.type === 'PAYMENT' ? 'bg-green-100 text-green-600 ring-green-500' :
+                            'bg-orange-100 text-orange-600 ring-orange-500'
                           }`}>
                           {action.type === 'BILL' && <FileText className="w-4 h-4" />}
                           {action.type === 'PAYMENT' && <DollarSign className="w-4 h-4" />}
