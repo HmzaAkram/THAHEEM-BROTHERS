@@ -3,10 +3,13 @@
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { useAuth } from '@/context/auth-context';
+import { useData } from '@/context/data-context';
 import { Building2, Lock } from 'lucide-react';
 
 export function Login() {
   const { setRole } = useAuth();
+  const { getDashboardStats } = useData();
+  const stats = getDashboardStats();
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 to-blue-100 flex items-center justify-center p-4">
@@ -51,20 +54,20 @@ export function Login() {
         </Card>
 
         <div className="mt-8 grid grid-cols-2 gap-4">
-          <Card className="bg-white border-0 shadow-sm">
+          <Card className="bg-white/80 backdrop-blur border-0 shadow-sm">
             <CardContent className="pt-6">
               <div className="text-center">
-                <div className="text-2xl font-bold text-primary">25</div>
+                <div className="text-2xl font-bold text-primary">{stats.activeCompanies}</div>
                 <div className="text-xs text-muted-foreground mt-1">
                   Companies
                 </div>
               </div>
             </CardContent>
           </Card>
-          <Card className="bg-white border-0 shadow-sm">
+          <Card className="bg-white/80 backdrop-blur border-0 shadow-sm">
             <CardContent className="pt-6">
               <div className="text-center">
-                <div className="text-2xl font-bold text-primary">PKR 2.4M</div>
+                <div className="text-2xl font-bold text-primary">PKR {(stats.outstanding / 1000000).toFixed(1)}M</div>
                 <div className="text-xs text-muted-foreground mt-1">
                   Outstanding
                 </div>

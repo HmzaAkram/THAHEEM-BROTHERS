@@ -27,118 +27,73 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { Plus, Eye } from 'lucide-react';
-import { useState } from 'react';
-
-const dummyPayments = [
-  {
-    id: 1,
-    paymentId: 'PAY-001',
-    company: 'THAHEEM BROTHERS',
-    paymentDate: '2026-02-10',
-    amount: 'PKR 250,000',
-    method: 'Bank Transfer',
-    referenceNo: 'TRF-2026-0001',
-  },
-  {
-    id: 2,
-    paymentId: 'PAY-002',
-    company: 'Import Traders',
-    paymentDate: '2026-02-08',
-    amount: 'PKR 60,000',
-    method: 'Check',
-    referenceNo: 'CHK-2026-0001',
-  },
-  {
-    id: 3,
-    paymentId: 'PAY-003',
-    company: 'Karachi Logistics',
-    paymentDate: '2026-02-05',
-    amount: 'PKR 180,000',
-    method: 'Bank Transfer',
-    referenceNo: 'TRF-2026-0002',
-  },
-  {
-    id: 4,
-    paymentId: 'PAY-004',
-    company: 'Metro Cargo Services',
-    paymentDate: '2026-02-03',
-    amount: 'PKR 95,000',
-    method: 'Online Transfer',
-    referenceNo: 'ONL-2026-0001',
-  },
-  {
-    id: 5,
-    paymentId: 'PAY-005',
-    company: 'Express Imports Ltd',
-    paymentDate: '2026-02-01',
-    amount: 'PKR 110,000',
-    method: 'Check',
-    referenceNo: 'CHK-2026-0002',
-  },
-  {
-    id: 6,
-    paymentId: 'PAY-006',
-    company: 'THAHEEM BROTHERS',
-    paymentDate: '2026-01-28',
-    amount: 'PKR 175,000',
-    method: 'Bank Transfer',
-    referenceNo: 'TRF-2026-0003',
-  },
-  {
-    id: 7,
-    paymentId: 'PAY-007',
-    company: 'Import Traders',
-    paymentDate: '2026-01-25',
-    amount: 'PKR 95,500',
-    method: 'Online Transfer',
-    referenceNo: 'ONL-2026-0002',
-  },
-  {
-    id: 8,
-    paymentId: 'PAY-008',
-    company: 'Global Freight Co',
-    paymentDate: '2026-01-22',
-    amount: 'PKR 300,000',
-    method: 'Bank Transfer',
-    referenceNo: 'TRF-2026-0004',
-  },
-  {
-    id: 9,
-    paymentId: 'PAY-009',
-    company: 'Orient Shipping',
-    paymentDate: '2026-01-20',
-    amount: 'PKR 200,000',
-    method: 'Check',
-    referenceNo: 'CHK-2026-0003',
-  },
-  {
-    id: 10,
-    paymentId: 'PAY-010',
-    company: 'Trade Hub International',
-    paymentDate: '2026-01-18',
-    amount: 'PKR 250,000',
-    method: 'Bank Transfer',
-    referenceNo: 'TRF-2026-0005',
-  },
-];
+import { Plus, Download, Filter } from 'lucide-react';
+import { useState, useMemo } from 'react';
+import { useData } from '@/context/data-context';
 
 export default function PaymentsPage() {
+  const { payments, companies, addPayment, bills } = useData();
   const [isDialogOpen, setIsDialogOpen] = useState(false);
+
+  // Form State
+  const [companyId, setCompanyId] = useState('');
+  const [date, setDate] = useState(new Date().toISOString().split('T')[0]);
+  const [amount, setAmount] = useState('');
+  const [reference, setReference] = useState('');
+  const [method, setMethod] = useState('Bank Transfer');
+  const [billId, setBillId] = useState('none');
+
+  const handleSubmit = () => {
+    if (!companyId || !amount || !date) {
+      alert("Please fill all required fields");
+      return;
+    }
+
+    const selectedCompany = companies.find(c => c.id === companyId);
+    if (!selectedCompany) return;
+
+    addPayment({
+      companyId: selectedCompany.id,
+      companyName: selectedCompany.name,
+      date,
+      amount: Number(amount),
+      reference: reference || 'N/A',
+      method,
+      billId: billId === 'none' ? undefined : billId
+    });
+
+    setIsDialogOpen(false);
+    // Reset Form
+    setCompanyId('');
+    setAmount('');
+    setReference('');
+    setBillId('none');
+  };
+
+  // Filter bills for selected company
+  const companyBills = useMemo(() => {
+    if (!companyId) return [];
+    return bills.filter(b => b.companyId === companyId && b.status !== 'Paid');
+  }, [companyId, bills]);
+
+  // Sort payments by date desc
+  const sortedPayments = useMemo(() => {
+    return [...payments].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+  }, [payments]);
 
   return (
     <DashboardLayout>
-      <div className="space-y-6">
+      <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
         <div className="flex items-center justify-between">
           <div>
             <h1 className="text-3xl font-bold text-foreground">Payments</h1>
             <p className="text-muted-foreground mt-1">
-              Track and manage customer payments
+              Record and track received payments.
             </p>
           </div>
           <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
             <DialogTrigger asChild>
-              <Button className="gap-2">
+              <Button className="gap-2 shadow-md bg-green-600 hover:bg-green-700">
                 <Plus className="w-4 h-4" />
                 Record Payment
               </Button>
@@ -149,77 +104,94 @@ export default function PaymentsPage() {
               </DialogHeader>
               <div className="space-y-4 pt-4">
                 <div>
-                  <Label htmlFor="payment-company">Select Company</Label>
-                  <Select>
+                  <Label>Select Company</Label>
+                  <Select onValueChange={setCompanyId} value={companyId}>
                     <SelectTrigger className="mt-1">
-                      <SelectValue placeholder="Choose company" />
+                      <SelectValue placeholder="Choose client..." />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="thaheem">THAHEEM BROTHERS</SelectItem>
-                      <SelectItem value="import">Import Traders</SelectItem>
-                      <SelectItem value="global">Global Freight Co</SelectItem>
+                      {companies.map(c => (
+                        <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>
+                      ))}
                     </SelectContent>
                   </Select>
+                </div>
+
+                <div>
+                  <Label>Date</Label>
+                  <Input
+                    type="date"
+                    className="mt-1"
+                    value={date}
+                    onChange={(e) => setDate(e.target.value)}
+                  />
+                </div>
+
+                <div>
+                  <Label>Amount (PKR)</Label>
+                  <Input
+                    type="number"
+                    placeholder="0.00"
+                    className="mt-1 font-mono"
+                    value={amount}
+                    onChange={(e) => setAmount(e.target.value)}
+                  />
                 </div>
 
                 <div className="grid grid-cols-2 gap-4">
                   <div>
-                    <Label htmlFor="payment-date">Payment Date</Label>
-                    <Input
-                      id="payment-date"
-                      type="date"
-                      className="mt-1"
-                      defaultValue="2026-02-12"
-                    />
+                    <Label>Payment Method</Label>
+                    <Select onValueChange={setMethod} value={method}>
+                      <SelectTrigger className="mt-1">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="Bank Transfer">Bank Transfer</SelectItem>
+                        <SelectItem value="Check">Check</SelectItem>
+                        <SelectItem value="Cash">Cash</SelectItem>
+                        <SelectItem value="Online">Online</SelectItem>
+                      </SelectContent>
+                    </Select>
                   </div>
                   <div>
-                    <Label htmlFor="payment-amount">Amount</Label>
+                    <Label>Reference No.</Label>
                     <Input
-                      id="payment-amount"
-                      placeholder="PKR"
+                      placeholder="TRF-12345"
                       className="mt-1"
+                      value={reference}
+                      onChange={(e) => setReference(e.target.value)}
                     />
                   </div>
                 </div>
 
-                <div>
-                  <Label htmlFor="payment-method">Payment Method</Label>
-                  <Select>
-                    <SelectTrigger className="mt-1">
-                      <SelectValue placeholder="Select method" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="bank">Bank Transfer</SelectItem>
-                      <SelectItem value="check">Check</SelectItem>
-                      <SelectItem value="online">Online Transfer</SelectItem>
-                      <SelectItem value="cash">Cash</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-
-                <div>
-                  <Label htmlFor="payment-ref">Reference Number</Label>
-                  <Input
-                    id="payment-ref"
-                    placeholder="e.g., TRF-2026-0001"
-                    className="mt-1"
-                  />
-                </div>
-
-                <div>
-                  <Label htmlFor="payment-notes">Notes</Label>
-                  <Input
-                    id="payment-notes"
-                    placeholder="Optional notes"
-                    className="mt-1"
-                  />
-                </div>
+                {companyId && companyBills.length > 0 && (
+                  <div className="bg-secondary/30 p-3 rounded-md border">
+                    <Label className="text-xs font-semibold uppercase text-muted-foreground mb-1 block">
+                      Link to Invoice (Optional)
+                    </Label>
+                    <Select onValueChange={setBillId} value={billId}>
+                      <SelectTrigger className="h-9 text-sm">
+                        <SelectValue placeholder="Select unpaid bill..." />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="none">-- General Payment --</SelectItem>
+                        {companyBills.map(b => (
+                          <SelectItem key={b.id} value={b.id}>
+                            {b.billNo} (Due: {b.totalAmount - b.paidAmount})
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                )}
 
                 <div className="flex gap-2 pt-4">
-                  <Button className="flex-1">Record Payment</Button>
+                  <Button className="flex-1 bg-green-600 hover:bg-green-700" onClick={handleSubmit}>
+                    Save Payment
+                  </Button>
                   <Button
                     variant="outline"
-                    className="flex-1 bg-transparent"
+                    className="flex-1"
                     onClick={() => setIsDialogOpen(false)}
                   >
                     Cancel
@@ -230,70 +202,52 @@ export default function PaymentsPage() {
           </Dialog>
         </div>
 
-        <Card>
+        <Card className="shadow-md border-border/50">
           <CardHeader>
-            <CardTitle className="text-base">Payment Records</CardTitle>
+            <CardTitle>Transaction History</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="overflow-x-auto">
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Payment ID</TableHead>
-                    <TableHead>Company</TableHead>
-                    <TableHead>Payment Date</TableHead>
-                    <TableHead>Amount</TableHead>
-                    <TableHead>Method</TableHead>
-                    <TableHead>Reference No</TableHead>
-                    <TableHead className="text-right">Action</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {dummyPayments.map((payment) => (
-                    <TableRow key={payment.id}>
-                      <TableCell className="font-mono text-sm">
-                        {payment.paymentId}
-                      </TableCell>
-                      <TableCell className="font-medium">
-                        {payment.company}
-                      </TableCell>
-                      <TableCell className="text-sm">
-                        {new Date(payment.paymentDate).toLocaleDateString()}
-                      </TableCell>
-                      <TableCell className="font-semibold">
-                        {payment.amount}
-                      </TableCell>
-                      <TableCell className="text-sm">
-                        <span className="bg-blue-100 text-blue-800 px-2.5 py-0.5 rounded-full text-xs">
-                          {payment.method}
-                        </span>
-                      </TableCell>
-                      <TableCell className="text-sm font-mono">
-                        {payment.referenceNo}
-                      </TableCell>
-                      <TableCell className="text-right">
-                        <Button variant="ghost" size="icon">
-                          <Eye className="w-4 h-4" />
-                        </Button>
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            </div>
-            <div className="flex items-center justify-between mt-4 text-sm">
-              <p className="text-muted-foreground">
-                Showing 1-10 of {dummyPayments.length} payments
-              </p>
-              <div className="flex gap-2">
-                <Button variant="outline" size="sm">
-                  Previous
-                </Button>
-                <Button variant="outline" size="sm">
-                  Next
-                </Button>
+            {sortedPayments.length === 0 ? (
+              <div className="text-center py-10 text-muted-foreground">
+                No payments recorded yet.
               </div>
-            </div>
+            ) : (
+              <div className="overflow-x-auto">
+                <Table>
+                  <TableHeader>
+                    <TableRow className="bg-secondary/50">
+                      <TableHead>Date</TableHead>
+                      <TableHead>Company</TableHead>
+                      <TableHead>Reference</TableHead>
+                      <TableHead>Method</TableHead>
+                      <TableHead className="text-right">Amount</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {sortedPayments.map((payment) => (
+                      <TableRow key={payment.id} className="hover:bg-muted/50 transition-colors">
+                        <TableCell className="text-sm text-muted-foreground">
+                          {new Date(payment.date).toLocaleDateString()}
+                        </TableCell>
+                        <TableCell className="font-medium">
+                          {payment.companyName}
+                        </TableCell>
+                        <TableCell className="font-mono text-sm">
+                          {payment.reference}
+                        </TableCell>
+                        <TableCell className="text-sm">
+                          {payment.method}
+                        </TableCell>
+                        <TableCell className="text-right font-bold text-green-600">
+                          + PKR {payment.amount.toLocaleString()}
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </div>
+            )}
+
           </CardContent>
         </Card>
       </div>

@@ -2,85 +2,93 @@
 @tailwind components;
 @tailwind utilities;
 
-body {
-  font-family: Arial, Helvetica, sans-serif;
-}
-
-@layer utilities {
-  .text-balance {
-    text-wrap: balance;
-  }
-}
-
 @layer base {
   :root {
-    --background: 0 0% 100%;
-    --foreground: 210 10% 12%;
+    /* Modern Dark Blue Theme (Light Mode - but distinctively blue-tinted) */
+    --background: 224 71% 96%;
+    /* Very light blue-grey */
+    --foreground: 222 47% 11%;
+    /* Deep navy */
+
     --card: 0 0% 100%;
-    --card-foreground: 210 10% 12%;
+    --card-foreground: 222 47% 11%;
+
     --popover: 0 0% 100%;
-    --popover-foreground: 210 10% 12%;
-    --primary: 210 100% 50%;
-    --primary-foreground: 0 0% 100%;
-    --secondary: 210 14% 97%;
-    --secondary-foreground: 210 10% 12%;
-    --muted: 210 14% 89%;
-    --muted-foreground: 210 8% 40%;
-    --accent: 210 100% 50%;
-    --accent-foreground: 0 0% 100%;
+    --popover-foreground: 222 47% 11%;
+
+    --primary: 224 64% 33%;
+    /* Modern Dark Blue (Brand Color) */
+    --primary-foreground: 210 40% 98%;
+
+    --secondary: 220 14% 93%;
+    /* Light grey-blue for pressed states/backgrounds */
+    --secondary-foreground: 222 47% 11.2%;
+
+    --muted: 210 40% 96.1%;
+    --muted-foreground: 215 16% 47%;
+
+    --accent: 210 40% 96.1%;
+    --accent-foreground: 222 47% 11.2%;
+
     --destructive: 0 84.2% 60.2%;
-    --destructive-foreground: 0 0% 98%;
-    --border: 210 14% 89%;
-    --input: 210 14% 93%;
-    --ring: 210 100% 50%;
-    --chart-1: 210 100% 50%;
-    --chart-2: 220 14% 96%;
-    --chart-3: 210 8% 40%;
-    --chart-4: 210 100% 50%;
-    --chart-5: 210 14% 89%;
-    --radius: 0.5rem;
-    --sidebar-background: 210 14% 97%;
-    --sidebar-foreground: 210 10% 12%;
-    --sidebar-primary: 210 100% 50%;
-    --sidebar-primary-foreground: 0 0% 100%;
-    --sidebar-accent: 210 14% 89%;
-    --sidebar-accent-foreground: 210 100% 50%;
-    --sidebar-border: 210 14% 89%;
-    --sidebar-ring: 210 100% 50%;
+    --destructive-foreground: 210 40% 98%;
+
+    --border: 214.3 31.8% 91.4%;
+    --input: 214.3 31.8% 91.4%;
+    --ring: 224 64% 33%;
+
+    --radius: 0.75rem;
+
+    --chart-1: 224 64% 33%;
+    /* Match Primary */
+    --chart-2: 199 89% 48%;
+    /* Complementary Cyan/Blue */
+    --chart-3: 142 71% 45%;
+    /* Success Green */
+    --chart-4: 262 83% 58%;
+    /* Purple accent */
+    --chart-5: 47 95% 49%;
+    /* Yellow/Orange accent */
   }
+
   .dark {
-    --background: 0 0% 3.9%;
-    --foreground: 0 0% 98%;
-    --card: 0 0% 3.9%;
-    --card-foreground: 0 0% 98%;
-    --popover: 0 0% 3.9%;
-    --popover-foreground: 0 0% 98%;
-    --primary: 0 0% 98%;
-    --primary-foreground: 0 0% 9%;
-    --secondary: 0 0% 14.9%;
-    --secondary-foreground: 0 0% 98%;
-    --muted: 0 0% 14.9%;
-    --muted-foreground: 0 0% 63.9%;
-    --accent: 0 0% 14.9%;
-    --accent-foreground: 0 0% 98%;
+    /* Modern Midnight Blue Theme */
+    --background: 222 47% 6%;
+    /* Almost black, deep blue tint */
+    --foreground: 210 40% 98%;
+
+    --card: 222 47% 10%;
+    /* Slightly lighter deep blue */
+    --card-foreground: 210 40% 98%;
+
+    --popover: 222 47% 10%;
+    --popover-foreground: 210 40% 98%;
+
+    --primary: 217 91% 60%;
+    /* Bright Electric Blue for dark mode pop */
+    --primary-foreground: 222 47% 11%;
+
+    --secondary: 217 32% 17%;
+    --secondary-foreground: 210 40% 98%;
+
+    --muted: 217 32% 17%;
+    --muted-foreground: 215 20% 65%;
+
+    --accent: 217 32% 17%;
+    --accent-foreground: 210 40% 98%;
+
     --destructive: 0 62.8% 30.6%;
-    --destructive-foreground: 0 0% 98%;
-    --border: 0 0% 14.9%;
-    --input: 0 0% 14.9%;
-    --ring: 0 0% 83.1%;
+    --destructive-foreground: 210 40% 98%;
+
+    --border: 217 32% 17%;
+    --input: 217 32% 17%;
+    --ring: 224 76% 48%;
+
     --chart-1: 220 70% 50%;
     --chart-2: 160 60% 45%;
     --chart-3: 30 80% 55%;
     --chart-4: 280 65% 60%;
     --chart-5: 340 75% 55%;
-    --sidebar-background: 240 5.9% 10%;
-    --sidebar-foreground: 240 4.8% 95.9%;
-    --sidebar-primary: 224.3 76.3% 48%;
-    --sidebar-primary-foreground: 0 0% 100%;
-    --sidebar-accent: 240 3.7% 15.9%;
-    --sidebar-accent-foreground: 240 4.8% 95.9%;
-    --sidebar-border: 240 3.7% 15.9%;
-    --sidebar-ring: 217.2 91.2% 59.8%;
   }
 }
 
@@ -88,7 +96,27 @@ body {
   * {
     @apply border-border;
   }
+
   body {
-    @apply bg-background text-foreground;
+    @apply bg-background text-foreground transition-colors duration-300;
+  }
+}
+
+/* Custom Utilities for "Modern" Feel */
+@layer utilities {
+  .glass-card {
+    @apply bg-white/70 dark:bg-slate-900/70 backdrop-blur-lg border border-white/20 dark:border-white/10 shadow-xl;
+  }
+
+  .hover-scale {
+    @apply transition-transform duration-200 hover:scale-[1.02] hover:shadow-lg;
+  }
+
+  .nav-item-active {
+    @apply bg-primary/10 text-primary border-r-4 border-primary;
+  }
+
+  .text-gradient {
+    @apply bg-clip-text text-transparent bg-gradient-to-r from-primary to-blue-500;
   }
 }

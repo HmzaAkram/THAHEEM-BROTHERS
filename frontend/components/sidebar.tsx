@@ -56,12 +56,11 @@ export function Sidebar({ role, onLogout }: SidebarProps) {
       </div>
 
       <aside
-        className={`${
-          isOpen ? 'translate-x-0' : '-translate-x-full'
-        } transition-transform lg:translate-x-0 fixed lg:static left-0 top-0 pt-16 lg:pt-0 h-screen w-64 bg-sidebar-background border-r border-sidebar-border flex flex-col z-40`}
+        className={`${isOpen ? 'translate-x-0' : '-translate-x-full'
+          } transition-transform duration-300 lg:translate-x-0 fixed lg:static left-0 top-0 pt-16 lg:pt-0 h-screen w-64 bg-sidebar-background border-r border-sidebar-border flex flex-col z-40 bg-gradient-to-b from-slate-900 to-slate-800 text-white shadow-2xl`}
       >
         <div className="px-6 py-8">
-          <h1 className="text-xl font-bold text-sidebar-primary">
+          <h1 className="text-xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-blue-400 to-cyan-300">
             {role === 'admin' ? 'Admin Panel' : 'Company Portal'}
           </h1>
         </div>
@@ -76,24 +75,26 @@ export function Sidebar({ role, onLogout }: SidebarProps) {
                 key={link.href}
                 href={link.href}
                 onClick={() => setIsOpen(false)}
-                className={`flex items-center gap-3 px-4 py-3 rounded-lg transition-colors ${
-                  isActive
-                    ? 'bg-sidebar-primary text-sidebar-primary-foreground'
-                    : 'text-sidebar-foreground hover:bg-sidebar-accent'
-                }`}
+                className={`flex items-center gap-3 px-4 py-3 rounded-lg transition-all duration-200 group relative overflow-hidden ${isActive
+                    ? 'bg-primary text-white shadow-lg shadow-primary/25 translate-x-1'
+                    : 'text-slate-300 hover:bg-white/5 hover:text-white hover:translate-x-1'
+                  }`}
               >
-                <Icon className="w-5 h-5" />
-                <span className="font-medium">{link.label}</span>
+                <Icon className={`w-5 h-5 transition-transform group-hover:scale-110 ${isActive ? 'text-white' : 'text-slate-400 group-hover:text-blue-300'}`} />
+                <span className="font-medium relative z-10">{link.label}</span>
+                {isActive && (
+                  <div className="absolute inset-0 bg-gradient-to-r from-blue-600/20 to-transparent pointer-events-none" />
+                )}
               </Link>
             );
           })}
         </nav>
 
-        <div className="p-4 border-t border-sidebar-border">
+        <div className="p-4 border-t border-slate-700/50 bg-slate-900/50">
           <Button
             onClick={onLogout}
-            variant="outline"
-            className="w-full justify-start gap-2 bg-transparent"
+            variant="ghost"
+            className="w-full justify-start gap-2 text-slate-300 hover:text-red-400 hover:bg-red-900/10 transition-colors"
           >
             <LogOut className="w-5 h-5" />
             Logout
@@ -103,7 +104,7 @@ export function Sidebar({ role, onLogout }: SidebarProps) {
 
       {isOpen && (
         <div
-          className="lg:hidden fixed inset-0 bg-black/20 z-30"
+          className="lg:hidden fixed inset-0 bg-black/50 backdrop-blur-sm z-30"
           onClick={() => setIsOpen(false)}
         />
       )}
