@@ -39,35 +39,58 @@ export default function PaymentsPage() {
   const [companyId, setCompanyId] = useState('');
   const [date, setDate] = useState(new Date().toISOString().split('T')[0]);
   const [amount, setAmount] = useState('');
-  const [reference, setReference] = useState('');
+  const [adjustment, setAdjustment] = useState('');
   const [method, setMethod] = useState('Bank Transfer');
-  const [billId, setBillId] = useState('none');
+  const [billId, setBillId] = useState(''); // Essential now
+
+  // Method specific state
+  const [trackingId, setTrackingId] = useState('');
+  const [chequeNo, setChequeNo] = useState('');
+  const [payOrderNo, setPayOrderNo] = useState('');
+  const [description, setDescription] = useState('');
 
   const handleSubmit = () => {
-    if (!companyId || !amount || !date) {
-      alert("Please fill all required fields");
+    if (!companyId || !amount || !date || !billId) {
+      alert("Please fill all required fields (Company, Bill, Amount, Date)");
       return;
     }
 
     const selectedCompany = companies.find(c => c.id === companyId);
     if (!selectedCompany) return;
 
+    // Construct reference based on method
+    let finalReference = '';
+    if (method === 'Bank Transfer') finalReference = `TRF: ${trackingId}`;
+    else if (method === 'Cheque') finalReference = `CHQ: ${chequeNo}`;
+    else if (method === 'Pay Order') finalReference = `PO: ${payOrderNo}`;
+    else if (method === 'Advance') finalReference = `ADV: ${description}`;
+    else finalReference = 'Cash';
+
     addPayment({
       companyId: selectedCompany.id,
       companyName: selectedCompany.name,
       date,
       amount: Number(amount),
-      reference: reference || 'N/A',
+      adjustment: Number(adjustment) || 0,
+      reference: finalReference,
       method,
-      billId: billId === 'none' ? undefined : billId
+      billId,
+      trackingId,
+      chequeNo,
+      payOrderNo,
+      description
     });
 
     setIsDialogOpen(false);
     // Reset Form
     setCompanyId('');
     setAmount('');
-    setReference('');
-    setBillId('none');
+    setAdjustment('');
+    setBillId('');
+    setTrackingId('');
+    setChequeNo('');
+    setPayOrderNo('');
+    setDescription('');
   };
 
   // Filter bills for selected company
@@ -118,27 +141,35 @@ export default function PaymentsPage() {
                 </div>
 
                 <div>
-                  <Label>Date</Label>
-                  <Input
-                    type="date"
-                    className="mt-1"
-                    value={date}
-                    onChange={(e) => setDate(e.target.value)}
-                  />
-                </div>
-
-                <div>
-                  <Label>Amount (PKR)</Label>
-                  <Input
-                    type="number"
-                    placeholder="0.00"
-                    className="mt-1 font-mono"
-                    value={amount}
-                    onChange={(e) => setAmount(e.target.value)}
-                  />
+                  <Label>Link to Invoice / Job (Required)</Label>
+                  <Select onValueChange={setBillId} value={billId}>
+                    <SelectTrigger className="mt-1">
+                      <SelectValue placeholder="Select Invoice to pay..." />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {companyBills.length === 0 ? (
+                        <SelectItem value="none" disabled>No pending bills found</SelectItem>
+                      ) : (
+                        companyBills.map(b => (
+                          <SelectItem key={b.id} value={b.id}>
+                            {b.billNo} - {b.jobNumber} (Due: {(b.totalAmount - b.paidAmount).toLocaleString()})
+                          </SelectItem>
+                        ))
+                      )}
+                    </SelectContent>
+                  </Select>
                 </div>
 
                 <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <Label>Date</Label>
+                    <Input
+                      type="date"
+                      className="mt-1"
+                      value={date}
+                      onChange={(e) => setDate(e.target.value)}
+                    />
+                  </div>
                   <div>
                     <Label>Payment Method</Label>
                     <Select onValueChange={setMethod} value={method}>
@@ -146,44 +177,86 @@ export default function PaymentsPage() {
                         <SelectValue />
                       </SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="Bank Transfer">Bank Transfer</SelectItem>
-                        <SelectItem value="Check">Check</SelectItem>
                         <SelectItem value="Cash">Cash</SelectItem>
-                        <SelectItem value="Online">Online</SelectItem>
+                        <SelectItem value="Bank Transfer">Bank Transfer</SelectItem>
+                        <SelectItem value="Cheque">Cheque</SelectItem>
+                        <SelectItem value="Pay Order">Pay Order</SelectItem>
+                        <SelectItem value="Advance">Advance</SelectItem>
                       </SelectContent>
                     </Select>
                   </div>
+                </div>
+
+                {/* Dynamic Fields based on Method */}
+                <div className="bg-secondary/20 p-3 rounded-md border space-y-3">
+                  {method === 'Bank Transfer' && (
+                    <div>
+                      <Label className="text-xs">Tracking ID</Label>
+                      <Input
+                        placeholder="e.g. TRF-123456789"
+                        className="mt-1"
+                        value={trackingId}
+                        onChange={(e) => setTrackingId(e.target.value)}
+                      />
+                    </div>
+                  )}
+                  {method === 'Cheque' && (
+                    <div>
+                      <Label className="text-xs">Cheque No</Label>
+                      <Input
+                        placeholder="e.g. CHQ-987654"
+                        className="mt-1"
+                        value={chequeNo}
+                        onChange={(e) => setChequeNo(e.target.value)}
+                      />
+                    </div>
+                  )}
+                  {method === 'Pay Order' && (
+                    <div>
+                      <Label className="text-xs">Pay Order No</Label>
+                      <Input
+                        placeholder="e.g. PO-554433"
+                        className="mt-1"
+                        value={payOrderNo}
+                        onChange={(e) => setPayOrderNo(e.target.value)}
+                      />
+                    </div>
+                  )}
+                  {/* Always show description as optional note, or mandatory for Advance */}
                   <div>
-                    <Label>Reference No.</Label>
+                    <Label className="text-xs">{method === 'Advance' ? 'Description (Required)' : 'Description / Notes'}</Label>
                     <Input
-                      placeholder="TRF-12345"
+                      placeholder="Add details..."
                       className="mt-1"
-                      value={reference}
-                      onChange={(e) => setReference(e.target.value)}
+                      value={description}
+                      onChange={(e) => setDescription(e.target.value)}
                     />
                   </div>
                 </div>
 
-                {companyId && companyBills.length > 0 && (
-                  <div className="bg-secondary/30 p-3 rounded-md border">
-                    <Label className="text-xs font-semibold uppercase text-muted-foreground mb-1 block">
-                      Link to Invoice (Optional)
-                    </Label>
-                    <Select onValueChange={setBillId} value={billId}>
-                      <SelectTrigger className="h-9 text-sm">
-                        <SelectValue placeholder="Select unpaid bill..." />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="none">-- General Payment --</SelectItem>
-                        {companyBills.map(b => (
-                          <SelectItem key={b.id} value={b.id}>
-                            {b.billNo} (Due: {b.totalAmount - b.paidAmount})
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <Label>Amount Paid (PKR)</Label>
+                    <Input
+                      type="number"
+                      placeholder="0.00"
+                      className="mt-1 font-mono font-bold"
+                      value={amount}
+                      onChange={(e) => setAmount(e.target.value)}
+                    />
                   </div>
-                )}
+                  <div>
+                    <Label>Adjustment (PKR)</Label>
+                    <Input
+                      type="number"
+                      placeholder="0.00"
+                      className="mt-1 font-mono text-muted-foreground"
+                      title="Amount waived off or adjusted"
+                      value={adjustment}
+                      onChange={(e) => setAdjustment(e.target.value)}
+                    />
+                  </div>
+                </div>
 
                 <div className="flex gap-2 pt-4">
                   <Button className="flex-1 bg-green-600 hover:bg-green-700" onClick={handleSubmit}>

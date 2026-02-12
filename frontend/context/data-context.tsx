@@ -50,7 +50,13 @@ export interface Payment {
   amount: number;
   reference: string;
   method: string;
-  billId?: string;
+  // New Fields for Specific Methods
+  trackingId?: string; // Bank Transfer
+  chequeNo?: string;   // Cheque
+  payOrderNo?: string; // Pay Order
+  description?: string; // Advance / General
+  adjustment?: number; // Adjustment Amount
+  billId?: string;     // Linked Bill
   createdAt: string;
 }
 
