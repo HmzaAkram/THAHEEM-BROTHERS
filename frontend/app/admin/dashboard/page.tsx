@@ -6,6 +6,13 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { useData } from '@/context/data-context';
 import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import {
   BarChart,
   Bar,
   XAxis,
@@ -26,11 +33,51 @@ import {
   Printer,
   Users
 } from 'lucide-react';
-import { useMemo } from 'react';
+import { useMemo, useState } from 'react';
 
 export default function AdminDashboard() {
-  const { getDashboardStats, bills, payments, companies } = useData();
-  const stats = getDashboardStats();
+  const { bills, payments, companies } = useData();
+  const [filterType, setFilterType] = useState('overall');
+
+  // Compute Filtered Stats
+  const filteredStats = useMemo(() => {
+    const now = new Date();
+    let startDate: Date | null = null;
+
+    if (filterType === 'monthly') {
+      startDate = new Date();
+      startDate.setMonth(now.getMonth() - 1); // Last 30 days roughly
+    } else if (filterType === 'yearly') {
+      startDate = new Date();
+      startDate.setFullYear(now.getFullYear() - 1); // Last 365 days
+    }
+
+    const filteredBills = startDate
+      ? bills.filter(b => new Date(b.createdAt) >= startDate!)
+      : bills;
+
+    const filteredPayments = startDate
+      ? payments.filter(p => new Date(p.createdAt) >= startDate!)
+      : payments;
+
+    const filteredCompanies = startDate
+      ? companies.filter(c => new Date(c.createdAt) >= startDate!)
+      : companies;
+
+    const totalBilled = filteredBills.reduce((sum, bill) => sum + bill.totalAmount, 0);
+    const totalCollected = filteredPayments.reduce((sum, payment) => sum + payment.amount, 0);
+    // Outstanding logic: 
+    // If we want "Outstanding created in this period", it is (BilledInPeriod - CollectedInPeriod).
+    // If we want "Total Outstanding", it stays same.
+    // User context implies "Monthly Stats" -> Performance of this month. So flow metric is better.
+    const outstanding = totalBilled - totalCollected;
+
+    // For "Total Companies", if filtered, we show "New Companies". If overall, "Total".
+    // We can change the label dynamically.
+    const activeCompanies = filteredCompanies.length;
+
+    return { totalBilled, totalCollected, outstanding, activeCompanies };
+  }, [bills, payments, companies, filterType]);
 
   // Compute Monthly Data for the last 6 months
   const monthlyData = useMemo(() => {
@@ -112,7 +159,17 @@ export default function AdminDashboard() {
               Overview of your clearing & forwarding business.
             </p>
           </div>
-          <div className="flex gap-3">
+          <div className="flex gap-3 items-center">
+            <Select value={filterType} onValueChange={setFilterType}>
+              <SelectTrigger className="w-[180px] shadow-sm">
+                <SelectValue placeholder="Select Period" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="overall">Overall Stats</SelectItem>
+                <SelectItem value="monthly">Monthly Stats</SelectItem>
+                <SelectItem value="yearly">Yearly Stats</SelectItem>
+              </SelectContent>
+            </Select>
             <Button variant="outline" className="gap-2 shadow-sm hover:bg-muted/80 transition-colors">
               <Printer className="w-4 h-4" />
               Print
@@ -127,31 +184,31 @@ export default function AdminDashboard() {
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
           <DashboardCard
             title="Total Companies"
-            value={stats.activeCompanies.toString()}
+            value={filteredStats.activeCompanies.toString()}
             icon={Users}
-            change="Active Clients"
+            change={filterType === 'overall' ? "Active Clients" : "New in Period"}
             changeType="neutral"
           />
           <DashboardCard
             title="Total Billed"
-            value={`PKR ${(stats.totalBilled / 1000).toFixed(1)}K`}
+            value={`PKR ${(filteredStats.totalBilled / 1000).toFixed(1)}K`}
             icon={FileText}
-            change="All time"
+            change={filterType === 'overall' ? "All time" : (filterType === 'monthly' ? "Past 30 Days" : "Past Year")}
             changeType="neutral"
           />
           <DashboardCard
             title="Total Collected"
-            value={`PKR ${(stats.totalCollected / 1000).toFixed(1)}K`}
+            value={`PKR ${(filteredStats.totalCollected / 1000).toFixed(1)}K`}
             icon={CreditCard}
-            change="All time"
+            change={filterType === 'overall' ? "All time" : (filterType === 'monthly' ? "Past 30 Days" : "Past Year")}
             changeType="positive"
           />
           <DashboardCard
             title="Outstanding Balance"
-            value={`PKR ${(stats.outstanding / 1000).toFixed(1)}K`}
+            value={`PKR ${(filteredStats.outstanding / 1000).toFixed(1)}K`}
             icon={DollarSign}
-            change="To be collected"
-            changeType={stats.outstanding > 0 ? "negative" : "positive"}
+            change={filterType === 'overall' ? "To be collected" : "Net Change"}
+            changeType={filteredStats.outstanding > 0 ? "negative" : "positive"}
           />
         </div>
 
@@ -190,7 +247,7 @@ export default function AdminDashboard() {
                       fontSize={12}
                       tickLine={false}
                       axisLine={false}
-                      tickFormatter={(value) => `PKR ${value / 1000}k`}
+                      tickFormatter={(value: number) => `PKR ${value / 1000}k`}
                     />
                     <Tooltip
                       cursor={{ fill: 'var(--muted)', opacity: 0.2 }}
