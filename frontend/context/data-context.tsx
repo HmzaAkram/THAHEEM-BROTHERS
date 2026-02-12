@@ -21,6 +21,7 @@ export type BillStatus = 'Paid' | 'Partial' | 'Unpaid';
 export interface BillItem {
   id: string;
   description: string;
+  notes?: string;
   quantity: number;
   rate: number;
   amount: number;
@@ -32,11 +33,12 @@ export interface Bill {
   companyId: string;
   companyName: string;
   date: string;
-  dueDate: string;
+  jobNumber: string;
   items: BillItem[];
   totalAmount: number;
   paidAmount: number;
   status: BillStatus;
+  attachment?: string;
   createdAt: string;
 }
 
@@ -126,7 +128,7 @@ const INITIAL_BILLS: Bill[] = [
     companyId: 'c1',
     companyName: 'THAHEEM BROTHERS',
     date: '2026-01-10',
-    dueDate: '2026-01-25',
+    jobNumber: 'JOB-2026-001',
     items: [
       { id: 'i1', description: 'Customs Clearance', quantity: 1, rate: 50000, amount: 50000 },
     ],
@@ -141,7 +143,7 @@ const INITIAL_BILLS: Bill[] = [
     companyId: 'c2',
     companyName: 'Import Traders',
     date: '2026-02-01',
-    dueDate: '2026-02-15',
+    jobNumber: 'JOB-2026-005',
     items: [
       { id: 'i2', description: 'Freight Charges', quantity: 1, rate: 120000, amount: 120000 },
     ],

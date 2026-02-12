@@ -41,18 +41,41 @@ export default function BillsPage() {
   const { bills, companies, addBill } = useData();
   const [isDialogOpen, setIsDialogOpen] = useState(false);
 
+  const BILL_ITEMS = [
+    "DUTY TAXES & ETO",
+    "CIVIL AVIATION AUTHORITY",
+    "GERRYS' DANATA PVT LTD",
+    "SHAHEEN CARGO AFU",
+    "MENZIES - RAS PVT LTD",
+    "DHL PAKISTAN PVT LTD",
+    "WEBOC TOKEN",
+    "CARPENTER CHARGES",
+    "CARTAGE",
+    "DELIVERY ORDER CHARGES",
+    "GENERAL ADMINISTRATION (MISC)",
+    "EXAMINATION CHARGES",
+    "MISC CHARGES",
+    "INVOICE NOT FOUND / FOUND SETTING",
+    "PSW CHARGES",
+    "SPEED MONEY",
+    "COURIER CHARGES",
+    "EXCISE",
+    "Others"
+  ];
+
   // Form State
   const [companyId, setCompanyId] = useState('');
   const [date, setDate] = useState(new Date().toISOString().split('T')[0]);
-  const [dueDate, setDueDate] = useState('');
+  const [jobNumber, setJobNumber] = useState('');
+  const [attachment, setAttachment] = useState<File | null>(null);
   const [items, setItems] = useState<Omit<BillItem, 'id'>[]>([
-    { description: '', quantity: 1, rate: 0, amount: 0 },
+    { description: 'DUTY TAXES & ETO', notes: '', quantity: 1, rate: 0, amount: 0 },
   ]);
 
   const totalAmount = items.reduce((sum, item) => sum + item.amount, 0);
 
   const handleAddItem = () => {
-    setItems([...items, { description: '', quantity: 1, rate: 0, amount: 0 }]);
+    setItems([...items, { description: 'DUTY TAXES & ETO', notes: '', quantity: 1, rate: 0, amount: 0 }]);
   };
 
   const handleRemoveItem = (index: number) => {
@@ -73,7 +96,7 @@ export default function BillsPage() {
   };
 
   const handleSubmit = () => {
-    if (!companyId || !date || !dueDate) {
+    if (!companyId || !date || !jobNumber) {
       alert("Please fill all required fields");
       return;
     }
@@ -100,7 +123,8 @@ export default function BillsPage() {
       companyId: selectedCompany.id,
       companyName: selectedCompany.name,
       date,
-      dueDate,
+      jobNumber,
+      attachment: attachment ? URL.createObjectURL(attachment) : undefined, // Mock upload
       items: finalItems,
       totalAmount: finalItems.reduce((sum, i) => sum + i.amount, 0),
     });
@@ -108,7 +132,9 @@ export default function BillsPage() {
     setIsDialogOpen(false);
     // Reset Form
     setCompanyId('');
-    setItems([{ description: '', quantity: 1, rate: 0, amount: 0 }]);
+    setJobNumber('');
+    setAttachment(null);
+    setItems([{ description: 'DUTY TAXES & ETO', notes: '', quantity: 1, rate: 0, amount: 0 }]);
   };
 
   // Sort bills by date desc
@@ -162,12 +188,24 @@ export default function BillsPage() {
                     />
                   </div>
                   <div>
-                    <Label>Due Date</Label>
+                    <Label>Job Number</Label>
                     <Input
-                      type="date"
+                      placeholder="e.g. JOB-1234"
                       className="mt-1"
-                      value={dueDate}
-                      onChange={(e) => setDueDate(e.target.value)}
+                      value={jobNumber}
+                      onChange={(e) => setJobNumber(e.target.value)}
+                    />
+                  </div>
+                  <div className="md:col-span-3">
+                    <Label>Upload Document (PDF/Image)</Label>
+                    <Input
+                      type="file"
+                      className="mt-1"
+                      accept=".pdf,image/*"
+                      onChange={(e) => {
+                        const file = e.target.files?.[0];
+                        if (file) setAttachment(file);
+                      }}
                     />
                   </div>
                 </div>
@@ -182,44 +220,71 @@ export default function BillsPage() {
 
                   <div className="space-y-3">
                     {items.map((item, idx) => (
-                      <div key={idx} className="flex gap-3 items-start animate-in fade-in slide-in-from-left-2">
-                        <div className="flex-1">
+                      <div key={idx} className="flex flex-col gap-2 p-3 border rounded-md bg-white/50 animate-in fade-in slide-in-from-left-2">
+                        <div className="flex gap-3 items-start">
+                          <div className="flex-1">
+                            <Select
+                              value={BILL_ITEMS.includes(item.description) ? item.description : 'Others'}
+                              onValueChange={(value) => handleItemChange(idx, 'description', value)}
+                            >
+                              <SelectTrigger>
+                                <SelectValue placeholder="Select Item" />
+                              </SelectTrigger>
+                              <SelectContent>
+                                {BILL_ITEMS.map((option) => (
+                                  <SelectItem key={option} value={option}>{option}</SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+                            {/* Show input if "Others" is selected or if the current value is not in the list (custom) */}
+                            {(item.description === 'Others' || !BILL_ITEMS.includes(item.description)) && (
+                              <Input
+                                placeholder="Specify Item Name"
+                                className="mt-2"
+                                value={item.description === 'Others' ? '' : item.description}
+                                onChange={(e) => handleItemChange(idx, 'description', e.target.value)}
+                              />
+                            )}
+                          </div>
+                          <div className="w-20">
+                            <Input
+                              type="number"
+                              placeholder="Qty"
+                              min="1"
+                              value={item.quantity}
+                              onChange={(e) => handleItemChange(idx, 'quantity', e.target.value)}
+                            />
+                          </div>
+                          <div className="w-32">
+                            <Input
+                              type="number"
+                              placeholder="Rate"
+                              min="0"
+                              value={item.rate}
+                              onChange={(e) => handleItemChange(idx, 'rate', e.target.value)}
+                            />
+                          </div>
+                          <div className="w-32 pt-2 font-mono text-right font-medium">
+                            {item.amount.toLocaleString()}
+                          </div>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="text-destructive hover:text-destructive/90 hover:bg-destructive/10"
+                            onClick={() => handleRemoveItem(idx)}
+                            disabled={items.length === 1}
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </Button>
+                        </div>
+                        <div className="pl-1">
                           <Input
-                            placeholder="Description (e.g. Storage Charges)"
-                            value={item.description}
-                            onChange={(e) => handleItemChange(idx, 'description', e.target.value)}
+                            placeholder="Add item details/notes..."
+                            className="text-sm bg-muted/30 border-dashed"
+                            value={item.notes || ''}
+                            onChange={(e) => handleItemChange(idx, 'notes', e.target.value)}
                           />
                         </div>
-                        <div className="w-20">
-                          <Input
-                            type="number"
-                            placeholder="Qty"
-                            min="1"
-                            value={item.quantity}
-                            onChange={(e) => handleItemChange(idx, 'quantity', e.target.value)}
-                          />
-                        </div>
-                        <div className="w-32">
-                          <Input
-                            type="number"
-                            placeholder="Rate"
-                            min="0"
-                            value={item.rate}
-                            onChange={(e) => handleItemChange(idx, 'rate', e.target.value)}
-                          />
-                        </div>
-                        <div className="w-32 pt-2 font-mono text-right font-medium">
-                          {item.amount.toLocaleString()}
-                        </div>
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          className="text-destructive hover:text-destructive/90 hover:bg-destructive/10"
-                          onClick={() => handleRemoveItem(idx)}
-                          disabled={items.length === 1}
-                        >
-                          <Trash2 className="w-4 h-4" />
-                        </Button>
                       </div>
                     ))}
                   </div>
@@ -270,7 +335,7 @@ export default function BillsPage() {
                       <TableHead>Bill No</TableHead>
                       <TableHead>Company</TableHead>
                       <TableHead>Date</TableHead>
-                      <TableHead>Due Date</TableHead>
+                      <TableHead>Job No</TableHead>
                       <TableHead>Amount</TableHead>
                       <TableHead>Paid</TableHead>
                       <TableHead>Status</TableHead>
@@ -289,8 +354,8 @@ export default function BillsPage() {
                         <TableCell className="text-sm text-muted-foreground">
                           {new Date(bill.date).toLocaleDateString()}
                         </TableCell>
-                        <TableCell className="text-sm text-muted-foreground">
-                          {new Date(bill.dueDate).toLocaleDateString()}
+                        <TableCell className="text-sm text-muted-foreground font-mono">
+                          {bill.jobNumber}
                         </TableCell>
                         <TableCell className="font-semibold">
                           PKR {bill.totalAmount.toLocaleString()}
@@ -326,6 +391,6 @@ export default function BillsPage() {
           </CardContent>
         </Card>
       </div>
-    </DashboardLayout>
+    </DashboardLayout >
   );
 }
