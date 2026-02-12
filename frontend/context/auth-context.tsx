@@ -2,11 +2,17 @@
 
 import { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 
-type UserRole = 'admin' | 'company';
+interface User {
+  id: string;
+  name: string;
+  email: string;
+  role: UserRole;
+}
 
 interface AuthContextType {
-  role: UserRole | null;
-  setRole: (role: UserRole) => void;
+  user: User | null;
+  role: UserRole | null; // Keep for backward compatibility if needed, but derive from user
+  login: (userData: User) => void;
   logout: () => void;
   isHydrated: boolean;
 }
@@ -14,30 +20,38 @@ interface AuthContextType {
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 export function AuthProvider({ children }: { children: ReactNode }) {
-  const [role, setRole] = useState<UserRole | null>(null);
+  const [user, setUser] = useState<User | null>(null);
   const [isHydrated, setIsHydrated] = useState(false);
 
   useEffect(() => {
-    // Load role from localStorage after hydration
-    const savedRole = localStorage.getItem('userRole') as UserRole | null;
-    if (savedRole) {
-      setRole(savedRole);
+    // Load user from localStorage after hydration
+    const savedUser = localStorage.getItem('currentUser');
+    if (savedUser) {
+      setUser(JSON.parse(savedUser));
     }
     setIsHydrated(true);
   }, []);
 
-  const handleSetRole = (newRole: UserRole) => {
-    setRole(newRole);
-    localStorage.setItem('userRole', newRole);
+  const login = (userData: User) => {
+    setUser(userData);
+    localStorage.setItem('currentUser', JSON.stringify(userData));
+    localStorage.setItem('userRole', userData.role); // Keep for compatibility
   };
 
   const logout = () => {
-    setRole(null);
+    setUser(null);
+    localStorage.removeItem('currentUser');
     localStorage.removeItem('userRole');
   };
 
   return (
-    <AuthContext.Provider value={{ role, setRole: handleSetRole, logout, isHydrated }}>
+    <AuthContext.Provider value={{
+      user,
+      role: user?.role || null,
+      login,
+      logout,
+      isHydrated
+    }}>
       {children}
     </AuthContext.Provider>
   );
