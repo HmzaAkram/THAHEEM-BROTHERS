@@ -47,6 +47,12 @@ export default function AdminDashboard() {
     if (filterType === 'monthly') {
       startDate = new Date();
       startDate.setMonth(now.getMonth() - 1); // Last 30 days roughly
+    } else if (filterType === '3_months') {
+      startDate = new Date();
+      startDate.setMonth(now.getMonth() - 3); // Last 90 days
+    } else if (filterType === '6_months') {
+      startDate = new Date();
+      startDate.setMonth(now.getMonth() - 6); // Last 180 days
     } else if (filterType === 'yearly') {
       startDate = new Date();
       startDate.setFullYear(now.getFullYear() - 1); // Last 365 days
@@ -147,6 +153,16 @@ export default function AdminDashboard() {
       .slice(0, 5);
   }, [bills, payments, companies]);
 
+  const filterLabel = useMemo(() => {
+    switch (filterType) {
+      case 'monthly': return "Last Month";
+      case '3_months': return "Last 3 Months";
+      case '6_months': return "Last 6 Months";
+      case 'yearly': return "Last Year";
+      default: return "All Time";
+    }
+  }, [filterType]);
+
   return (
     <DashboardLayout>
       <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
@@ -167,6 +183,8 @@ export default function AdminDashboard() {
               <SelectContent>
                 <SelectItem value="overall">Overall Stats</SelectItem>
                 <SelectItem value="monthly">Monthly Stats</SelectItem>
+                <SelectItem value="3_months">3 Months Stats</SelectItem>
+                <SelectItem value="6_months">6 Months Stats</SelectItem>
                 <SelectItem value="yearly">Yearly Stats</SelectItem>
               </SelectContent>
             </Select>
@@ -183,31 +201,31 @@ export default function AdminDashboard() {
 
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
           <DashboardCard
-            title={filterType === 'monthly' ? "New Companies" : (filterType === 'yearly' ? "New Companies" : "Total Companies")}
+            title={filterType === 'overall' ? "Total Companies" : "New Companies"}
             value={filteredStats.activeCompanies.toString()}
             icon={Users}
-            change={filterType === 'overall' ? "Overall Companies" : (filterType === 'monthly' ? "Last Month" : "Last Year")}
+            change={filterLabel}
             changeType="neutral"
           />
           <DashboardCard
-            title={filterType === 'monthly' ? "Billed" : (filterType === 'yearly' ? "Billed" : "Total Billed")}
+            title={filterType === 'overall' ? "Total Billed" : "Billed"}
             value={`PKR ${(filteredStats.totalBilled / 1000).toFixed(1)}K`}
             icon={FileText}
-            change={filterType === 'overall' ? "All Time" : (filterType === 'monthly' ? "Last Month" : "Last Year")}
+            change={filterLabel}
             changeType="neutral"
           />
           <DashboardCard
-            title={filterType === 'monthly' ? "Collected" : (filterType === 'yearly' ? "Collected" : "Total Collected")}
+            title={filterType === 'overall' ? "Total Collected" : "Collected"}
             value={`PKR ${(filteredStats.totalCollected / 1000).toFixed(1)}K`}
             icon={CreditCard}
-            change={filterType === 'overall' ? "All Time" : (filterType === 'monthly' ? "Last Month" : "Last Year")}
+            change={filterLabel}
             changeType="positive"
           />
           <DashboardCard
-            title={filterType === 'monthly' ? "Outstanding" : (filterType === 'yearly' ? "Outstanding" : "Outstanding Balance")}
+            title={filterType === 'overall' ? "Outstanding Balance" : "Outstanding"}
             value={`PKR ${(filteredStats.outstanding / 1000).toFixed(1)}K`}
             icon={DollarSign}
-            change={filterType === 'overall' ? "All Time" : (filterType === 'monthly' ? "Last Month" : "Last Year")}
+            change={filterLabel}
             changeType={filteredStats.outstanding > 0 ? "negative" : "positive"}
           />
         </div>
