@@ -54,6 +54,21 @@ export default function CompanyDetailsPage() {
     const [isEditing, setIsEditing] = useState(false);
     const [editedCompany, setEditedCompany] = useState<any>(null);
 
+    const stats = useMemo(() => {
+        const totalBilled = ledger.filter(l => l.type === 'BILL').reduce((sum, l) => sum + l.debit, 0);
+        const totalPaid = ledger.filter(l => l.type === 'PAYMENT').reduce((sum, l) => sum + l.credit, 0);
+        const outstanding = totalBilled - totalPaid;
+        return { totalBilled, totalPaid, outstanding };
+    }, [ledger]);
+
+    // Chart Data preparation (cumulative balance over time)
+    const chartData = useMemo(() => {
+        return ledger.map(entry => ({
+            date: new Date(entry.date).toLocaleDateString(),
+            balance: entry.balance
+        }));
+    }, [ledger]);
+
     if (!company) {
         return (
             <DashboardLayout>
@@ -77,21 +92,6 @@ export default function CompanyDetailsPage() {
         updateCompany(company.id, editedCompany);
         setIsEditing(false);
     }
-
-    const stats = useMemo(() => {
-        const totalBilled = ledger.filter(l => l.type === 'BILL').reduce((sum, l) => sum + l.debit, 0);
-        const totalPaid = ledger.filter(l => l.type === 'PAYMENT').reduce((sum, l) => sum + l.credit, 0);
-        const outstanding = totalBilled - totalPaid;
-        return { totalBilled, totalPaid, outstanding };
-    }, [ledger]);
-
-    // Chart Data preparation (cumulative balance over time)
-    const chartData = useMemo(() => {
-        return ledger.map(entry => ({
-            date: new Date(entry.date).toLocaleDateString(),
-            balance: entry.balance
-        }));
-    }, [ledger]);
 
     return (
         <DashboardLayout>
@@ -136,17 +136,47 @@ export default function CompanyDetailsPage() {
                                 {isEditing ? (
                                     <div className="space-y-3">
                                         <div>
-                                            <Label>Name</Label>
+                                            <Label>Company Name</Label>
                                             <Input
                                                 value={editedCompany.name}
                                                 onChange={(e) => setEditedCompany({ ...editedCompany, name: e.target.value })}
                                             />
                                         </div>
                                         <div>
-                                            <Label>Email (Login)</Label>
+                                            <Label>Company NTN</Label>
+                                            <Input
+                                                value={editedCompany.ntn || ''}
+                                                onChange={(e) => setEditedCompany({ ...editedCompany, ntn: e.target.value })}
+                                                placeholder="Enter NTN number"
+                                            />
+                                        </div>
+                                        <div>
+                                            <Label>Company Email</Label>
                                             <Input
                                                 value={editedCompany.email}
                                                 onChange={(e) => setEditedCompany({ ...editedCompany, email: e.target.value })}
+                                            />
+                                        </div>
+                                        <div>
+                                            <Label>Company Phone</Label>
+                                            <Input
+                                                value={editedCompany.phone}
+                                                onChange={(e) => setEditedCompany({ ...editedCompany, phone: e.target.value })}
+                                            />
+                                        </div>
+                                        <div>
+                                            <Label>Company Address</Label>
+                                            <Input
+                                                value={editedCompany.address}
+                                                onChange={(e) => setEditedCompany({ ...editedCompany, address: e.target.value })}
+                                            />
+                                        </div>
+                                        <div>
+                                            <Label>Username</Label>
+                                            <Input
+                                                value={editedCompany.username || ''}
+                                                onChange={(e) => setEditedCompany({ ...editedCompany, username: e.target.value })}
+                                                placeholder="Login username"
                                             />
                                         </div>
                                         <div>
@@ -154,20 +184,6 @@ export default function CompanyDetailsPage() {
                                             <Input
                                                 value={editedCompany.password}
                                                 onChange={(e) => setEditedCompany({ ...editedCompany, password: e.target.value })}
-                                            />
-                                        </div>
-                                        <div>
-                                            <Label>Phone</Label>
-                                            <Input
-                                                value={editedCompany.phone}
-                                                onChange={(e) => setEditedCompany({ ...editedCompany, phone: e.target.value })}
-                                            />
-                                        </div>
-                                        <div>
-                                            <Label>Address</Label>
-                                            <Input
-                                                value={editedCompany.address}
-                                                onChange={(e) => setEditedCompany({ ...editedCompany, address: e.target.value })}
                                             />
                                         </div>
                                         <div className="flex items-center gap-2">
@@ -188,12 +204,44 @@ export default function CompanyDetailsPage() {
                                             <p className="text-xs text-muted-foreground uppercase tracking-wider">Company Name</p>
                                             <p className="font-medium text-lg">{company.name}</p>
                                         </div>
+                                        {company.ntn && (
+                                            <>
+                                                <Separator />
+                                                <div className="space-y-1">
+                                                    <p className="text-xs text-muted-foreground uppercase tracking-wider">Company NTN</p>
+                                                    <p className="font-medium">{company.ntn}</p>
+                                                </div>
+                                            </>
+                                        )}
+                                        <Separator />
+                                        <div className="space-y-1">
+                                            <p className="text-xs text-muted-foreground uppercase tracking-wider">Company Email</p>
+                                            <p className="font-medium">{company.email}</p>
+                                        </div>
+                                        <div className="space-y-1">
+                                            <p className="text-xs text-muted-foreground uppercase tracking-wider flex items-center gap-1">
+                                                <Phone className="w-3 h-3" /> Company Phone
+                                            </p>
+                                            <p className="font-medium">{company.phone}</p>
+                                        </div>
+                                        <div className="space-y-1">
+                                            <p className="text-xs text-muted-foreground uppercase tracking-wider flex items-center gap-1">
+                                                <MapPin className="w-3 h-3" /> Company Address
+                                            </p>
+                                            <p className="font-medium">{company.address}</p>
+                                        </div>
                                         <Separator />
                                         <div className="space-y-1">
                                             <p className="text-xs text-muted-foreground uppercase tracking-wider flex items-center gap-1">
-                                                <Mail className="w-3 h-3" /> Login Credentails
+                                                <Mail className="w-3 h-3" /> Login Credentials
                                             </p>
                                             <div className="bg-muted/50 p-3 rounded-md border border-border/50 space-y-2">
+                                                {company.username && (
+                                                    <div className="flex justify-between items-center">
+                                                        <span className="text-sm text-muted-foreground">Username:</span>
+                                                        <span className="font-mono text-sm">{company.username}</span>
+                                                    </div>
+                                                )}
                                                 <div className="flex justify-between items-center">
                                                     <span className="text-sm text-muted-foreground">Email:</span>
                                                     <span className="font-mono text-sm">{company.email}</span>
@@ -206,19 +254,6 @@ export default function CompanyDetailsPage() {
                                                     </span>
                                                 </div>
                                             </div>
-                                        </div>
-                                        <Separator />
-                                        <div className="space-y-1">
-                                            <p className="text-xs text-muted-foreground uppercase tracking-wider flex items-center gap-1">
-                                                <Phone className="w-3 h-3" /> Contact
-                                            </p>
-                                            <p className="font-medium">{company.phone}</p>
-                                        </div>
-                                        <div className="space-y-1">
-                                            <p className="text-xs text-muted-foreground uppercase tracking-wider flex items-center gap-1">
-                                                <MapPin className="w-3 h-3" /> Address
-                                            </p>
-                                            <p className="font-medium">{company.address}</p>
                                         </div>
                                         <Separator />
                                         <div className="flex items-center gap-2">

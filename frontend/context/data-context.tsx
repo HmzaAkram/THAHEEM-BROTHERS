@@ -6,9 +6,11 @@ import React, { createContext, useContext, useState, useEffect, ReactNode } from
 export interface Company {
   id: string;
   name: string;
+  ntn?: string;
   email: string;
   phone: string;
   address: string;
+  username?: string;
   password?: string; // Optional for now to avoid breaking existing logic immediately
   status: 'Active' | 'Inactive';
   createdAt: string;

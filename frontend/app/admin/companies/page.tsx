@@ -34,9 +34,11 @@ export default function CompaniesPage() {
   // New Company Form State
   const [formData, setFormData] = useState({
     name: '',
+    ntn: '',
     email: '',
     phone: '',
     address: '',
+    username: '',
     password: '',
   });
 
@@ -61,7 +63,7 @@ export default function CompaniesPage() {
       password: formData.password || 'password123',
       status: 'Active',
     });
-    setFormData({ name: '', email: '', phone: '', address: '', password: '' });
+    setFormData({ name: '', ntn: '', email: '', phone: '', address: '', username: '', password: '' });
     setIsDialogOpen(false);
   };
 
@@ -101,7 +103,19 @@ export default function CompaniesPage() {
                     />
                   </div>
                   <div>
-                    <Label htmlFor="email">Email (Login ID) *</Label>
+                    <Label htmlFor="ntn">Company NTN</Label>
+                    <Input
+                      id="ntn"
+                      value={formData.ntn}
+                      onChange={handleInputChange}
+                      placeholder="Enter NTN number"
+                      className="mt-1"
+                    />
+                  </div>
+                </div>
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <Label htmlFor="email">Company Email *</Label>
                     <Input
                       id="email"
                       type="email"
@@ -111,8 +125,38 @@ export default function CompaniesPage() {
                       className="mt-1"
                     />
                   </div>
+                  <div>
+                    <Label htmlFor="phone">Company Phone No</Label>
+                    <Input
+                      id="phone"
+                      value={formData.phone}
+                      onChange={handleInputChange}
+                      placeholder="+92..."
+                      className="mt-1"
+                    />
+                  </div>
+                </div>
+                <div>
+                  <Label htmlFor="address">Company Address</Label>
+                  <Input
+                    id="address"
+                    value={formData.address}
+                    onChange={handleInputChange}
+                    placeholder="Registered address"
+                    className="mt-1"
+                  />
                 </div>
                 <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <Label htmlFor="username">Username</Label>
+                    <Input
+                      id="username"
+                      value={formData.username}
+                      onChange={handleInputChange}
+                      placeholder="Login username"
+                      className="mt-1"
+                    />
+                  </div>
                   <div>
                     <Label htmlFor="password">Password</Label>
                     <Input
@@ -124,26 +168,6 @@ export default function CompaniesPage() {
                       className="mt-1"
                     />
                   </div>
-                  <div>
-                    <Label htmlFor="phone">Phone</Label>
-                    <Input
-                      id="phone"
-                      value={formData.phone}
-                      onChange={handleInputChange}
-                      placeholder="+92..."
-                      className="mt-1"
-                    />
-                  </div>
-                </div>
-                <div>
-                  <Label htmlFor="address">Address</Label>
-                  <Input
-                    id="address"
-                    value={formData.address}
-                    onChange={handleInputChange}
-                    placeholder="Registered address"
-                    className="mt-1"
-                  />
                 </div>
                 <div className="flex gap-2 pt-4">
                   <Button className="flex-1" onClick={handleSubmit}>
