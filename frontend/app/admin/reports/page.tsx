@@ -34,23 +34,25 @@ import { Download, Printer } from 'lucide-react';
 import { useState } from 'react';
 
 const outstandingData = [
-  { company: 'THAHEEM BROTHERS', outstanding: 0, bills: 7, daysOverdue: 0 },
-  { company: 'Import Traders', outstanding: 65500, bills: 3, daysOverdue: 10 },
-  { company: 'Global Freight Co', outstanding: 450000, bills: 1, daysOverdue: 38 },
-  { company: 'Karachi Logistics', outstanding: 0, bills: 1, daysOverdue: 0 },
-  { company: 'Orient Shipping', outstanding: 320000, bills: 2, daysOverdue: 28 },
+  { company: 'THAHEEM BROTHERS', outstanding: 0, bills: 7, daysOverdue: 0, lastDueDate: '2026-02-10' },
+  { company: 'Import Traders', outstanding: 65500, bills: 3, daysOverdue: 10, lastDueDate: '2026-02-02' },
+  { company: 'Global Freight Co', outstanding: 450000, bills: 1, daysOverdue: 38, lastDueDate: '2026-01-05' },
+  { company: 'Karachi Logistics', outstanding: 0, bills: 1, daysOverdue: 0, lastDueDate: '2026-02-08' },
+  { company: 'Orient Shipping', outstanding: 320000, bills: 2, daysOverdue: 28, lastDueDate: '2026-01-15' },
   {
     company: 'Metro Cargo Services',
     outstanding: 0,
     bills: 1,
     daysOverdue: 0,
+    lastDueDate: '2026-02-09',
   },
-  { company: 'Express Imports Ltd', outstanding: 100000, bills: 2, daysOverdue: 18 },
+  { company: 'Express Imports Ltd', outstanding: 100000, bills: 2, daysOverdue: 18, lastDueDate: '2026-01-25' },
   {
     company: 'Trade Hub International',
     outstanding: 435000,
     bills: 1,
     daysOverdue: 45,
+    lastDueDate: '2025-12-28',
   },
 ];
 
@@ -141,6 +143,79 @@ export default function ReportsPage() {
           </CardContent>
         </Card>
 
+        {/* Swapped: Table First */}
+        <Card>
+          <CardHeader>
+            <div className="flex items-center justify-between">
+              <CardTitle className="text-base">Outstanding by Company</CardTitle>
+              <div className="flex gap-2">
+                <Button variant="outline" size="sm" className="gap-2 bg-transparent">
+                  <Download className="w-4 h-4" />
+                  Export
+                </Button>
+                <Button variant="outline" size="sm" className="gap-2 bg-transparent">
+                  <Printer className="w-4 h-4" />
+                  Print
+                </Button>
+              </div>
+            </div>
+          </CardHeader>
+          <CardContent>
+            <div className="overflow-x-auto">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Company</TableHead>
+                    <TableHead className="text-right">Outstanding</TableHead>
+                    <TableHead className="text-right"># Bills</TableHead>
+                    <TableHead className="text-right">Last Due</TableHead> {/* New Column */}
+                    <TableHead className="text-right">Days Overdue</TableHead>
+                    <TableHead className="text-right">Status</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {outstandingData.map((item, idx) => (
+                    <TableRow key={idx}>
+                      <TableCell className="font-medium">{item.company}</TableCell>
+                      <TableCell className="text-right font-semibold">
+                        PKR {item.outstanding.toLocaleString()}
+                      </TableCell>
+                      <TableCell className="text-right">{item.bills}</TableCell>
+                      <TableCell className="text-right text-muted-foreground">{item.lastDueDate}</TableCell> {/* New Cell */}
+                      <TableCell className="text-right">
+                        {item.daysOverdue > 0 ? (
+                          <span className="text-red-600 font-semibold">
+                            {item.daysOverdue} days
+                          </span>
+                        ) : (
+                          <span className="text-green-600">Current</span>
+                        )}
+                      </TableCell>
+                      <TableCell className="text-right">
+                        <span
+                          className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${item.outstanding > 300000
+                            ? 'bg-red-100 text-red-800'
+                            : item.outstanding > 100000
+                              ? 'bg-yellow-100 text-yellow-800'
+                              : 'bg-green-100 text-green-800'
+                            }`}
+                        >
+                          {item.outstanding > 300000
+                            ? 'High Risk'
+                            : item.outstanding > 100000
+                              ? 'Medium'
+                              : 'Low Risk'}
+                        </span>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Swapped: Charts Next */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
           <Card>
             <CardHeader>
@@ -208,75 +283,6 @@ export default function ReportsPage() {
             </CardContent>
           </Card>
         </div>
-
-        <Card>
-          <CardHeader>
-            <div className="flex items-center justify-between">
-              <CardTitle className="text-base">Outstanding by Company</CardTitle>
-              <div className="flex gap-2">
-                <Button variant="outline" size="sm" className="gap-2 bg-transparent">
-                  <Download className="w-4 h-4" />
-                  Export
-                </Button>
-                <Button variant="outline" size="sm" className="gap-2 bg-transparent">
-                  <Printer className="w-4 h-4" />
-                  Print
-                </Button>
-              </div>
-            </div>
-          </CardHeader>
-          <CardContent>
-            <div className="overflow-x-auto">
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Company</TableHead>
-                    <TableHead className="text-right">Outstanding</TableHead>
-                    <TableHead className="text-right"># Bills</TableHead>
-                    <TableHead className="text-right">Days Overdue</TableHead>
-                    <TableHead className="text-right">Status</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {outstandingData.map((item, idx) => (
-                    <TableRow key={idx}>
-                      <TableCell className="font-medium">{item.company}</TableCell>
-                      <TableCell className="text-right font-semibold">
-                        PKR {item.outstanding.toLocaleString()}
-                      </TableCell>
-                      <TableCell className="text-right">{item.bills}</TableCell>
-                      <TableCell className="text-right">
-                        {item.daysOverdue > 0 ? (
-                          <span className="text-red-600 font-semibold">
-                            {item.daysOverdue} days
-                          </span>
-                        ) : (
-                          <span className="text-green-600">Current</span>
-                        )}
-                      </TableCell>
-                      <TableCell className="text-right">
-                        <span
-                          className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${item.outstanding > 300000
-                              ? 'bg-red-100 text-red-800'
-                              : item.outstanding > 100000
-                                ? 'bg-yellow-100 text-yellow-800'
-                                : 'bg-green-100 text-green-800'
-                            }`}
-                        >
-                          {item.outstanding > 300000
-                            ? 'High Risk'
-                            : item.outstanding > 100000
-                              ? 'Medium'
-                              : 'Low Risk'}
-                        </span>
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            </div>
-          </CardContent>
-        </Card>
       </div>
     </DashboardLayout>
   );

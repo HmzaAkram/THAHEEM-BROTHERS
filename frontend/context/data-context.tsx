@@ -296,23 +296,37 @@ export function DataProvider({ children }: { children: ReactNode }) {
       credit: 0,
       balance: 0, // Calculated later
       companyId: b.companyId,
+      companyName: b.companyName,
       referenceId: b.id,
       type: 'BILL' as const,
-      timestamp: new Date(b.date).getTime()
+      timestamp: new Date(b.date).getTime(),
+      billNo: b.billNo,
+      jobNumber: b.jobNumber
     }));
 
-    const companyPayments = payments.filter(p => p.companyId === companyId).map(p => ({
-      id: p.id + '_credit',
-      date: p.date,
-      description: `Payment Received (${p.method}) - ${p.reference}`,
-      debit: 0,
-      credit: p.amount,
-      balance: 0, // Calculated later
-      companyId: p.companyId,
-      referenceId: p.id,
-      type: 'PAYMENT' as const,
-      timestamp: new Date(p.date).getTime()
-    }));
+    const companyPayments = payments.filter(p => p.companyId === companyId).map(p => {
+      // Find linked bill to get Job Number if available
+      const linkedBill = bills.find(b => b.id === p.billId);
+
+      return {
+        id: p.id + '_credit',
+        date: p.date,
+        description: `Payment Received`,
+        debit: 0,
+        credit: p.amount,
+        balance: 0,
+        companyId: p.companyId,
+        companyName: p.companyName,
+        referenceId: p.id,
+        type: 'PAYMENT' as const,
+        timestamp: new Date(p.date).getTime(),
+        method: p.method,
+        paymentRef: p.reference,
+        // Inherit Job/Bill info if linked
+        billNo: linkedBill?.billNo,
+        jobNumber: linkedBill?.jobNumber
+      };
+    });
 
     const allEntries = [...companyBills, ...companyPayments].sort((a, b) => a.timestamp - b.timestamp);
 
