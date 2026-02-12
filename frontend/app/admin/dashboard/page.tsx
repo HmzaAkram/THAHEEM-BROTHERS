@@ -183,31 +183,31 @@ export default function AdminDashboard() {
 
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
           <DashboardCard
-            title="Total Companies"
+            title={filterType === 'monthly' ? "New Companies" : (filterType === 'yearly' ? "New Companies" : "Total Companies")}
             value={filteredStats.activeCompanies.toString()}
             icon={Users}
-            change={filterType === 'overall' ? "Active Clients" : "New in Period"}
+            change={filterType === 'overall' ? "Overall Companies" : (filterType === 'monthly' ? "Last Month" : "Last Year")}
             changeType="neutral"
           />
           <DashboardCard
-            title="Total Billed"
+            title={filterType === 'monthly' ? "Billed" : (filterType === 'yearly' ? "Billed" : "Total Billed")}
             value={`PKR ${(filteredStats.totalBilled / 1000).toFixed(1)}K`}
             icon={FileText}
-            change={filterType === 'overall' ? "All time" : (filterType === 'monthly' ? "Past 30 Days" : "Past Year")}
+            change={filterType === 'overall' ? "All Time" : (filterType === 'monthly' ? "Last Month" : "Last Year")}
             changeType="neutral"
           />
           <DashboardCard
-            title="Total Collected"
+            title={filterType === 'monthly' ? "Collected" : (filterType === 'yearly' ? "Collected" : "Total Collected")}
             value={`PKR ${(filteredStats.totalCollected / 1000).toFixed(1)}K`}
             icon={CreditCard}
-            change={filterType === 'overall' ? "All time" : (filterType === 'monthly' ? "Past 30 Days" : "Past Year")}
+            change={filterType === 'overall' ? "All Time" : (filterType === 'monthly' ? "Last Month" : "Last Year")}
             changeType="positive"
           />
           <DashboardCard
-            title="Outstanding Balance"
+            title={filterType === 'monthly' ? "Outstanding" : (filterType === 'yearly' ? "Outstanding" : "Outstanding Balance")}
             value={`PKR ${(filteredStats.outstanding / 1000).toFixed(1)}K`}
             icon={DollarSign}
-            change={filterType === 'overall' ? "To be collected" : "Net Change"}
+            change={filterType === 'overall' ? "All Time" : (filterType === 'monthly' ? "Last Month" : "Last Year")}
             changeType={filteredStats.outstanding > 0 ? "negative" : "positive"}
           />
         </div>

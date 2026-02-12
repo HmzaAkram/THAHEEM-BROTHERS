@@ -44,7 +44,7 @@ export function DashboardCard({
               {changeType === 'positive' && '+'}
               {change}
             </span>
-            <span className="opacity-70 group-hover:opacity-100 transition-opacity">from last month</span>
+            <span className="opacity-70 group-hover:opacity-100 transition-opacity">Data</span>
           </p>
         )}
       </CardContent>
