@@ -67,6 +67,8 @@ export default function BillsPage() {
   const [companyId, setCompanyId] = useState('');
   const [date, setDate] = useState(new Date().toISOString().split('T')[0]);
   const [jobNumber, setJobNumber] = useState('');
+  const [via, setVia] = useState('');
+  const [weight, setWeight] = useState('');
   const [attachment, setAttachment] = useState<File | null>(null);
   const [items, setItems] = useState<Omit<BillItem, 'id'>[]>([
     { description: 'DUTY TAXES & ETO', notes: '', quantity: 1, rate: 0, amount: 0 },
@@ -124,6 +126,8 @@ export default function BillsPage() {
       companyName: selectedCompany.name,
       date,
       jobNumber,
+      via,
+      weight,
       attachment: attachment ? URL.createObjectURL(attachment) : undefined, // Mock upload
       items: finalItems,
       totalAmount: finalItems.reduce((sum, i) => sum + i.amount, 0),
@@ -133,6 +137,8 @@ export default function BillsPage() {
     // Reset Form
     setCompanyId('');
     setJobNumber('');
+    setVia('');
+    setWeight('');
     setAttachment(null);
     setItems([{ description: 'DUTY TAXES & ETO', notes: '', quantity: 1, rate: 0, amount: 0 }]);
   };
@@ -191,12 +197,35 @@ export default function BillsPage() {
                       />
                     </div>
                     <div>
-                      <Label className="text-xs font-medium text-muted-foreground">Job/invoice Number</Label>
+                      <Label className="text-xs font-medium text-muted-foreground">Job/Invoice Number</Label>
                       <Input
                         placeholder="e.g. JOB-1234"
                         className="mt-1 bg-white dark:bg-slate-950"
                         value={jobNumber}
                         onChange={(e) => setJobNumber(e.target.value)}
+                      />
+                    </div>
+                    <div>
+                      <Label className="text-xs font-medium text-muted-foreground">Via (Transport Mode)</Label>
+                      <Select onValueChange={setVia} value={via}>
+                        <SelectTrigger className="mt-1 bg-white dark:bg-slate-950">
+                          <SelectValue placeholder="Select Mode" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="Air">Air</SelectItem>
+                          <SelectItem value="Sea">Sea</SelectItem>
+                          <SelectItem value="Land">Land</SelectItem>
+                          <SelectItem value="Train">Train</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div>
+                      <Label className="text-xs font-medium text-muted-foreground">Weight (kg/lbs)</Label>
+                      <Input
+                        placeholder="e.g. 500 kg"
+                        className="mt-1 bg-white dark:bg-slate-950"
+                        value={weight}
+                        onChange={(e) => setWeight(e.target.value)}
                       />
                     </div>
                     <div>
@@ -212,7 +241,7 @@ export default function BillsPage() {
                           }}
                         />
                         <div className="flex items-center gap-2 px-3 py-2 border rounded-md bg-white dark:bg-slate-950 text-sm text-muted-foreground">
-                          <Download className="w-4 h-4" /> {/* Using Download icon as generic file icon for now, can replace with Paperclip if imported */}
+                          <Download className="w-4 h-4" />
                           <span className="truncate max-w-[200px]">
                             {attachment ? attachment.name : "Click to upload PDF or Image"}
                           </span>

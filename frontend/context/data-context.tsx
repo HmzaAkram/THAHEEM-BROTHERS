@@ -39,6 +39,8 @@ export interface Bill {
   paidAmount: number;
   status: BillStatus;
   attachment?: string;
+  via?: string;
+  weight?: string | number;
   createdAt: string;
 }
 
