@@ -88,6 +88,26 @@ export interface LedgerEntry {
   type: 'BILL' | 'PAYMENT';
 }
 
+export interface SecurityTracking {
+  id: string;
+  companyId: string;
+  companyName: string;
+  gdNumber: string;
+  noOfContainers: number;
+  containerNo: string;
+  amountPerContainer: number;
+  refundDays: number;
+  port: string;
+  isDocumentSubmitted: boolean;
+  refundDueDate: string;
+  isRefundReceived: boolean;
+  receivedAmountDate?: string;
+  payOrderNo: string;
+  receiverName: string;
+  status: 'Pending' | 'Completed';
+  createdAt: string;
+}
+
 interface DataContextType {
   companies: Company[];
   bills: Bill[];
@@ -97,6 +117,9 @@ interface DataContextType {
   deleteCompany: (id: string) => void;
   addBill: (bill: Omit<Bill, 'id' | 'createdAt' | 'paidAmount' | 'status'>) => void;
   addPayment: (payment: Omit<Payment, 'id' | 'createdAt'>) => void;
+  addSecurity: (security: Omit<SecurityTracking, 'id' | 'createdAt' | 'status'>) => void;
+  updateSecurity: (id: string, data: Partial<SecurityTracking>) => void;
+  securities: SecurityTracking[];
   getCompanyLedger: (companyId: string) => LedgerEntry[];
   getCompanyBalance: (companyId: string) => number;
   getDashboardStats: () => {
@@ -344,6 +367,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
   const [companies, setCompanies] = useState<Company[]>([]);
   const [bills, setBills] = useState<Bill[]>([]);
   const [payments, setPayments] = useState<Payment[]>([]);
+  const [securities, setSecurities] = useState<SecurityTracking[]>([]);
   const [isLoaded, setIsLoaded] = useState(false);
 
   // Load data from localStorage on mount
@@ -372,6 +396,11 @@ export function DataProvider({ children }: { children: ReactNode }) {
       setPayments(INITIAL_PAYMENTS);
       localStorage.setItem('payments', JSON.stringify(INITIAL_PAYMENTS));
     }
+
+    const loadedSecurities = localStorage.getItem('securities');
+    if (loadedSecurities) {
+      setSecurities(JSON.parse(loadedSecurities));
+    }
     setIsLoaded(true);
   }, []);
 
@@ -381,8 +410,9 @@ export function DataProvider({ children }: { children: ReactNode }) {
       localStorage.setItem('companies', JSON.stringify(companies));
       localStorage.setItem('bills', JSON.stringify(bills));
       localStorage.setItem('payments', JSON.stringify(payments));
+      localStorage.setItem('securities', JSON.stringify(securities));
     }
-  }, [companies, bills, payments, isLoaded]);
+  }, [companies, bills, payments, securities, isLoaded]);
 
   const addCompany = (companyData: Omit<Company, 'id' | 'createdAt'>) => {
     const newCompany: Company = {
@@ -440,6 +470,22 @@ export function DataProvider({ children }: { children: ReactNode }) {
       // Logic to auto-allocate payment to oldest unpaid bills could go here
       // prioritizing "fully automated" requirement
     }
+  };
+
+  const addSecurity = (securityData: Omit<SecurityTracking, 'id' | 'createdAt' | 'status'>) => {
+    const newSecurity: SecurityTracking = {
+      ...securityData,
+      id: Math.random().toString(36).substr(2, 9),
+      status: 'Pending',
+      createdAt: new Date().toISOString(),
+    };
+    setSecurities([...securities, newSecurity]);
+  };
+
+  const updateSecurity = (id: string, data: Partial<SecurityTracking>) => {
+    setSecurities(prev => prev.map(s =>
+      s.id === id ? { ...s, ...data } : s
+    ));
   };
 
   const getCompanyLedger = (companyId: string): LedgerEntry[] => {
@@ -517,6 +563,9 @@ export function DataProvider({ children }: { children: ReactNode }) {
         deleteCompany,
         addBill,
         addPayment,
+        addSecurity,
+        updateSecurity,
+        securities,
         getCompanyLedger,
         getCompanyBalance,
         getDashboardStats,

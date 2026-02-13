@@ -12,6 +12,7 @@ import {
   Menu,
   X,
   LogOut,
+  ShieldCheck,
 } from 'lucide-react';
 import { useState } from 'react';
 import { Button } from '@/components/ui/button';
@@ -32,6 +33,7 @@ export function Sidebar({ role, onLogout }: SidebarProps) {
     { href: '/admin/payments', label: 'Payments', icon: CreditCard },
     { href: '/admin/ledger', label: 'Ledger', icon: BookOpen },
     { href: '/admin/reports', label: 'Reports', icon: FileBarChart },
+    { href: '/admin/securities', label: 'Securities', icon: ShieldCheck },
   ];
 
   const companyLinks = [
@@ -76,8 +78,8 @@ export function Sidebar({ role, onLogout }: SidebarProps) {
                 href={link.href}
                 onClick={() => setIsOpen(false)}
                 className={`flex items-center gap-3 px-4 py-3 rounded-lg transition-all duration-200 group relative overflow-hidden ${isActive
-                    ? 'bg-primary text-white shadow-lg shadow-primary/25 translate-x-1'
-                    : 'text-slate-300 hover:bg-white/5 hover:text-white hover:translate-x-1'
+                  ? 'bg-primary text-white shadow-lg shadow-primary/25 translate-x-1'
+                  : 'text-slate-300 hover:bg-white/5 hover:text-white hover:translate-x-1'
                   }`}
               >
                 <Icon className={`w-5 h-5 transition-transform group-hover:scale-110 ${isActive ? 'text-white' : 'text-slate-400 group-hover:text-blue-300'}`} />
