@@ -22,8 +22,6 @@ export interface BillItem {
   id: string;
   description: string;
   notes?: string;
-  quantity: number;
-  rate: number;
   amount: number;
 }
 
@@ -32,7 +30,9 @@ export interface Bill {
   billNo: string;
   companyId: string;
   companyName: string;
-  date: string;
+  date: string; // This will represent Arrival Date
+  invoiceNo: string;
+  invoiceDate: string;
   jobNumber: string;
   items: BillItem[];
   totalAmount: number;
@@ -41,6 +41,12 @@ export interface Bill {
   attachment?: string;
   via?: string;
   weight?: string | number;
+  exporter?: string;
+  beNumber?: string;
+  packages?: string | number;
+  igm?: string;
+  hawb?: string;
+  index?: string | number;
   createdAt: string;
 }
 
@@ -143,13 +149,16 @@ const INITIAL_BILLS: Bill[] = [
     companyId: 'c1',
     companyName: 'Pacific Textiles Mills',
     date: '2025-01-15',
+    invoiceNo: 'INV-2025-001',
+    invoiceDate: '2025-01-14',
     jobNumber: 'JOB-25-001',
     via: 'Sea',
     weight: '12000 kg',
+    exporter: 'Pacific Exports',
     items: [
-      { id: 'i1', description: 'Customs Duty', quantity: 1, rate: 450000, amount: 450000 },
-      { id: 'i2', description: 'Port Charges', quantity: 1, rate: 25000, amount: 25000 },
-      { id: 'i3', description: 'Agency Fee', quantity: 1, rate: 15000, amount: 15000 },
+      { id: 'i1', description: 'Customs Duty', amount: 450000 },
+      { id: 'i2', description: 'Port Charges', amount: 25000 },
+      { id: 'i3', description: 'Agency Fee', amount: 15000 },
     ],
     totalAmount: 490000,
     paidAmount: 490000,
@@ -162,12 +171,14 @@ const INITIAL_BILLS: Bill[] = [
     companyId: 'c1',
     companyName: 'Pacific Textiles Mills',
     date: '2025-02-20',
+    invoiceNo: 'INV-2025-004',
+    invoiceDate: '2025-02-19',
     jobNumber: 'JOB-25-012',
     via: 'Air',
     weight: '500 kg',
     items: [
-      { id: 'i4', description: 'Air Freight', quantity: 1, rate: 180000, amount: 180000 },
-      { id: 'i5', description: 'Handling', quantity: 1, rate: 5000, amount: 5000 },
+      { id: 'i4', description: 'Air Freight', amount: 180000 },
+      { id: 'i5', description: 'Handling', amount: 5000 },
     ],
     totalAmount: 185000,
     paidAmount: 100000,
@@ -180,11 +191,13 @@ const INITIAL_BILLS: Bill[] = [
     companyId: 'c1',
     companyName: 'Pacific Textiles Mills',
     date: '2025-03-10',
+    invoiceNo: 'INV-2025-008',
+    invoiceDate: '2025-03-09',
     jobNumber: 'JOB-25-025',
     via: 'Sea',
     weight: '24000 kg',
     items: [
-      { id: 'i6', description: 'Customs & Duties', quantity: 1, rate: 650000, amount: 650000 },
+      { id: 'i6', description: 'Customs & Duties', amount: 650000 },
     ],
     totalAmount: 650000,
     paidAmount: 0,
@@ -199,12 +212,14 @@ const INITIAL_BILLS: Bill[] = [
     companyId: 'c2',
     companyName: 'Global Electronics Pvt Ltd',
     date: '2025-02-05',
+    invoiceNo: 'INV-2025-002',
+    invoiceDate: '2025-02-04',
     jobNumber: 'JOB-25-005',
     via: 'Air',
     weight: '800 kg',
     items: [
-      { id: 'i7', description: 'Clearance Charges', quantity: 1, rate: 120000, amount: 120000 },
-      { id: 'i8', description: 'Delivery Order', quantity: 1, rate: 15000, amount: 15000 },
+      { id: 'i7', description: 'Clearance Charges', amount: 120000 },
+      { id: 'i8', description: 'Delivery Order', amount: 15000 },
     ],
     totalAmount: 135000,
     paidAmount: 135000,
@@ -217,12 +232,14 @@ const INITIAL_BILLS: Bill[] = [
     companyId: 'c2',
     companyName: 'Global Electronics Pvt Ltd',
     date: '2025-03-01',
+    invoiceNo: 'INV-2025-005',
+    invoiceDate: '2025-02-28',
     jobNumber: 'JOB-25-018',
     via: 'Sea',
     weight: '5000 kg',
     items: [
-      { id: 'i9', description: 'Import Duties', quantity: 1, rate: 320000, amount: 320000 },
-      { id: 'i10', description: 'Sales Tax', quantity: 1, rate: 85000, amount: 85000 },
+      { id: 'i9', description: 'Import Duties', amount: 320000 },
+      { id: 'i10', description: 'Sales Tax', amount: 85000 },
     ],
     totalAmount: 405000,
     paidAmount: 0,
@@ -237,12 +254,14 @@ const INITIAL_BILLS: Bill[] = [
     companyId: 'c3',
     companyName: 'Fresh Foods Distributors',
     date: '2025-03-15',
+    invoiceNo: 'INV-2025-003',
+    invoiceDate: '2025-03-14',
     jobNumber: 'JOB-25-030',
     via: 'Land',
     weight: 'Truck Load',
     items: [
-      { id: 'i11', description: 'Cross Border Fee', quantity: 1, rate: 45000, amount: 45000 },
-      { id: 'i12', description: 'Customs', quantity: 1, rate: 25000, amount: 25000 },
+      { id: 'i11', description: 'Cross Border Fee', amount: 45000 },
+      { id: 'i12', description: 'Customs', amount: 25000 },
     ],
     totalAmount: 70000,
     paidAmount: 70000,

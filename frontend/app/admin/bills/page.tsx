@@ -27,7 +27,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { Plus, Download, Eye, trash2, Trash2 } from 'lucide-react';
+import { Plus, Download, Eye, Trash2 } from 'lucide-react';
 import { useState, useMemo } from 'react';
 import { useData, BillItem } from '@/context/data-context';
 
@@ -66,18 +66,26 @@ export default function BillsPage() {
   // Form State
   const [companyId, setCompanyId] = useState('');
   const [date, setDate] = useState(new Date().toISOString().split('T')[0]);
+  const [exporter, setExporter] = useState('');
+  const [invoiceNo, setInvoiceNo] = useState('');
+  const [invoiceDate, setInvoiceDate] = useState(new Date().toISOString().split('T')[0]);
+  const [beNumber, setBeNumber] = useState('');
+  const [hawb, setHawb] = useState('');
+  const [igm, setIgm] = useState('');
+  const [index, setIndex] = useState('');
+  const [packages, setPackages] = useState('');
   const [jobNumber, setJobNumber] = useState('');
   const [via, setVia] = useState('');
   const [weight, setWeight] = useState('');
   const [attachment, setAttachment] = useState<File | null>(null);
   const [items, setItems] = useState<Omit<BillItem, 'id'>[]>([
-    { description: 'DUTY TAXES & ETO', notes: '', quantity: 1, rate: 0, amount: 0 },
+    { description: 'DUTY TAXES & ETO', notes: '', amount: 0 },
   ]);
 
   const totalAmount = items.reduce((sum, item) => sum + item.amount, 0);
 
   const handleAddItem = () => {
-    setItems([...items, { description: 'DUTY TAXES & ETO', notes: '', quantity: 1, rate: 0, amount: 0 }]);
+    setItems([...items, { description: 'DUTY TAXES & ETO', notes: '', amount: 0 }]);
   };
 
   const handleRemoveItem = (index: number) => {
@@ -87,11 +95,6 @@ export default function BillsPage() {
   const handleItemChange = (index: number, field: keyof typeof items[0], value: string | number) => {
     const newItems = [...items];
     const item = { ...newItems[index], [field]: value };
-
-    // Auto calculate amount
-    if (field === 'quantity' || field === 'rate') {
-      item.amount = Number(item.quantity) * Number(item.rate);
-    }
 
     newItems[index] = item as any;
     setItems(newItems);
@@ -110,8 +113,6 @@ export default function BillsPage() {
     const finalItems: BillItem[] = items.map((item, idx) => ({
       ...item,
       id: `item-${Date.now()}-${idx}`,
-      quantity: Number(item.quantity),
-      rate: Number(item.rate),
       amount: Number(item.amount)
     })).filter(i => i.description && i.amount > 0);
 
@@ -125,10 +126,17 @@ export default function BillsPage() {
       companyId: selectedCompany.id,
       companyName: selectedCompany.name,
       date,
+      invoiceNo,
+      invoiceDate,
+      beNumber,
+      hawb,
+      igm,
+      index,
+      packages,
       jobNumber,
       via,
       weight,
-      attachment: attachment ? URL.createObjectURL(attachment) : undefined, // Mock upload
+      attachment: attachment ? URL.createObjectURL(attachment) : undefined,
       items: finalItems,
       totalAmount: finalItems.reduce((sum, i) => sum + i.amount, 0),
     });
@@ -139,8 +147,16 @@ export default function BillsPage() {
     setJobNumber('');
     setVia('');
     setWeight('');
+    setExporter('');
+    setInvoiceNo('');
+    setInvoiceDate(new Date().toISOString().split('T')[0]);
+    setBeNumber('');
+    setHawb('');
+    setIgm('');
+    setIndex('');
+    setPackages('');
     setAttachment(null);
-    setItems([{ description: 'DUTY TAXES & ETO', notes: '', quantity: 1, rate: 0, amount: 0 }]);
+    setItems([{ description: 'DUTY TAXES & ETO', notes: '', amount: 0 }]);
   };
 
   // Sort bills by date desc
@@ -173,7 +189,7 @@ export default function BillsPage() {
                 {/* Bill Details Section */}
                 <div className="bg-muted/30 p-4 rounded-lg border">
                   <h3 className="text-sm font-semibold mb-3 text-muted-foreground uppercase tracking-wider">Invoice Details</h3>
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                     <div className="md:col-span-1">
                       <Label className="text-xs font-medium text-muted-foreground">Client Company</Label>
                       <Select onValueChange={setCompanyId} value={companyId}>
@@ -188,7 +204,7 @@ export default function BillsPage() {
                       </Select>
                     </div>
                     <div>
-                      <Label className="text-xs font-medium text-muted-foreground">Invoice Date</Label>
+                      <Label className="text-xs font-medium text-muted-foreground">Arrival Date</Label>
                       <Input
                         type="date"
                         className="mt-1 bg-white dark:bg-slate-950"
@@ -197,7 +213,7 @@ export default function BillsPage() {
                       />
                     </div>
                     <div>
-                      <Label className="text-xs font-medium text-muted-foreground">Job/Invoice Number</Label>
+                      <Label className="text-xs font-medium text-muted-foreground">Job Number</Label>
                       <Input
                         placeholder="e.g. JOB-1234"
                         className="mt-1 bg-white dark:bg-slate-950"
@@ -205,30 +221,105 @@ export default function BillsPage() {
                         onChange={(e) => setJobNumber(e.target.value)}
                       />
                     </div>
+
                     <div>
-                      <Label className="text-xs font-medium text-muted-foreground">Via (Transport Mode)</Label>
+                      <Label className="text-xs font-medium text-muted-foreground">Exporter</Label>
+                      <Input
+                        placeholder="e.g. V Mane Fils SA"
+                        className="mt-1 bg-white dark:bg-slate-950"
+                        value={exporter}
+                        onChange={(e) => setExporter(e.target.value)}
+                      />
+                    </div>
+                    <div>
+                      <Label className="text-xs font-medium text-muted-foreground">Invoice No#</Label>
+                      <Input
+                        placeholder="e.g. 4544/26"
+                        className="mt-1 bg-white dark:bg-slate-950"
+                        value={invoiceNo}
+                        onChange={(e) => setInvoiceNo(e.target.value)}
+                      />
+                    </div>
+                    <div>
+                      <Label className="text-xs font-medium text-muted-foreground">Invoice Date</Label>
+                      <Input
+                        type="date"
+                        className="mt-1 bg-white dark:bg-slate-950"
+                        value={invoiceDate}
+                        onChange={(e) => setInvoiceDate(e.target.value)}
+                      />
+                    </div>
+
+                    <div>
+                      <Label className="text-xs font-medium text-muted-foreground">BE No#</Label>
+                      <Input
+                        placeholder="e.g. KPAF-HC-51667"
+                        className="mt-1 bg-white dark:bg-slate-950"
+                        value={beNumber}
+                        onChange={(e) => setBeNumber(e.target.value)}
+                      />
+                    </div>
+                    <div>
+                      <Label className="text-xs font-medium text-muted-foreground">HAWB No#</Label>
+                      <Input
+                        placeholder="e.g. 176-10189373"
+                        className="mt-1 bg-white dark:bg-slate-950"
+                        value={hawb}
+                        onChange={(e) => setHawb(e.target.value)}
+                      />
+                    </div>
+                    <div>
+                      <Label className="text-xs font-medium text-muted-foreground">VIA (Mode)</Label>
                       <Select onValueChange={setVia} value={via}>
                         <SelectTrigger className="mt-1 bg-white dark:bg-slate-950">
-                          <SelectValue placeholder="Select Mode" />
+                          <SelectValue placeholder="Select" />
                         </SelectTrigger>
                         <SelectContent>
-                          <SelectItem value="Air">Air</SelectItem>
-                          <SelectItem value="Sea">Sea</SelectItem>
-                          <SelectItem value="Land">Land</SelectItem>
-                          <SelectItem value="Train">Train</SelectItem>
+                          <SelectItem value="AIR">AIR</SelectItem>
+                          <SelectItem value="SEA">SEA</SelectItem>
+                          <SelectItem value="LAND">LAND</SelectItem>
                         </SelectContent>
                       </Select>
                     </div>
+
                     <div>
-                      <Label className="text-xs font-medium text-muted-foreground">Weight (kg/lbs)</Label>
+                      <Label className="text-xs font-medium text-muted-foreground">PKGS / CTN #</Label>
                       <Input
-                        placeholder="e.g. 500 kg"
+                        placeholder="e.g. 11"
+                        className="mt-1 bg-white dark:bg-slate-950"
+                        value={packages}
+                        onChange={(e) => setPackages(e.target.value)}
+                      />
+                    </div>
+                    <div>
+                      <Label className="text-xs font-medium text-muted-foreground">Weight</Label>
+                      <Input
+                        placeholder="e.g. 505"
                         className="mt-1 bg-white dark:bg-slate-950"
                         value={weight}
                         onChange={(e) => setWeight(e.target.value)}
                       />
                     </div>
                     <div>
+                      <Label className="text-xs font-medium text-muted-foreground">IGM #</Label>
+                      <Input
+                        placeholder="e.g. 1566"
+                        className="mt-1 bg-white dark:bg-slate-950"
+                        value={igm}
+                        onChange={(e) => setIgm(e.target.value)}
+                      />
+                    </div>
+                    <div>
+                      <Label className="text-xs font-medium text-muted-foreground">INDEX</Label>
+                      <Input
+                        placeholder="e.g. 39"
+                        className="mt-1 bg-white dark:bg-slate-950"
+                        value={index}
+                        onChange={(e) => setIndex(e.target.value)}
+                      />
+                    </div>
+
+                    <div className="md:col-span-2">
                       <Label className="text-xs font-medium text-muted-foreground">Attach Document</Label>
                       <div className="relative mt-1">
                         <Input
@@ -264,7 +355,7 @@ export default function BillsPage() {
                       <div key={idx} className="group relative grid grid-cols-12 gap-3 p-4 border rounded-xl bg-white dark:bg-slate-950 shadow-sm hover:shadow-md transition-all duration-200">
 
                         {/* Row 1: Main Details */}
-                        <div className="col-span-12 md:col-span-5">
+                        <div className="col-span-12 md:col-span-7">
                           <Label className="text-xs text-muted-foreground mb-1 block">Service / Item</Label>
                           <Select
                             value={BILL_ITEMS.includes(item.description) ? item.description : 'Others'}
@@ -294,32 +385,20 @@ export default function BillsPage() {
                           )}
                         </div>
 
-                        <div className="col-span-4 md:col-span-2">
-                          <Label className="text-xs text-muted-foreground mb-1 block">Qty</Label>
-                          <Input
-                            type="number"
-                            placeholder="1"
-                            min="1"
-                            className="h-9"
-                            value={item.quantity}
-                            onChange={(e) => handleItemChange(idx, 'quantity', e.target.value)}
-                          />
-                        </div>
-
-                        <div className="col-span-4 md:col-span-2">
-                          <Label className="text-xs text-muted-foreground mb-1 block">Rate</Label>
+                        <div className="col-span-6 md:col-span-2">
+                          <Label className="text-xs text-muted-foreground mb-1 block">Amount</Label>
                           <Input
                             type="number"
                             placeholder="0"
                             min="0"
-                            className="h-9"
-                            value={item.rate}
-                            onChange={(e) => handleItemChange(idx, 'rate', e.target.value)}
+                            className="h-9 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                            value={item.amount}
+                            onChange={(e) => handleItemChange(idx, 'amount', e.target.value)}
                           />
                         </div>
 
-                        <div className="col-span-4 md:col-span-2 flex flex-col justify-end pb-1">
-                          <Label className="text-xs text-muted-foreground mb-1 block text-right">Amount</Label>
+                        <div className="col-span-6 md:col-span-2 flex flex-col justify-end pb-1">
+                          <Label className="text-xs text-muted-foreground mb-1 block text-right">Total</Label>
                           <div className="text-right font-mono font-medium text-sm h-8 flex items-center justify-end">
                             {item.amount.toLocaleString()}
                           </div>
