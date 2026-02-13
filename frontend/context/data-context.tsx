@@ -23,6 +23,7 @@ export interface BillItem {
   description: string;
   notes?: string;
   amount: number;
+  invoiceNo?: string;
 }
 
 export interface Bill {
@@ -50,6 +51,10 @@ export interface Bill {
   gdNumber?: string;
   noOfContainers?: string | number;
   containerNo?: string;
+  serviceCharges?: number;
+  salesTax?: number;
+  advancePayment?: number;
+  grandTotal: number;
   createdAt: string;
 }
 
@@ -164,6 +169,7 @@ const INITIAL_BILLS: Bill[] = [
       { id: 'i3', description: 'Agency Fee', amount: 15000 },
     ],
     totalAmount: 490000,
+    grandTotal: 490000,
     paidAmount: 490000,
     status: 'Paid',
     createdAt: '2025-01-15',
@@ -184,6 +190,7 @@ const INITIAL_BILLS: Bill[] = [
       { id: 'i5', description: 'Handling', amount: 5000 },
     ],
     totalAmount: 185000,
+    grandTotal: 185000,
     paidAmount: 100000,
     status: 'Partial',
     createdAt: '2025-02-20',
@@ -203,6 +210,7 @@ const INITIAL_BILLS: Bill[] = [
       { id: 'i6', description: 'Customs & Duties', amount: 650000 },
     ],
     totalAmount: 650000,
+    grandTotal: 650000,
     paidAmount: 0,
     status: 'Unpaid',
     createdAt: '2025-03-10',
@@ -225,6 +233,7 @@ const INITIAL_BILLS: Bill[] = [
       { id: 'i8', description: 'Delivery Order', amount: 15000 },
     ],
     totalAmount: 135000,
+    grandTotal: 135000,
     paidAmount: 135000,
     status: 'Paid',
     createdAt: '2025-02-05',
@@ -245,6 +254,7 @@ const INITIAL_BILLS: Bill[] = [
       { id: 'i10', description: 'Sales Tax', amount: 85000 },
     ],
     totalAmount: 405000,
+    grandTotal: 405000,
     paidAmount: 0,
     status: 'Unpaid',
     createdAt: '2025-03-01',
@@ -267,6 +277,7 @@ const INITIAL_BILLS: Bill[] = [
       { id: 'i12', description: 'Customs', amount: 25000 },
     ],
     totalAmount: 70000,
+    grandTotal: 70000,
     paidAmount: 70000,
     status: 'Paid',
     createdAt: '2025-03-15',

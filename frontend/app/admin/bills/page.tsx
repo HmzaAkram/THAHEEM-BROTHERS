@@ -97,15 +97,15 @@ export default function BillsPage() {
   const [weight, setWeight] = useState('');
   const [attachment, setAttachment] = useState<File | null>(null);
   const [items, setItems] = useState<Omit<BillItem, 'id'>[]>([
-    { description: 'DUTY TAXES & ETO', notes: '', amount: 0 },
-    { description: 'CIVIL AVIATION AUTHORITY', notes: '', amount: 0 },
-    { description: "GERRYS' DANATA PVT LTD", notes: '', amount: 0 },
+    { description: 'DUTY TAXES & ETO', notes: '', amount: 0, invoiceNo: '' },
+    { description: 'CIVIL AVIATION AUTHORITY', notes: '', amount: 0, invoiceNo: '' },
+    { description: "GERRYS' DANATA PVT LTD", notes: '', amount: 0, invoiceNo: '' },
   ]);
 
   const totalAmount = items.reduce((sum, item) => sum + item.amount, 0);
 
   const handleAddItem = () => {
-    setItems([...items, { description: 'DUTY TAXES & ETO', notes: '', amount: 0 }]);
+    setItems([...items, { description: 'DUTY TAXES & ETO', notes: '', amount: 0, invoiceNo: '' }]);
   };
 
   const handleRemoveItem = (index: number) => {
@@ -183,9 +183,9 @@ export default function BillsPage() {
     setPackages('');
     setAttachment(null);
     setItems([
-      { description: 'DUTY TAXES & ETO', notes: '', amount: 0 },
-      { description: 'CIVIL AVIATION AUTHORITY', notes: '', amount: 0 },
-      { description: "GERRYS' DANATA PVT LTD", notes: '', amount: 0 },
+      { description: 'DUTY TAXES & ETO', notes: '', amount: 0, invoiceNo: '' },
+      { description: 'CIVIL AVIATION AUTHORITY', notes: '', amount: 0, invoiceNo: '' },
+      { description: "GERRYS' DANATA PVT LTD", notes: '', amount: 0, invoiceNo: '' },
     ]);
   };
 
@@ -432,68 +432,81 @@ export default function BillsPage() {
 
                     <div className="space-y-4">
                       {items.map((item, idx) => (
-                        <div key={idx} className="group relative grid grid-cols-12 gap-4 p-5 border rounded-2xl bg-white dark:bg-slate-950 shadow-sm hover:shadow-md hover:border-primary/20 transition-all duration-300">
-                          {/* Service Selection */}
-                          <div className="col-span-12 md:col-span-8 space-y-2">
-                            <Label className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground/60">Service / Item</Label>
-                            <Select
-                              value={BILL_ITEMS.includes(item.description) ? item.description : 'Others'}
-                              onValueChange={(value) => handleItemChange(idx, 'description', value)}
-                            >
-                              <SelectTrigger className="h-10 bg-muted/20 border-border/30">
-                                <SelectValue placeholder="Select Item" />
-                              </SelectTrigger>
-                              <SelectContent>
-                                {BILL_ITEMS.map((option) => (
-                                  <SelectItem key={option} value={option}>{option}</SelectItem>
-                                ))}
-                              </SelectContent>
-                            </Select>
+                        <div key={idx} className="group relative space-y-4 p-5 border rounded-2xl bg-white dark:bg-slate-950 shadow-sm hover:shadow-md hover:border-primary/20 transition-all duration-300">
+                          <div className="flex flex-col md:flex-row gap-4 items-end">
+                            {/* Service Selection */}
+                            <div className="flex-1 min-w-[200px] space-y-2">
+                              <Label className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground/60">Service / Item</Label>
+                              <Select
+                                value={BILL_ITEMS.includes(item.description) ? item.description : 'Others'}
+                                onValueChange={(value) => handleItemChange(idx, 'description', value)}
+                              >
+                                <SelectTrigger className="h-10 bg-muted/20 border-border/30">
+                                  <SelectValue placeholder="Select Item" />
+                                </SelectTrigger>
+                                <SelectContent>
+                                  {BILL_ITEMS.map((option) => (
+                                    <SelectItem key={option} value={option}>{option}</SelectItem>
+                                  ))}
+                                </SelectContent>
+                              </Select>
 
-                            {(item.description === 'Others' || !BILL_ITEMS.includes(item.description)) && (
-                              <div className="animate-in fade-in slide-in-from-top-1">
-                                <Input
-                                  placeholder="Specify Service Name"
-                                  className="h-9 text-sm bg-primary/5 border-primary/10 focus:border-primary/30"
-                                  value={item.description === 'Others' ? '' : item.description}
-                                  onChange={(e) => handleItemChange(idx, 'description', e.target.value)}
-                                  autoFocus
-                                />
-                              </div>
-                            )}
-                          </div>
+                              {(item.description === 'Others' || !BILL_ITEMS.includes(item.description)) && (
+                                <div className="animate-in fade-in slide-in-from-top-1">
+                                  <Input
+                                    placeholder="Specify Service Name"
+                                    className="h-9 text-sm bg-primary/5 border-primary/10 focus:border-primary/30"
+                                    value={item.description === 'Others' ? '' : item.description}
+                                    onChange={(e) => handleItemChange(idx, 'description', e.target.value)}
+                                    autoFocus
+                                  />
+                                </div>
+                              )}
+                            </div>
 
-                          {/* Amount Input */}
-                          <div className="col-span-12 md:col-span-3 space-y-2">
-                            <Label className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground/60 text-right block">Amount (PKR)</Label>
-                            <Input
-                              type="number"
-                              placeholder="0"
-                              min="0"
-                              className="h-10 text-right font-mono [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none bg-muted/20 border-border/30"
-                              value={item.amount}
-                              onChange={(e) => handleItemChange(idx, 'amount', e.target.value)}
-                            />
-                          </div>
+                            {/* Amount Input */}
+                            <div className="w-full md:w-32 space-y-2 text-right">
+                              <Label className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground/60 block">Amount (PKR)</Label>
+                              <Input
+                                type="number"
+                                placeholder="0"
+                                min="0"
+                                className="h-10 text-right font-mono [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none bg-muted/20 border-border/30"
+                                value={item.amount}
+                                onChange={(e) => handleItemChange(idx, 'amount', e.target.value)}
+                              />
+                            </div>
 
-                          {/* Remove Button */}
-                          <div className="col-span-12 md:col-span-1 flex items-end justify-end md:justify-center pb-0.5">
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              className="text-muted-foreground/40 hover:text-destructive hover:bg-destructive/10 h-9 w-9 rounded-xl transition-colors"
-                              onClick={() => handleRemoveItem(idx)}
-                              disabled={items.length === 1}
-                            >
-                              <Trash2 className="w-4 h-4" />
-                            </Button>
+                            {/* Invoice No# Input */}
+                            <div className="w-full md:w-32 space-y-2 text-right">
+                              <Label className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground/60 block">Invoice Number</Label>
+                              <Input
+                                placeholder="Example: 123"
+                                className="h-10 text-right font-mono bg-muted/20 border-border/30"
+                                value={item.invoiceNo || ''}
+                                onChange={(e) => handleItemChange(idx, 'invoiceNo', e.target.value)}
+                              />
+                            </div>
+
+                            {/* Remove Button */}
+                            <div className="flex items-center justify-center pb-0.5">
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                className="text-muted-foreground/40 hover:text-destructive hover:bg-destructive/10 h-9 w-9 rounded-xl transition-colors"
+                                onClick={() => handleRemoveItem(idx)}
+                                disabled={items.length === 1}
+                              >
+                                <Trash2 className="w-4 h-4" />
+                              </Button>
+                            </div>
                           </div>
 
                           {/* Description/Notes */}
-                          <div className="col-span-12 pt-3 border-t border-border/30">
+                          <div className="pt-3 border-t border-border/30">
                             <Label className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground/60 mb-1.5 block">Internal Notes / details</Label>
                             <Input
-                              placeholder="e.g. Container number, specific charges..."
+                              placeholder="Example: Container number, specific charges..."
                               className="h-9 text-sm bg-transparent border-dashed border-border/50 focus:border-solid focus:bg-white dark:focus:bg-slate-950 transition-all"
                               value={item.notes || ''}
                               onChange={(e) => handleItemChange(idx, 'notes', e.target.value)}
