@@ -101,8 +101,12 @@ export default function BillsPage() {
     { description: 'CIVIL AVIATION AUTHORITY', notes: '', amount: 0, invoiceNo: '' },
     { description: "GERRYS' DANATA PVT LTD", notes: '', amount: 0, invoiceNo: '' },
   ]);
+  const [serviceCharges, setServiceCharges] = useState<string>('');
+  const [advancePayment, setAdvancePayment] = useState<string>('');
 
-  const totalAmount = items.reduce((sum, item) => sum + item.amount, 0);
+  const totalAmount = items.reduce((sum, item) => sum + (Number(item.amount) || 0), 0);
+  const salesTax = (Number(serviceCharges) || 0) * 0.15;
+  const grandTotal = totalAmount + (Number(serviceCharges) || 0) + salesTax - (Number(advancePayment) || 0);
 
   const handleAddItem = () => {
     setItems([...items, { description: 'DUTY TAXES & ETO', notes: '', amount: 0, invoiceNo: '' }]);
@@ -161,7 +165,11 @@ export default function BillsPage() {
       weight,
       attachment: attachment ? URL.createObjectURL(attachment) : undefined,
       items: finalItems,
-      totalAmount: finalItems.reduce((sum, i) => sum + i.amount, 0),
+      totalAmount: totalAmount,
+      serviceCharges: Number(serviceCharges) || 0,
+      salesTax: salesTax,
+      advancePayment: Number(advancePayment) || 0,
+      grandTotal: grandTotal,
     });
 
     setIsDialogOpen(false);
@@ -178,6 +186,8 @@ export default function BillsPage() {
     setIgm('');
     setIndex('');
     setGdNumber('');
+    setServiceCharges('');
+    setAdvancePayment('');
     setNoOfContainers('');
     setContainerNo('');
     setPackages('');
@@ -472,7 +482,7 @@ export default function BillsPage() {
                                 placeholder="0"
                                 min="0"
                                 className="h-10 text-right font-mono [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none bg-muted/20 border-border/30"
-                                value={item.amount}
+                                value={item.amount || ''}
                                 onChange={(e) => handleItemChange(idx, 'amount', e.target.value)}
                               />
                             </div>
@@ -517,21 +527,60 @@ export default function BillsPage() {
                     </div>
                   </div>
 
-                  <div className="flex justify-end pt-4">
-                    <div className="bg-white dark:bg-slate-950 rounded-2xl p-6 border border-border/50 shadow-lg min-w-[280px] relative overflow-hidden group">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6 pt-4">
+                    <div className="space-y-4">
+                      <div className="grid grid-cols-1 gap-4">
+                        <div className="space-y-2">
+                          <Label className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground/60">Company Service Charges</Label>
+                          <Input
+                            type="number"
+                            placeholder="Example: 5000"
+                            className="h-10 font-mono bg-white dark:bg-slate-950 border-border/50"
+                            value={serviceCharges}
+                            onChange={(e) => setServiceCharges(e.target.value)}
+                          />
+                        </div>
+                        <div className="space-y-2">
+                          <Label className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground/60">Advance Payment Received</Label>
+                          <Input
+                            type="number"
+                            placeholder="Example: 10000"
+                            className="h-10 font-mono bg-white dark:bg-slate-950 border-border/50 text-green-600 dark:text-green-400 font-bold"
+                            value={advancePayment}
+                            onChange={(e) => setAdvancePayment(e.target.value)}
+                          />
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="bg-white dark:bg-slate-950 rounded-2xl p-6 border border-border/50 shadow-lg relative overflow-hidden group">
                       <div className="absolute top-0 right-0 w-24 h-24 bg-primary/5 rounded-full -mr-12 -mt-12 transition-transform group-hover:scale-110" />
                       <div className="space-y-3 relative">
                         <div className="flex justify-between items-center text-xs font-semibold text-muted-foreground uppercase tracking-widest">
-                          <span>Subtotal Value</span>
-                          <span>PKR {totalAmount.toLocaleString()}</span>
+                          <span>Subtotal Items</span>
+                          <span className="font-mono">PKR {totalAmount.toLocaleString()}</span>
                         </div>
+                        <div className="flex justify-between items-center text-xs font-semibold text-muted-foreground uppercase tracking-widest">
+                          <span>Service Charges</span>
+                          <span className="font-mono">PKR {(Number(serviceCharges) || 0).toLocaleString()}</span>
+                        </div>
+                        <div className="flex justify-between items-center text-xs font-semibold text-primary uppercase tracking-widest">
+                          <span>SBR Sales Tax (15%)</span>
+                          <span className="font-mono">PKR {salesTax.toLocaleString()}</span>
+                        </div>
+                        {Number(advancePayment) > 0 && (
+                          <div className="flex justify-between items-center text-xs font-semibold text-green-600 dark:text-green-400 uppercase tracking-widest">
+                            <span>Advance Payment</span>
+                            <span className="font-mono">- PKR {(Number(advancePayment) || 0).toLocaleString()}</span>
+                          </div>
+                        )}
                         <div className="h-px bg-gradient-to-r from-transparent via-border/50 to-transparent" />
                         <div className="flex justify-between items-end">
                           <div className="space-y-1">
                             <p className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground/60">Grand Total Payable</p>
                             <p className="text-2xl font-black text-primary font-mono tracking-tighter">
                               <span className="text-xs font-bold mr-1 tracking-normal">PKR</span>
-                              {totalAmount.toLocaleString()}
+                              {grandTotal.toLocaleString()}
                             </p>
                           </div>
                           <AlertCircle className="w-5 h-5 text-primary/20 mb-1" />
