@@ -31,7 +31,7 @@ export interface Bill {
   companyId: string;
   companyName: string;
   date: string; // This will represent Arrival Date
-  invoiceNo: string;
+  invoiceNo?: string;
   invoiceDate: string;
   jobNumber: string;
   items: BillItem[];
@@ -47,6 +47,9 @@ export interface Bill {
   igm?: string;
   hawb?: string;
   index?: string | number;
+  gdNumber?: string;
+  noOfContainers?: string | number;
+  containerNo?: string;
   createdAt: string;
 }
 

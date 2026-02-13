@@ -88,6 +88,9 @@ export default function BillsPage() {
   const [hawb, setHawb] = useState('');
   const [igm, setIgm] = useState('');
   const [index, setIndex] = useState('');
+  const [gdNumber, setGdNumber] = useState('');
+  const [noOfContainers, setNoOfContainers] = useState('');
+  const [containerNo, setContainerNo] = useState('');
   const [packages, setPackages] = useState('');
   const [jobNumber, setJobNumber] = useState('');
   const [via, setVia] = useState('');
@@ -95,6 +98,8 @@ export default function BillsPage() {
   const [attachment, setAttachment] = useState<File | null>(null);
   const [items, setItems] = useState<Omit<BillItem, 'id'>[]>([
     { description: 'DUTY TAXES & ETO', notes: '', amount: 0 },
+    { description: 'CIVIL AVIATION AUTHORITY', notes: '', amount: 0 },
+    { description: "GERRYS' DANATA PVT LTD", notes: '', amount: 0 },
   ]);
 
   const totalAmount = items.reduce((sum, item) => sum + item.amount, 0);
@@ -147,6 +152,9 @@ export default function BillsPage() {
       hawb,
       igm,
       index,
+      gdNumber,
+      noOfContainers,
+      containerNo,
       packages,
       jobNumber,
       via,
@@ -169,9 +177,16 @@ export default function BillsPage() {
     setHawb('');
     setIgm('');
     setIndex('');
+    setGdNumber('');
+    setNoOfContainers('');
+    setContainerNo('');
     setPackages('');
     setAttachment(null);
-    setItems([{ description: 'DUTY TAXES & ETO', notes: '', amount: 0 }]);
+    setItems([
+      { description: 'DUTY TAXES & ETO', notes: '', amount: 0 },
+      { description: 'CIVIL AVIATION AUTHORITY', notes: '', amount: 0 },
+      { description: "GERRYS' DANATA PVT LTD", notes: '', amount: 0 },
+    ]);
   };
 
   // Sort bills by date desc
@@ -224,7 +239,7 @@ export default function BillsPage() {
                         </Select>
                       </div>
                       <div>
-                        <Label className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground mb-1.5 block">Arrival Date</Label>
+                        <Label className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground mb-1.5 block">Date</Label>
                         <div className="relative">
                           <Input
                             type="date"
@@ -239,7 +254,7 @@ export default function BillsPage() {
                         <Label className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground mb-1.5 block">Job Number</Label>
                         <div className="relative">
                           <Input
-                            placeholder="e.g. JOB-1234"
+                            placeholder="Example: JOB-1234"
                             className="bg-white dark:bg-slate-950 border-border/50 focus:ring-primary/20 transition-all pl-10 h-10"
                             value={jobNumber}
                             onChange={(e) => setJobNumber(e.target.value)}
@@ -279,26 +294,29 @@ export default function BillsPage() {
                         </div>
                         <div>
                           <Label className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground mb-1.5 block">Weight</Label>
-                          <Input
-                            placeholder="505"
-                            className="bg-white dark:bg-slate-950 border-border/50 h-10"
-                            value={weight}
-                            onChange={(e) => setWeight(e.target.value)}
-                          />
+                          <div className="relative">
+                            <Input
+                              placeholder="Example: 505"
+                              className="bg-white dark:bg-slate-950 border-border/50 h-10 pr-10"
+                              value={weight}
+                              onChange={(e) => setWeight(e.target.value)}
+                            />
+                            <span className="absolute right-3 top-1/2 -translate-y-1/2 text-[10px] font-bold text-muted-foreground/50 pointer-events-none uppercase">KG</span>
+                          </div>
                         </div>
                         <div>
                           <Label className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground mb-1.5 block">PKGS / CTN #</Label>
                           <Input
-                            placeholder="11"
+                            placeholder="Example: 11"
                             className="bg-white dark:bg-slate-950 border-border/50 h-10"
                             value={packages}
                             onChange={(e) => setPackages(e.target.value)}
                           />
                         </div>
                         <div>
-                          <Label className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground mb-1.5 block">IGM #</Label>
+                          <Label className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground mb-1.5 block">IGM (Inside)</Label>
                           <Input
-                            placeholder="1566"
+                            placeholder="Example: 01"
                             className="bg-white dark:bg-slate-950 border-border/50 h-10"
                             value={igm}
                             onChange={(e) => setIgm(e.target.value)}
@@ -307,13 +325,35 @@ export default function BillsPage() {
                         <div>
                           <Label className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground mb-1.5 block">INDEX</Label>
                           <Input
-                            placeholder="39"
+                            placeholder="Example: 01"
                             className="bg-white dark:bg-slate-950 border-border/50 h-10"
                             value={index}
                             onChange={(e) => setIndex(e.target.value)}
                           />
                         </div>
                       </div>
+                      {via === 'SEA' && (
+                        <div className="grid grid-cols-2 gap-x-6 gap-y-5 mt-5 pt-5 border-t border-border/50 animate-in fade-in slide-in-from-top-2">
+                          <div>
+                            <Label className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground mb-1.5 block">No of Containers</Label>
+                            <Input
+                              placeholder="Example: 2"
+                              className="bg-white dark:bg-slate-950 border-border/50 h-10"
+                              value={noOfContainers}
+                              onChange={(e) => setNoOfContainers(e.target.value)}
+                            />
+                          </div>
+                          <div>
+                            <Label className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground mb-1.5 block">Container No</Label>
+                            <Input
+                              placeholder="Example: MSCU1234567"
+                              className="bg-white dark:bg-slate-950 border-border/50 h-10"
+                              value={containerNo}
+                              onChange={(e) => setContainerNo(e.target.value)}
+                            />
+                          </div>
+                        </div>
+                      )}
                     </div>
 
                     {/* Section 3: Invoice Details */}
@@ -326,23 +366,14 @@ export default function BillsPage() {
                         <div className="col-span-2">
                           <Label className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground mb-1.5 block">Exporter Name</Label>
                           <Input
-                            placeholder="V Mane Fils SA"
+                            placeholder="Example: Exporter Name"
                             className="bg-white dark:bg-slate-950 border-border/50 h-10"
                             value={exporter}
                             onChange={(e) => setExporter(e.target.value)}
                           />
                         </div>
                         <div>
-                          <Label className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground mb-1.5 block">Invoice No#</Label>
-                          <Input
-                            placeholder="4544/26"
-                            className="bg-white dark:bg-slate-950 border-border/50 h-10"
-                            value={invoiceNo}
-                            onChange={(e) => setInvoiceNo(e.target.value)}
-                          />
-                        </div>
-                        <div>
-                          <Label className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground mb-1.5 block">Invoice Date</Label>
+                          <Label className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground mb-1.5 block">Arrival Date</Label>
                           <Input
                             type="date"
                             className="bg-white dark:bg-slate-950 border-border/50 h-10"
@@ -351,9 +382,18 @@ export default function BillsPage() {
                           />
                         </div>
                         <div className="col-span-2">
+                          <Label className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground mb-1.5 block">GD No</Label>
+                          <Input
+                            placeholder="Example: ABC-123"
+                            className="bg-white dark:bg-slate-950 border-border/50 h-10"
+                            value={gdNumber}
+                            onChange={(e) => setGdNumber(e.target.value)}
+                          />
+                        </div>
+                        <div className="col-span-2">
                           <Label className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground mb-1.5 block">BE No# (Customs Reference)</Label>
                           <Input
-                            placeholder="KPAF-HC-51667"
+                            placeholder="Example: KPAF-HC-123"
                             className="bg-white dark:bg-slate-950 border-border/50 h-10 font-mono text-xs"
                             value={beNumber}
                             onChange={(e) => setBeNumber(e.target.value)}
@@ -362,7 +402,7 @@ export default function BillsPage() {
                         <div className="col-span-2">
                           <Label className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground mb-1.5 block">HAWB No#</Label>
                           <Input
-                            placeholder="176-10189373"
+                            placeholder="Example: 123"
                             className="bg-white dark:bg-slate-950 border-border/50 h-10 font-mono text-xs"
                             value={hawb}
                             onChange={(e) => setHawb(e.target.value)}
@@ -372,39 +412,6 @@ export default function BillsPage() {
                     </div>
                   </div>
 
-                  {/* Section 4: Document Attachment */}
-                  <div className="bg-primary/[0.02] p-6 rounded-2xl border-2 border-dashed border-primary/20 hover:border-primary/40 transition-colors group">
-                    <div className="flex flex-col items-center justify-center space-y-3">
-                      <div className="w-12 h-12 rounded-full bg-primary/10 flex items-center justify-center group-hover:scale-110 transition-transform">
-                        <Download className="w-6 h-6 text-primary" />
-                      </div>
-                      <div className="text-center">
-                        <p className="text-sm font-semibold text-foreground">Attach Shipment Documents</p>
-                        <p className="text-xs text-muted-foreground mt-1">Upload PDF or high-resolution images</p>
-                      </div>
-                      <div className="relative w-full max-w-xs mt-2">
-                        <Input
-                          type="file"
-                          className="opacity-0 absolute inset-0 w-full h-full cursor-pointer z-10"
-                          accept=".pdf,image/*"
-                          onChange={(e) => {
-                            const file = e.target.files?.[0];
-                            if (file) setAttachment(file);
-                          }}
-                        />
-                        <div className="flex items-center justify-center gap-2 px-6 py-2.5 border-2 rounded-xl bg-white dark:bg-slate-950 text-sm font-medium text-foreground/80 shadow-sm border-border/50">
-                          {attachment ? (
-                            <span className="truncate flex items-center gap-2">
-                              <FileText className="w-4 h-4 text-primary" />
-                              {attachment.name}
-                            </span>
-                          ) : (
-                            "Select Files"
-                          )}
-                        </div>
-                      </div>
-                    </div>
-                  </div>
 
                   <div className="space-y-6">
                     <div className="flex justify-between items-center pb-2 border-b border-border/50">
@@ -427,7 +434,7 @@ export default function BillsPage() {
                       {items.map((item, idx) => (
                         <div key={idx} className="group relative grid grid-cols-12 gap-4 p-5 border rounded-2xl bg-white dark:bg-slate-950 shadow-sm hover:shadow-md hover:border-primary/20 transition-all duration-300">
                           {/* Service Selection */}
-                          <div className="col-span-12 md:col-span-7 space-y-2">
+                          <div className="col-span-12 md:col-span-8 space-y-2">
                             <Label className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground/60">Service / Item</Label>
                             <Select
                               value={BILL_ITEMS.includes(item.description) ? item.description : 'Others'}
@@ -457,8 +464,8 @@ export default function BillsPage() {
                           </div>
 
                           {/* Amount Input */}
-                          <div className="col-span-6 md:col-span-2 space-y-2">
-                            <Label className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground/60 text-right block">Rate (PKR)</Label>
+                          <div className="col-span-12 md:col-span-3 space-y-2">
+                            <Label className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground/60 text-right block">Amount (PKR)</Label>
                             <Input
                               type="number"
                               placeholder="0"
@@ -467,14 +474,6 @@ export default function BillsPage() {
                               value={item.amount}
                               onChange={(e) => handleItemChange(idx, 'amount', e.target.value)}
                             />
-                          </div>
-
-                          {/* Total Display */}
-                          <div className="col-span-6 md:col-span-2 space-y-2">
-                            <Label className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground/60 text-right block">Total</Label>
-                            <div className="h-10 flex items-center justify-end px-3 rounded-md bg-primary/5 font-mono font-bold text-primary border border-primary/10">
-                              {item.amount.toLocaleString()}
-                            </div>
                           </div>
 
                           {/* Remove Button */}
@@ -542,6 +541,40 @@ export default function BillsPage() {
                     >
                       Close Window
                     </Button>
+                  </div>
+
+                  {/* Section 4: Document Attachment - REPOSITIONED TO ABSOLUTE BOTTOM */}
+                  <div className="bg-primary/[0.02] p-6 rounded-2xl border-2 border-dashed border-primary/20 hover:border-primary/40 transition-colors group mt-8">
+                    <div className="flex flex-col items-center justify-center space-y-3">
+                      <div className="w-12 h-12 rounded-full bg-primary/10 flex items-center justify-center group-hover:scale-110 transition-transform">
+                        <Download className="w-6 h-6 text-primary" />
+                      </div>
+                      <div className="text-center">
+                        <p className="text-sm font-semibold text-foreground">Attach Shipment Documents</p>
+                        <p className="text-xs text-muted-foreground mt-1">Upload PDF or high-resolution images</p>
+                      </div>
+                      <div className="relative w-full max-w-xs mt-2">
+                        <Input
+                          type="file"
+                          className="opacity-0 absolute inset-0 w-full h-full cursor-pointer z-10"
+                          accept=".pdf,image/*"
+                          onChange={(e) => {
+                            const file = e.target.files?.[0];
+                            if (file) setAttachment(file);
+                          }}
+                        />
+                        <div className="flex items-center justify-center gap-2 px-6 py-2.5 border-2 rounded-xl bg-white dark:bg-slate-950 text-sm font-medium text-foreground/80 shadow-sm border-border/50">
+                          {attachment ? (
+                            <span className="truncate flex items-center gap-2">
+                              <FileText className="w-4 h-4 text-primary" />
+                              {attachment.name}
+                            </span>
+                          ) : (
+                            "Select Files"
+                          )}
+                        </div>
+                      </div>
+                    </div>
                   </div>
                 </div>
               </div>
