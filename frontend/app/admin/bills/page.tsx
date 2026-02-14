@@ -102,11 +102,11 @@ export default function BillsPage() {
     { description: "GERRYS' DANATA PVT LTD", notes: '', amount: 0, invoiceNo: '' },
   ]);
   const [serviceCharges, setServiceCharges] = useState<string>('');
+  const [salesTax, setSalesTax] = useState<string>('');
   const [advancePayment, setAdvancePayment] = useState<string>('');
 
   const totalAmount = items.reduce((sum, item) => sum + (Number(item.amount) || 0), 0);
-  const salesTax = (Number(serviceCharges) || 0) * 0.15;
-  const grandTotal = totalAmount + (Number(serviceCharges) || 0) + salesTax - (Number(advancePayment) || 0);
+  const grandTotal = totalAmount + (Number(serviceCharges) || 0) + (Number(salesTax) || 0) - (Number(advancePayment) || 0);
 
   const handleAddItem = () => {
     setItems([...items, { description: 'DUTY TAXES & ETO', notes: '', amount: 0, invoiceNo: '' }]);
@@ -167,7 +167,7 @@ export default function BillsPage() {
       items: finalItems,
       totalAmount: totalAmount,
       serviceCharges: Number(serviceCharges) || 0,
-      salesTax: salesTax,
+      salesTax: Number(salesTax) || 0,
       advancePayment: Number(advancePayment) || 0,
       grandTotal: grandTotal,
     });
@@ -187,6 +187,7 @@ export default function BillsPage() {
     setIndex('');
     setGdNumber('');
     setServiceCharges('');
+    setSalesTax('');
     setAdvancePayment('');
     setNoOfContainers('');
     setContainerNo('');
@@ -541,6 +542,16 @@ export default function BillsPage() {
                           />
                         </div>
                         <div className="space-y-2">
+                          <Label className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground/60">SBR Sales Tax (15%)</Label>
+                          <Input
+                            type="number"
+                            placeholder="Example: 750"
+                            className="h-10 font-mono bg-white dark:bg-slate-950 border-border/50 text-primary font-bold"
+                            value={salesTax}
+                            onChange={(e) => setSalesTax(e.target.value)}
+                          />
+                        </div>
+                        <div className="space-y-2">
                           <Label className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground/60">Advance Payment Received</Label>
                           <Input
                             type="number"
@@ -566,7 +577,7 @@ export default function BillsPage() {
                         </div>
                         <div className="flex justify-between items-center text-xs font-semibold text-primary uppercase tracking-widest">
                           <span>SBR Sales Tax (15%)</span>
-                          <span className="font-mono">PKR {salesTax.toLocaleString()}</span>
+                          <span className="font-mono">PKR {(Number(salesTax) || 0).toLocaleString()}</span>
                         </div>
                         {Number(advancePayment) > 0 && (
                           <div className="flex justify-between items-center text-xs font-semibold text-green-600 dark:text-green-400 uppercase tracking-widest">

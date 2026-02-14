@@ -234,6 +234,15 @@ export default function SecuritiesPage() {
                                                     onChange={(e) => setPort(e.target.value)}
                                                 />
                                             </div>
+                                            <div className="space-y-2">
+                                                <Label className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground/60">Receiver Person Name</Label>
+                                                <Input
+                                                    placeholder="Example: Hamza Akram"
+                                                    className="h-11 bg-white dark:bg-slate-950 border-border/40 rounded-xl font-mono"
+                                                    value={receiverName}
+                                                    onChange={(e) => setReceiverName(e.target.value)}
+                                                />
+                                            </div>
                                             <div className="md:col-span-2 flex items-center justify-end px-6 rounded-xl bg-primary/5 border border-primary/10">
                                                 <div className="text-right">
                                                     <p className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground/60">Total Security Amount</p>
@@ -316,15 +325,6 @@ export default function SecuritiesPage() {
                                                             onChange={(e) => setPayOrderNo(e.target.value)}
                                                         />
                                                     </div>
-                                                    <div className="space-y-2">
-                                                        <Label className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground/60">Name of Receiver</Label>
-                                                        <Input
-                                                            placeholder="Example: John Doe"
-                                                            className="h-11 bg-white dark:bg-slate-950 border-border/40 rounded-xl font-mono"
-                                                            value={receiverName}
-                                                            onChange={(e) => setReceiverName(e.target.value)}
-                                                        />
-                                                    </div>
                                                 </div>
                                             )}
                                         </div>
@@ -372,6 +372,7 @@ export default function SecuritiesPage() {
                                         <TableHead className="font-black uppercase tracking-widest text-[10px] text-muted-foreground/70 text-center">Containers</TableHead>
                                         <TableHead className="font-black uppercase tracking-widest text-[10px] text-muted-foreground/70 text-right">Amount (PKR)</TableHead>
                                         <TableHead className="font-black uppercase tracking-widest text-[10px] text-muted-foreground/70">Refund Due</TableHead>
+                                        <TableHead className="font-black uppercase tracking-widest text-[10px] text-muted-foreground/70">Receiver</TableHead>
                                         <TableHead className="font-black uppercase tracking-widest text-[10px] text-muted-foreground/70">Status</TableHead>
                                         <TableHead className="w-[100px] pr-8 text-right font-black uppercase tracking-widest text-[10px] text-muted-foreground/70">Actions</TableHead>
                                     </TableRow>
@@ -428,9 +429,15 @@ export default function SecuritiesPage() {
                                                     </div>
                                                 </TableCell>
                                                 <TableCell>
+                                                    <div className="flex items-center gap-2 text-xs font-bold text-slate-600 dark:text-slate-400">
+                                                        <User className="w-3.5 h-3.5 opacity-60 text-primary" />
+                                                        {security.receiverName || 'N/A'}
+                                                    </div>
+                                                </TableCell>
+                                                <TableCell>
                                                     <Badge className={`rounded-lg px-3 py-1 font-black uppercase tracking-widest text-[9px] border shadow-sm ${security.isRefundReceived
-                                                            ? 'bg-green-100 text-green-800 border-green-200'
-                                                            : 'bg-orange-100 text-orange-800 border-orange-200'
+                                                        ? 'bg-green-100 text-green-800 border-green-200'
+                                                        : 'bg-orange-100 text-orange-800 border-orange-200'
                                                         }`}>
                                                         {security.isRefundReceived ? 'Received' : 'Pending Refund'}
                                                     </Badge>
