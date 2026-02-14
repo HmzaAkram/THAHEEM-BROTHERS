@@ -306,7 +306,7 @@ export default function BillsPage() {
                           <Label className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground mb-1.5 block">Weight</Label>
                           <div className="relative">
                             <Input
-                              placeholder="Example: 505"
+                              placeholder="01"
                               className="bg-white dark:bg-slate-950 border-border/50 h-10 pr-10"
                               value={weight}
                               onChange={(e) => setWeight(e.target.value)}
@@ -317,7 +317,7 @@ export default function BillsPage() {
                         <div>
                           <Label className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground mb-1.5 block">PKGS / CTN #</Label>
                           <Input
-                            placeholder="Example: 11"
+                            placeholder="01"
                             className="bg-white dark:bg-slate-950 border-border/50 h-10"
                             value={packages}
                             onChange={(e) => setPackages(e.target.value)}
@@ -326,7 +326,7 @@ export default function BillsPage() {
                         <div>
                           <Label className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground mb-1.5 block">IGM (Inside)</Label>
                           <Input
-                            placeholder="Example: 01"
+                            placeholder="01"
                             className="bg-white dark:bg-slate-950 border-border/50 h-10"
                             value={igm}
                             onChange={(e) => setIgm(e.target.value)}
@@ -335,7 +335,7 @@ export default function BillsPage() {
                         <div>
                           <Label className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground mb-1.5 block">INDEX</Label>
                           <Input
-                            placeholder="Example: 01"
+                            placeholder="01"
                             className="bg-white dark:bg-slate-950 border-border/50 h-10"
                             value={index}
                             onChange={(e) => setIndex(e.target.value)}
@@ -474,6 +474,17 @@ export default function BillsPage() {
                               )}
                             </div>
 
+                            {/* Invoice No# Input */}
+                            <div className="w-full md:w-32 space-y-2 text-right">
+                              <Label className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground/60 block">Invoice Number</Label>
+                              <Input
+                                placeholder="Example: 123"
+                                className="h-10 text-right font-mono bg-muted/20 border-border/30"
+                                value={item.invoiceNo || ''}
+                                onChange={(e) => handleItemChange(idx, 'invoiceNo', e.target.value)}
+                              />
+                            </div>
+
                             {/* Amount Input */}
                             <div className="w-full md:w-32 space-y-2 text-right">
                               <Label className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground/60 block">Amount (PKR)</Label>
@@ -484,17 +495,6 @@ export default function BillsPage() {
                                 className="h-10 text-right font-mono [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none bg-muted/20 border-border/30"
                                 value={item.amount || ''}
                                 onChange={(e) => handleItemChange(idx, 'amount', e.target.value)}
-                              />
-                            </div>
-
-                            {/* Invoice No# Input */}
-                            <div className="w-full md:w-32 space-y-2 text-right">
-                              <Label className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground/60 block">Invoice Number</Label>
-                              <Input
-                                placeholder="Example: 123"
-                                className="h-10 text-right font-mono bg-muted/20 border-border/30"
-                                value={item.invoiceNo || ''}
-                                onChange={(e) => handleItemChange(idx, 'invoiceNo', e.target.value)}
                               />
                             </div>
 
@@ -589,23 +589,7 @@ export default function BillsPage() {
                     </div>
                   </div>
 
-                  <div className="flex gap-4 pt-6">
-                    <Button
-                      className="flex-1 h-12 bg-primary hover:bg-primary/90 text-primary-foreground font-bold shadow-lg shadow-primary/20 rounded-xl transition-all active:scale-[0.98]"
-                      onClick={handleSubmit}
-                    >
-                      Generate Invoice
-                    </Button>
-                    <Button
-                      variant="ghost"
-                      className="flex-1 h-12 font-semibold text-muted-foreground hover:bg-muted/50 rounded-xl"
-                      onClick={() => setIsDialogOpen(false)}
-                    >
-                      Close Window
-                    </Button>
-                  </div>
-
-                  {/* Section 4: Document Attachment - REPOSITIONED TO ABSOLUTE BOTTOM */}
+                  {/* Section 4: Document Attachment - RELOCATED ABOVE BUTTONS */}
                   <div className="bg-primary/[0.02] p-6 rounded-2xl border-2 border-dashed border-primary/20 hover:border-primary/40 transition-colors group mt-8">
                     <div className="flex flex-col items-center justify-center space-y-3">
                       <div className="w-12 h-12 rounded-full bg-primary/10 flex items-center justify-center group-hover:scale-110 transition-transform">
@@ -637,6 +621,22 @@ export default function BillsPage() {
                         </div>
                       </div>
                     </div>
+                  </div>
+
+                  <div className="flex gap-4 pt-6">
+                    <Button
+                      className="flex-1 h-12 bg-primary hover:bg-primary/90 text-primary-foreground font-bold shadow-lg shadow-primary/20 rounded-xl transition-all active:scale-[0.98]"
+                      onClick={handleSubmit}
+                    >
+                      Generate Invoice
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      className="flex-1 h-12 font-semibold text-muted-foreground hover:bg-muted/50 rounded-xl"
+                      onClick={() => setIsDialogOpen(false)}
+                    >
+                      Close Window
+                    </Button>
                   </div>
                 </div>
               </div>
