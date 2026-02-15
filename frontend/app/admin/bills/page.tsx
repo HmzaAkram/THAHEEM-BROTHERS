@@ -183,8 +183,11 @@ export default function BillsPage() {
       return;
     }
 
-    const selectedCompany = companies.find(c => c.id === companyId);
-    if (!selectedCompany) return;
+    const selectedCompany = companies.find(c => String(c.id) === String(companyId));
+    if (!selectedCompany) {
+      alert("Selected company not found. Please try re-selecting the company.");
+      return;
+    }
 
     // Generate valid bill items with IDs
     const finalItems: BillItem[] = items.map((item, idx) => ({

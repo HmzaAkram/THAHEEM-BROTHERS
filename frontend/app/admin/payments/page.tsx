@@ -29,10 +29,11 @@ import {
 } from '@/components/ui/select';
 import { Plus, Download, Filter, Search, DollarSign, TrendingUp, CreditCard } from 'lucide-react';
 import { useState, useMemo } from 'react';
-import { useData } from '@/context/data-context';
+import { useData, Payment } from '@/context/data-context';
 import { formatDate, formatCurrency } from '@/lib/utils';
 import { CompanySelect } from '@/components/company-select';
 import { GenericSearchSelect } from '@/components/search-select';
+import { MultiSearchSelect } from '@/components/multi-search-select';
 
 export default function PaymentsPage() {
   const { payments, companies, addPayment, bills } = useData();
@@ -42,10 +43,11 @@ export default function PaymentsPage() {
   // Form State
   const [companyId, setCompanyId] = useState('');
   const [date, setDate] = useState(new Date().toISOString().split('T')[0]);
-  const [amount, setAmount] = useState('');
-  const [adjustment, setAdjustment] = useState('');
+  const [amount, setAmount] = useState(''); // Global amount or single
+  const [adjustment, setAdjustment] = useState(''); // Global adjustment or single
   const [method, setMethod] = useState('Bank Transfer');
-  const [billId, setBillId] = useState(''); // Essential now
+  const [selectedBillIds, setSelectedBillIds] = useState<string[]>([]);
+  const [billPayments, setBillPayments] = useState<Record<string, { amount: string, adjustment: string }>>({});
 
   // Table Filters State
   const [timeFilter, setTimeFilter] = useState<'overall' | 'monthly' | '3months' | '6months' | 'yearly'>('overall');
@@ -59,56 +61,82 @@ export default function PaymentsPage() {
   const [description, setDescription] = useState('');
 
   const handleSubmit = async () => {
-    if (!companyId || !amount || !date || !billId) {
-      alert("Please fill all required fields (Company, Bill, Amount, Date)");
+    if (!companyId || !date || selectedBillIds.length === 0) {
+      alert("Please select a company, date, and at least one bill.");
       return;
     }
 
-    const selectedCompany = companies.find(c => c.id === companyId);
-    if (!selectedCompany) return;
-
-    // Construct reference based on method
-    let finalReference = '';
-    if (method === 'Bank Transfer') finalReference = `TRF: ${trackingId}`;
-    else if (method === 'Cheque') finalReference = `CHQ: ${chequeNo}`;
-    else if (method === 'Pay Order') finalReference = `PO: ${payOrderNo}`;
-    else if (method === 'Advance') finalReference = `ADV: ${description}`;
-    else finalReference = 'Cash';
+    // Validate that each selected bill has a valid amount
+    for (const id of selectedBillIds) {
+      const p = billPayments[id];
+      if (!p || !p.amount || Number(p.amount) <= 0) {
+        alert(`Please enter a valid amount for all selected bills.`);
+        return;
+      }
+    }
 
     setLoading(true);
     try {
-      const result = await addPayment({
-        companyId: selectedCompany.id,
-        companyName: selectedCompany.name,
-        date,
-        amount: Number(amount),
-        adjustment: Number(adjustment) || 0,
-        reference: finalReference,
-        method,
-        billId,
-        trackingId,
-        chequeNo,
-        payOrderNo,
-        description
-      });
+      let successCount = 0;
+      let errorCount = 0;
 
-      if (result.ok) {
+      for (const id of selectedBillIds) {
+        const p = billPayments[id];
+
+        // Construct reference based on method
+        let finalReference = '';
+        if (method === 'Bank Transfer') finalReference = `TRF: ${trackingId}`;
+        else if (method === 'Cheque') finalReference = `CHQ: ${chequeNo}`;
+        else if (method === 'Pay Order') finalReference = `PO: ${payOrderNo}`;
+        else if (method === 'Advance') finalReference = `ADV: ${description}`;
+        else finalReference = 'Cash';
+
+        const paymentData: Omit<Payment, 'id' | 'createdAt'> = {
+          companyId,
+          companyName: companies.find(c => String(c.id) === String(companyId))?.name || 'Unknown',
+          date,
+          amount: Number(p.amount),
+          adjustment: Number(p.adjustment || 0),
+          method,
+          billId: id,
+          trackingId: method === 'Bank Transfer' ? trackingId : undefined,
+          chequeNo: method === 'Cheque' ? chequeNo : undefined,
+          payOrderNo: method === 'Pay Order' ? payOrderNo : undefined,
+          description: description,
+          reference: finalReference
+        };
+
+        const result = await addPayment(paymentData);
+        if (result.ok) {
+          successCount++;
+        } else {
+          errorCount++;
+          console.error(`Failed to record payment for bill ${id}:`, result.message);
+        }
+      }
+
+      if (successCount > 0) {
+        alert(errorCount === 0
+          ? `Successfully recorded ${successCount} payment(s).`
+          : `Recorded ${successCount} payments. ${errorCount} failed.`);
+
         setIsDialogOpen(false);
-        // Reset Form
+        // Reset state
         setCompanyId('');
         setAmount('');
         setAdjustment('');
-        setBillId('');
+        setSelectedBillIds([]);
+        setBillPayments({});
         setTrackingId('');
         setChequeNo('');
         setPayOrderNo('');
         setDescription('');
       } else {
-        alert("Failed to record payment: " + result.message);
+        alert("Failed to record any payments. Please check console for details.");
       }
     } catch (error) {
-      console.error("Failed to record payment:", error);
-      alert("An unexpected error occurred while recording the payment.");
+      console.error("Failed to record payments:", error);
+      alert("An unexpected error occurred while recording payments.");
     } finally {
       setLoading(false);
     }
@@ -117,13 +145,17 @@ export default function PaymentsPage() {
   // Filter bills for selected company
   const companyBills = useMemo(() => {
     if (!companyId) return [];
-    return bills.filter(b => b.companyId === companyId && b.status !== 'Paid');
+    // Handle both number and string ID types and ensure we filter for non-paid bills
+    return bills.filter(b =>
+      (String(b.companyId) === String(companyId)) &&
+      (b.status !== 'Paid' && b.calculatedStatus !== 'Paid')
+    );
   }, [companyId, bills]);
 
   const billOptions = useMemo(() => {
     return companyBills.map(b => ({
       id: b.id,
-      label: `${b.billNo} - ${b.jobNumber} (Due: ${formatCurrency(b.totalAmount - b.paidAmount)})`
+      label: `BILL: ${b.billNo} | JOB: ${b.jobNumber} (Due: ${formatCurrency((b.grandTotal || b.totalAmount) - b.paidAmount)})`
     }));
   }, [companyBills]);
 
@@ -193,7 +225,7 @@ export default function PaymentsPage() {
                 Record Payment
               </Button>
             </DialogTrigger>
-            <DialogContent className="max-w-md">
+            <DialogContent className="max-w-md max-h-[90vh] overflow-y-auto">
               <DialogHeader>
                 <DialogTitle>Record New Payment</DialogTitle>
               </DialogHeader>
@@ -205,23 +237,85 @@ export default function PaymentsPage() {
                     value={companyId}
                     onValueChange={(val) => {
                       setCompanyId(val);
-                      setBillId(''); // Reset bill when company changes
+                      setSelectedBillIds([]); // Reset selection when company changes
+                      setBillPayments({});
                     }}
                     className="mt-1"
                   />
                 </div>
 
                 <div>
-                  <Label>Link to Invoice / Job (Required)</Label>
-                  <GenericSearchSelect
+                  <Label>Link to Invoice(s) / Job(s) (Required)</Label>
+                  <MultiSearchSelect
                     options={billOptions}
-                    value={billId}
-                    onValueChange={setBillId}
-                    placeholder={companyId ? "Select Invoice to pay..." : "Select company first"}
+                    selectedIds={selectedBillIds}
+                    onValueChange={(ids) => {
+                      setSelectedBillIds(ids);
+                      // Initialize payment data for new IDs
+                      const newBillPayments = { ...billPayments };
+                      ids.forEach(id => {
+                        if (!newBillPayments[id]) {
+                          const bill = bills.find(b => b.id === id);
+                          const due = ((bill?.grandTotal || bill?.totalAmount) || 0) - (bill?.paidAmount || 0);
+                          newBillPayments[id] = { amount: String(due), adjustment: '0' };
+                        }
+                      });
+                      setBillPayments(newBillPayments);
+                    }}
+                    placeholder={companyId ? "Select Invoice(s) to pay..." : "Select company first"}
                     emptyText={companyId ? "No pending bills found" : "Select company first"}
                     className="mt-1"
                   />
                 </div>
+
+                {/* Per-Bill Payment Inputs */}
+                {selectedBillIds.length > 0 && (
+                  <div className="space-y-4 max-h-[300px] overflow-y-auto pr-2 bg-slate-50 dark:bg-slate-900/40 p-3 rounded-lg border border-dashed border-green-200 dark:border-green-900/50">
+                    <p className="text-[10px] font-bold uppercase tracking-widest text-green-600 dark:text-green-500">Payment Allocation</p>
+                    {selectedBillIds.map(id => {
+                      const bill = bills.find(b => b.id === id);
+                      return (
+                        <div key={id} className="space-y-2 pb-3 border-b border-muted last:border-0 last:pb-0">
+                          <div className="flex justify-between items-center">
+                            <span className="text-xs font-bold text-foreground truncate max-w-[150px]">
+                              {bill?.billNo} | {bill?.jobNumber}
+                            </span>
+                            <span className="text-[10px] text-muted-foreground">
+                              Due: {formatCurrency(((bill?.grandTotal || bill?.totalAmount) || 0) - (bill?.paidAmount || 0))}
+                            </span>
+                          </div>
+                          <div className="grid grid-cols-2 gap-3">
+                            <div>
+                              <Label className="text-[10px]">Amount Paid</Label>
+                              <Input
+                                type="number"
+                                size={2}
+                                className="h-8 text-xs font-mono font-bold"
+                                value={billPayments[id]?.amount || ''}
+                                onChange={(e) => setBillPayments(prev => ({
+                                  ...prev,
+                                  [id]: { ...prev[id], amount: e.target.value }
+                                }))}
+                              />
+                            </div>
+                            <div>
+                              <Label className="text-[10px]">Adjustment</Label>
+                              <Input
+                                type="number"
+                                className="h-8 text-xs font-mono"
+                                value={billPayments[id]?.adjustment || ''}
+                                onChange={(e) => setBillPayments(prev => ({
+                                  ...prev,
+                                  [id]: { ...prev[id], adjustment: e.target.value }
+                                }))}
+                              />
+                            </div>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
 
                 <div className="grid grid-cols-2 gap-4">
                   <div>
@@ -297,31 +391,11 @@ export default function PaymentsPage() {
                   </div>
                 </div>
 
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <Label>Amount Paid (PKR)</Label>
-                    <Input
-                      type="number"
-                      placeholder="0.00"
-                      className="mt-1 font-mono font-bold"
-                      value={amount}
-                      onChange={(e) => setAmount(e.target.value)}
-                      onWheel={(e) => e.currentTarget.blur()}
-                    />
+                {selectedBillIds.length === 0 && (
+                  <div className="bg-amber-50 dark:bg-amber-950/20 p-3 rounded border border-amber-200 dark:border-amber-900 flex items-center gap-3">
+                    <p className="text-xs text-amber-700 dark:text-amber-400">Please select at least one bill to record a payment.</p>
                   </div>
-                  <div>
-                    <Label>Adjustment (PKR)</Label>
-                    <Input
-                      type="number"
-                      placeholder="0.00"
-                      className="mt-1 font-mono text-muted-foreground"
-                      title="Amount waived off or adjusted"
-                      value={adjustment}
-                      onChange={(e) => setAdjustment(e.target.value)}
-                      onWheel={(e) => e.currentTarget.blur()}
-                    />
-                  </div>
-                </div>
+                )}
 
                 <div className="flex gap-2 pt-4">
                   <Button className="flex-1 bg-green-600 hover:bg-green-700" onClick={handleSubmit} disabled={loading}>
@@ -439,7 +513,7 @@ export default function PaymentsPage() {
                             )}
                           </TableCell>
                           <TableCell className="text-right font-black text-primary bg-muted/20 whitespace-nowrap">
-                            {linkedBill ? formatCurrency(linkedBill.grandTotal) : '-'}
+                            {linkedBill ? formatCurrency((linkedBill.grandTotal || 0) + (linkedBill.advancePayment || 0)) : '-'}
                           </TableCell>
                         </TableRow>
                       );

@@ -51,7 +51,7 @@ class Bill extends Model
 
     public function getPaidAmountAttribute()
     {
-        return (float) $this->payments()->sum('amount');
+        return (float) ($this->payments()->sum('amount') + $this->payments()->sum('adjustment'));
     }
 
     public function getCalculatedStatusAttribute()
