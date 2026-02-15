@@ -20,17 +20,31 @@ import {
 } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Plus, Edit2, Eye, Trash2, Search, ArrowRight } from 'lucide-react';
-import { useState } from 'react';
+import { Plus, Edit2, Eye, Trash2, Search, ArrowRight, Calendar, DollarSign, Users, CreditCard, TrendingUp, Filter } from 'lucide-react';
+import { useState, useMemo } from 'react';
 import { useData } from '@/context/data-context';
 import { useRouter } from 'next/navigation';
+import { DashboardCard } from '@/components/dashboard-card';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
 
 export default function CompaniesPage() {
-  const { companies, addCompany, deleteCompany, getCompanyBalance } = useData();
+  const { companies, bills, payments, addCompany, deleteCompany, getCompanyBalance } = useData();
+  const router = useRouter();
+
+  // Filters State
   const [searchTerm, setSearchTerm] = useState('');
+  const [dateFrom, setDateFrom] = useState('');
+  const [dateTo, setDateTo] = useState('');
+  const [timeShortcut, setTimeShortcut] = useState('overall');
+
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [loading, setLoading] = useState(false);
-  const router = useRouter();
 
   // New Company Form State
   const [formData, setFormData] = useState({
@@ -43,11 +57,85 @@ export default function CompaniesPage() {
     password: '',
   });
 
-  const filteredCompanies = companies.filter(
-    (company) =>
-      company.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      company.email.toLowerCase().includes(searchTerm.toLowerCase())
-  );
+  const filteredCompanies = useMemo(() => {
+    let filtered = [...companies];
+
+    // Date Filtering (by createdAt)
+    if (dateFrom || dateTo) {
+      filtered = filtered.filter(c => {
+        const createdDate = new Date(c.createdAt).toISOString().split('T')[0];
+        if (dateFrom && createdDate < dateFrom) return false;
+        if (dateTo && createdDate > dateTo) return false;
+        return true;
+      });
+    }
+
+    // Search Filtering
+    if (searchTerm.trim()) {
+      const q = searchTerm.toLowerCase();
+      filtered = filtered.filter(
+        (company) =>
+          company.name.toLowerCase().includes(q) ||
+          company.email.toLowerCase().includes(q) ||
+          (company.identifier && company.identifier.toLowerCase().includes(q))
+      );
+    }
+
+    return filtered;
+  }, [companies, searchTerm, dateFrom, dateTo]);
+
+  // Context Totals for Filtered Companies
+  const companyTotals = useMemo(() => {
+    return filteredCompanies.reduce((acc, company) => {
+      // Find all bills for this company
+      let companyBills = bills.filter(b => b.companyId === company.id);
+      // Find all payments for this company
+      let companyPayments = payments.filter(p => p.companyId === company.id);
+
+      // Apply date filters to the activity if set
+      if (dateFrom || dateTo) {
+        companyBills = companyBills.filter(b => {
+          const d = new Date(b.date).toISOString().split('T')[0];
+          if (dateFrom && d < dateFrom) return false;
+          if (dateTo && d > dateTo) return false;
+          return true;
+        });
+        companyPayments = companyPayments.filter(p => {
+          const d = new Date(p.date).toISOString().split('T')[0];
+          if (dateFrom && d < dateFrom) return false;
+          if (dateTo && d > dateTo) return false;
+          return true;
+        });
+      }
+
+      // Sum totals
+      const billed = companyBills.reduce((s, b) => s + (b.grandTotal || 0), 0);
+      const collected = companyPayments.reduce((s, p) => s + (p.amount || 0), 0);
+
+      acc.billed += billed;
+      acc.collected += collected;
+      acc.outstanding += (billed - collected);
+      return acc;
+    }, { billed: 0, collected: 0, outstanding: 0, count: filteredCompanies.length });
+  }, [filteredCompanies, bills, payments, dateFrom, dateTo]);
+
+  const handleTimeShortcut = (val: string) => {
+    setTimeShortcut(val);
+    const now = new Date();
+    const today = now.toISOString().split('T')[0];
+
+    if (val === 'today') {
+      setDateFrom(today);
+      setDateTo(today);
+    } else if (val === 'monthly') {
+      const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1).toISOString().split('T')[0];
+      setDateFrom(startOfMonth);
+      setDateTo(today);
+    } else if (val === 'overall') {
+      setDateFrom('');
+      setDateTo('');
+    }
+  };
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { id, value } = e.target;
@@ -203,112 +291,180 @@ export default function CompaniesPage() {
         </div>
 
         <Card className="border-0 shadow-xl bg-white/50 dark:bg-slate-900/50 backdrop-blur-md">
-          <CardHeader>
-            <div className="flex items-center gap-2 bg-background/50 p-2 rounded-lg border border-border/50">
-              <Search className="w-4 h-4 text-muted-foreground ml-2" />
-              <Input
-                placeholder="Search companies..."
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                className="flex-1 border-0 bg-transparent focus-visible:ring-0"
-              />
+          <CardHeader className="pb-2">
+            <div className="flex flex-col md:flex-row items-start md:items-center gap-4 bg-background/50 p-4 rounded-xl border border-border/50">
+              <div className="relative flex-1 w-full">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground mr-2" />
+                <Input
+                  placeholder="Search companies..."
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                  className="pl-9 bg-white/50 border-border/40 focus:bg-white transition-all rounded-xl"
+                />
+              </div>
+              <div className="flex flex-wrap gap-3 w-full md:w-auto">
+                <div className="flex items-center gap-2">
+                  <Label className="text-[10px] font-bold uppercase text-muted-foreground hidden lg:block">From</Label>
+                  <Input
+                    type="date"
+                    value={dateFrom}
+                    onChange={(e) => {
+                      setDateFrom(e.target.value);
+                      setTimeShortcut('overall');
+                    }}
+                    className="h-10 w-[140px] bg-white border-border/40 rounded-xl px-3"
+                  />
+                </div>
+                <div className="flex items-center gap-2">
+                  <Label className="text-[10px] font-bold uppercase text-muted-foreground hidden lg:block">To</Label>
+                  <Input
+                    type="date"
+                    value={dateTo}
+                    onChange={(e) => {
+                      setDateTo(e.target.value);
+                      setTimeShortcut('overall');
+                    }}
+                    className="h-10 w-[140px] bg-white border-border/40 rounded-xl px-3"
+                  />
+                </div>
+                <Select value={timeShortcut} onValueChange={handleTimeShortcut}>
+                  <SelectTrigger className="w-[140px] h-10 bg-white border-border/40 rounded-xl">
+                    <div className="flex items-center gap-2">
+                      <Filter className="w-3.5 h-3.5 text-muted-foreground" />
+                      <SelectValue placeholder="Period" />
+                    </div>
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="overall">All Time</SelectItem>
+                    <SelectItem value="today">Today</SelectItem>
+                    <SelectItem value="monthly">This Month</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
             </div>
           </CardHeader>
           <CardContent>
-            <div className="overflow-x-auto">
-              <Table>
-                <TableHeader>
-                  <TableRow className="hover:bg-transparent">
-                    <TableHead className="w-[80px]">ID</TableHead>
-                    <TableHead>Company Name</TableHead>
-                    <TableHead>Email / Login</TableHead>
-                    <TableHead>Phone</TableHead>
-                    <TableHead>Balance</TableHead>
-                    <TableHead>Status</TableHead>
-                    <TableHead className="text-right">Actions</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {filteredCompanies.length === 0 ? (
-                    <TableRow>
-                      <TableCell colSpan={6} className="text-center py-8 text-muted-foreground">
-                        No companies found.
-                      </TableCell>
+            <div className="rounded-xl border border-border/50 overflow-hidden shadow-inner bg-slate-50/50">
+              <div className="overflow-x-auto">
+                <Table>
+                  <TableHeader>
+                    <TableRow className="hover:bg-transparent">
+                      <TableHead className="w-[80px]">ID</TableHead>
+                      <TableHead>Company Name</TableHead>
+                      <TableHead>Email / Login</TableHead>
+                      <TableHead>Phone</TableHead>
+                      <TableHead>Balance</TableHead>
+                      <TableHead>Status</TableHead>
+                      <TableHead className="text-right">Actions</TableHead>
                     </TableRow>
-                  ) : (
-                    filteredCompanies.map((company) => {
-                      const balance = getCompanyBalance(company.id);
-                      return (
-                        <TableRow key={company.id} className="group hover:bg-muted/30 transition-colors">
-                          <TableCell className="font-mono text-xs text-primary font-bold">
-                            {company.identifier || `C${company.id}`}
-                          </TableCell>
-                          <TableCell className="font-medium text-foreground">
-                            {company.name}
-                          </TableCell>
-                          <TableCell className="text-muted-foreground font-mono text-xs">
-                            {company.email}
-                          </TableCell>
-                          <TableCell>{company.phone}</TableCell>
-                          <TableCell className={`font-bold ${balance > 0 ? 'text-red-600' : 'text-green-600'}`}>
-                            PKR {balance.toLocaleString()}
-                          </TableCell>
-                          <TableCell>
-                            <span
-                              className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium border ${company.status === 'Active'
-                                ? 'bg-green-100 text-green-700 border-green-200'
-                                : 'bg-gray-100 text-gray-700 border-gray-200'
-                                }`}
-                            >
-                              {company.status}
-                            </span>
-                          </TableCell>
-                          <TableCell className="text-right">
-                            <div className="flex items-center justify-end gap-2">
-                              <Button
-                                variant="ghost"
-                                size="sm"
-                                className="h-8 w-8 p-0 hover:bg-blue-100"
-                                onClick={() => router.push(`/admin/companies/${company.id}`)}
-                                title="View Details"
+                  </TableHeader>
+                  <TableBody>
+                    {filteredCompanies.length === 0 ? (
+                      <TableRow>
+                        <TableCell colSpan={6} className="text-center py-8 text-muted-foreground">
+                          No companies found.
+                        </TableCell>
+                      </TableRow>
+                    ) : (
+                      filteredCompanies.map((company) => {
+                        const balance = getCompanyBalance(company.id);
+                        return (
+                          <TableRow key={company.id} className="group hover:bg-muted/30 transition-colors">
+                            <TableCell className="font-mono text-xs text-primary font-bold">
+                              {company.identifier || `C${company.id}`}
+                            </TableCell>
+                            <TableCell className="font-medium text-foreground">
+                              {company.name}
+                            </TableCell>
+                            <TableCell className="text-muted-foreground font-mono text-xs">
+                              {company.email}
+                            </TableCell>
+                            <TableCell>{company.phone}</TableCell>
+                            <TableCell className={`font-bold ${balance > 0 ? 'text-red-600' : 'text-green-600'}`}>
+                              PKR {balance.toLocaleString()}
+                            </TableCell>
+                            <TableCell>
+                              <span
+                                className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium border ${company.status === 'Active'
+                                  ? 'bg-green-100 text-green-700 border-green-200'
+                                  : 'bg-gray-100 text-gray-700 border-gray-200'
+                                  }`}
                               >
-                                <Eye className="w-4 h-4 text-blue-600" />
-                              </Button>
-                              <Button
-                                variant="ghost"
-                                size="sm"
-                                className="h-8 w-8 p-0 hover:bg-orange-100"
-                                onClick={() => router.push(`/admin/companies/${company.id}`)}
-                                title="Edit Company"
-                              >
-                                <Edit2 className="w-4 h-4 text-orange-600" />
-                              </Button>
-                              <Button
-                                variant="ghost"
-                                size="sm"
-                                className="h-8 w-8 p-0 hover:bg-red-100"
-                                onClick={() => {
-                                  if (confirm('Are you sure you want to delete ' + company.name + '?')) {
-                                    deleteCompany(company.id);
-                                  }
-                                }}
-                                title="Delete Company"
-                              >
-                                <Trash2 className="w-4 h-4 text-red-600" />
-                              </Button>
-                            </div>
-                          </TableCell>
-                        </TableRow>
-                      );
-                    })
-                  )}
-                </TableBody>
-              </Table>
+                                {company.status}
+                              </span>
+                            </TableCell>
+                            <TableCell className="text-right">
+                              <div className="flex items-center justify-end gap-2">
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  className="h-8 w-8 p-0 hover:bg-blue-100"
+                                  onClick={() => router.push(`/admin/companies/${company.id}`)}
+                                  title="View Details"
+                                >
+                                  <Eye className="w-4 h-4 text-blue-600" />
+                                </Button>
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  className="h-8 w-8 p-0 hover:bg-orange-100"
+                                  onClick={() => router.push(`/admin/companies/${company.id}`)}
+                                  title="Edit Company"
+                                >
+                                  <Edit2 className="w-4 h-4 text-orange-600" />
+                                </Button>
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  className="h-8 w-8 p-0 hover:bg-red-100"
+                                  onClick={() => {
+                                    if (confirm('Are you sure you want to delete ' + company.name + '?')) {
+                                      deleteCompany(company.id);
+                                    }
+                                  }}
+                                  title="Delete Company"
+                                >
+                                  <Trash2 className="w-4 h-4 text-red-600" />
+                                </Button>
+                              </div>
+                            </TableCell>
+                          </TableRow>
+                        );
+                      })
+                    )}
+                  </TableBody>
+                </Table>
+              </div>
             </div>
             <div className="flex items-center justify-between mt-4 text-sm text-muted-foreground">
               <p>
                 Showing {filteredCompanies.length} company records
               </p>
+            </div>
+
+            {/* Bottom Summary Totals */}
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mt-10 border-t pt-10">
+              <DashboardCard
+                title="Filtered Companies"
+                value={companyTotals.count.toString()}
+                icon={Users}
+                change="Selected Records"
+                changeType="neutral"
+              />
+              <DashboardCard
+                title="Total Outstanding"
+                value={`PKR ${companyTotals.outstanding.toLocaleString()}`}
+                icon={DollarSign}
+                change="Filtered Context"
+                changeType="negative"
+              />
+              <DashboardCard
+                title="Total Collected"
+                value={`PKR ${companyTotals.collected.toLocaleString()}`}
+                icon={CreditCard}
+                change="In selected period"
+                changeType="positive"
+              />
             </div>
           </CardContent>
         </Card>

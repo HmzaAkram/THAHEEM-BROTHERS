@@ -27,20 +27,29 @@ import {
     SelectTrigger,
     SelectValue,
 } from '@/components/ui/select';
+import {
+    Tabs,
+    TabsContent,
+    TabsList,
+    TabsTrigger,
+} from '@/components/ui/tabs';
 import { Checkbox } from '@/components/ui/checkbox';
 import {
-    Plus,
-    ShieldCheck,
-    Ship,
-    Anchor,
-    Calendar,
-    CreditCard,
-    User,
-    Search,
     CheckCircle2,
     Clock,
     ArrowRight,
-    ClipboardList
+    ClipboardList,
+    Shield,
+    Users,
+    FileText,
+    Eye,
+    ShieldCheck,
+    Search,
+    Plus,
+    Ship,
+    Anchor,
+    Calendar,
+    User
 } from 'lucide-react';
 import { useState, useMemo } from 'react';
 import { useData, SecurityTracking } from '@/context/data-context';
@@ -50,8 +59,11 @@ import { formatDate } from '@/lib/utils';
 export default function SecuritiesPage() {
     const { securities, companies, addSecurity, updateSecurity } = useData();
     const [isDialogOpen, setIsDialogOpen] = useState(false);
+    const [isViewDialogOpen, setIsViewDialogOpen] = useState(false);
+    const [selectedSecurity, setSelectedSecurity] = useState<SecurityTracking | null>(null);
     const [loading, setLoading] = useState(false);
     const [searchTerm, setSearchTerm] = useState('');
+    const [statusFilter, setStatusFilter] = useState<'all' | 'pending' | 'received'>('all');
 
     // Form State
     const [companyId, setCompanyId] = useState('');
@@ -68,11 +80,17 @@ export default function SecuritiesPage() {
     const [payOrderNo, setPayOrderNo] = useState('');
     const [receiverName, setReceiverName] = useState('');
 
-    const filteredSecurities = securities.filter(s =>
-        s.companyName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        s.gdNumber.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        s.containerNo.toLowerCase().includes(searchTerm.toLowerCase())
-    );
+    const filteredSecurities = securities.filter(s => {
+        const matchesSearch = s.companyName.toLowerCase().includes(searchTerm.toLowerCase()) ||
+            s.gdNumber.toLowerCase().includes(searchTerm.toLowerCase()) ||
+            s.containerNo.toLowerCase().includes(searchTerm.toLowerCase());
+
+        const matchesStatus = statusFilter === 'all' ? true :
+            statusFilter === 'pending' ? !s.isRefundReceived :
+                s.isRefundReceived;
+
+        return matchesSearch && matchesStatus;
+    });
 
     const handleSubmit = async () => {
         if (!companyId || !gdNumber || !noOfContainers || !amountPerContainer) {
@@ -144,7 +162,15 @@ export default function SecuritiesPage() {
                         <p className="text-muted-foreground mt-1 font-medium">Manage and track container refund securities</p>
                     </div>
 
-                    <div className="flex items-center gap-3 w-full md:w-auto">
+                    <div className="flex items-center gap-3 w-full md:w-auto flex-wrap">
+                        <Tabs value={statusFilter} onValueChange={(v) => setStatusFilter(v as any)} className="w-full md:w-auto">
+                            <TabsList className="grid w-full grid-cols-3 h-10 bg-muted/50">
+                                <TabsTrigger value="all" className="text-xs font-bold uppercase">All</TabsTrigger>
+                                <TabsTrigger value="pending" className="text-xs font-bold uppercase">Pending</TabsTrigger>
+                                <TabsTrigger value="received" className="text-xs font-bold uppercase">Received</TabsTrigger>
+                            </TabsList>
+                        </Tabs>
+
                         <div className="relative flex-1 md:w-64">
                             <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
                             <Input
@@ -454,25 +480,39 @@ export default function SecuritiesPage() {
                                                     </Badge>
                                                 </TableCell>
                                                 <TableCell className="pr-8 text-right">
-                                                    <Button
-                                                        variant="ghost"
-                                                        size="icon"
-                                                        className="h-9 w-9 rounded-xl text-muted-foreground hover:bg-white hover:text-primary hover:shadow-md transition-all active:scale-95"
-                                                        onClick={async () => {
-                                                            if (window.confirm("Mark as refund received?")) {
-                                                                try {
-                                                                    const result = await updateSecurity(security.id, { isRefundReceived: true, status: 'Completed' });
-                                                                    // add check if result.ok here if updateSecurity is updated to return result
-                                                                } catch (err) {
-                                                                    console.error("Failed to update security:", err);
-                                                                    alert("Failed to update security record.");
+                                                    <div className="flex items-center justify-end gap-2">
+                                                        <Button
+                                                            variant="ghost"
+                                                            size="icon"
+                                                            className="h-9 w-9 rounded-xl text-muted-foreground hover:bg-white hover:text-primary hover:shadow-md transition-all active:scale-95"
+                                                            onClick={async () => {
+                                                                if (window.confirm("Mark as refund received?")) {
+                                                                    try {
+                                                                        const result = await updateSecurity(security.id, { isRefundReceived: true, status: 'Completed' });
+                                                                    } catch (err) {
+                                                                        console.error("Failed to update security:", err);
+                                                                        alert("Failed to update security record.");
+                                                                    }
                                                                 }
-                                                            }
-                                                        }}
-                                                        disabled={security.isRefundReceived}
-                                                    >
-                                                        <CheckCircle2 className="w-4 h-4" />
-                                                    </Button>
+                                                            }}
+                                                            disabled={security.isRefundReceived}
+                                                            title="Mark as Received"
+                                                        >
+                                                            <CheckCircle2 className="w-4 h-4" />
+                                                        </Button>
+                                                        <Button
+                                                            variant="ghost"
+                                                            size="icon"
+                                                            className="h-9 w-9 rounded-xl text-muted-foreground hover:bg-white hover:text-primary hover:shadow-md transition-all active:scale-95"
+                                                            onClick={() => {
+                                                                setSelectedSecurity(security);
+                                                                setIsViewDialogOpen(true);
+                                                            }}
+                                                            title="View Details"
+                                                        >
+                                                            <Eye className="w-4 h-4" />
+                                                        </Button>
+                                                    </div>
                                                 </TableCell>
                                             </TableRow>
                                         ))
@@ -482,7 +522,202 @@ export default function SecuritiesPage() {
                         </div>
                     </CardContent>
                 </Card>
+
+                {/* Totaling Section */}
+                {securities.length > 0 && (
+                    <Card className="rounded-[2rem] border-none shadow-2xl shadow-slate-200/50 dark:shadow-none bg-gradient-to-br from-white/90 to-primary/5 dark:from-slate-900/90 dark:to-primary/10 backdrop-blur-xl overflow-hidden">
+                        <CardHeader className="px-8 pt-6 pb-4">
+                            <CardTitle className="text-lg font-black flex items-center gap-2 text-primary">
+                                <ClipboardList className="w-5 h-5" />
+                                Financial Summary
+                            </CardTitle>
+                        </CardHeader>
+                        <CardContent className="px-8 pb-8">
+                            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                                <div className="flex items-center justify-between p-5 rounded-2xl bg-white dark:bg-slate-900 border-2 border-border/30 shadow-md hover:shadow-lg transition-all">
+                                    <div>
+                                        <p className="text-xs font-bold uppercase tracking-wider text-muted-foreground mb-2">Total Pending</p>
+                                        <p className="text-2xl font-black text-amber-600 font-mono">
+                                            PKR {securities.filter(s => !s.isRefundReceived).reduce((sum, s) => sum + (s.noOfContainers * s.amountPerContainer), 0).toLocaleString()}
+                                        </p>
+                                        <p className="text-xs font-bold text-amber-600/60 mt-1">
+                                            {securities.filter(s => !s.isRefundReceived).length} pending records
+                                        </p>
+                                    </div>
+                                    <Clock className="w-10 h-10 text-amber-500/30" />
+                                </div>
+                                <div className="flex items-center justify-between p-5 rounded-2xl bg-white dark:bg-slate-900 border-2 border-border/30 shadow-md hover:shadow-lg transition-all">
+                                    <div>
+                                        <p className="text-xs font-bold uppercase tracking-wider text-muted-foreground mb-2">Total Received</p>
+                                        <p className="text-2xl font-black text-emerald-600 font-mono">
+                                            PKR {securities.filter(s => s.isRefundReceived).reduce((sum, s) => sum + (s.noOfContainers * s.amountPerContainer), 0).toLocaleString()}
+                                        </p>
+                                        <p className="text-xs font-bold text-emerald-600/60 mt-1">
+                                            {securities.filter(s => s.isRefundReceived).length} received records
+                                        </p>
+                                    </div>
+                                    <CheckCircle2 className="w-10 h-10 text-emerald-500/30" />
+                                </div>
+                                <div className="flex items-center justify-between p-5 rounded-2xl bg-gradient-to-br from-primary/10 to-primary/5 border-2 border-primary/30 shadow-md hover:shadow-xl transition-all">
+                                    <div>
+                                        <p className="text-xs font-bold uppercase tracking-wider text-primary/70 mb-2">Grand Total</p>
+                                        <p className="text-2xl font-black text-primary font-mono">
+                                            PKR {securities.reduce((sum, s) => sum + (s.noOfContainers * s.amountPerContainer), 0).toLocaleString()}
+                                        </p>
+                                        <p className="text-xs font-bold text-primary/60 mt-1">
+                                            {securities.length} total records
+                                        </p>
+                                    </div>
+                                    <Shield className="w-10 h-10 text-primary/30" />
+                                </div>
+                            </div>
+                            <div className="mt-6 pt-4 border-t border-border/30 flex justify-between items-center text-sm">
+                                <span className="text-muted-foreground font-semibold">
+                                    Displaying {filteredSecurities.length} of {securities.length} securities
+                                </span>
+                                <span className="text-muted-foreground font-semibold">
+                                    {securities.filter(s => !s.isRefundReceived).length} Pending • {securities.filter(s => s.isRefundReceived).length} Received
+                                </span>
+                            </div>
+                        </CardContent>
+                    </Card>
+                )}
             </div>
+
+            {/* Security View Dialog */}
+            <Dialog open={isViewDialogOpen} onOpenChange={setIsViewDialogOpen}>
+                <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
+                    <DialogHeader>
+                        <DialogTitle className="flex items-center gap-3 text-2xl">
+                            <Shield className="w-6 h-6 text-primary" />
+                            Security Details - {selectedSecurity?.gdNumber}
+                        </DialogTitle>
+                    </DialogHeader>
+                    {selectedSecurity && (
+                        <div className="space-y-6 pt-4">
+                            {/* Company & Basic Info */}
+                            <div className="bg-muted/30 p-5 rounded-xl border border-border/50">
+                                <h3 className="text-sm font-bold uppercase tracking-wider text-muted-foreground mb-4 flex items-center gap-2">
+                                    <Users className="w-4 h-4" /> Company Information
+                                </h3>
+                                <div className="grid grid-cols-2 gap-4">
+                                    <div>
+                                        <p className="text-xs text-muted-foreground font-semibold mb-1">Company Name</p>
+                                        <p className="font-bold text-foreground">{selectedSecurity.companyName}</p>
+                                    </div>
+                                    <div>
+                                        <p className="text-xs text-muted-foreground font-semibold mb-1">GD Number</p>
+                                        <p className="font-mono font-bold text-foreground">{selectedSecurity.gdNumber}</p>
+                                    </div>
+                                </div>
+                            </div>
+
+                            {/* Container Details */}
+                            <div className="bg-muted/30 p-5 rounded-xl border border-border/50">
+                                <h3 className="text-sm font-bold uppercase tracking-wider text-muted-foreground mb-4 flex items-center gap-2">
+                                    <FileText className="w-4 h-4" /> Container & Amount Details
+                                </h3>
+                                <div className="grid grid-cols-2 gap-4">
+                                    <div>
+                                        <p className="text-xs text-muted-foreground font-semibold mb-1">Number of Containers</p>
+                                        <p className="font-bold text-foreground">{selectedSecurity.noOfContainers}</p>
+                                    </div>
+                                    <div>
+                                        <p className="text-xs text-muted-foreground font-semibold mb-1">Container Number</p>
+                                        <p className="font-mono font-bold text-foreground">{selectedSecurity.containerNo}</p>
+                                    </div>
+                                    <div>
+                                        <p className="text-xs text-muted-foreground font-semibold mb-1">Amount Per Container</p>
+                                        <p className="font-mono font-bold text-foreground">PKR {selectedSecurity.amountPerContainer.toLocaleString()}</p>
+                                    </div>
+                                    <div>
+                                        <p className="text-xs text-muted-foreground font-semibold mb-1">Total Amount</p>
+                                        <p className="font-mono font-black text-primary text-lg">
+                                            PKR {(selectedSecurity.noOfContainers * selectedSecurity.amountPerContainer).toLocaleString()}
+                                        </p>
+                                    </div>
+                                </div>
+                            </div>
+
+                            {/* Port & Refund Details */}
+                            <div className="bg-muted/30 p-5 rounded-xl border border-border/50">
+                                <h3 className="text-sm font-bold uppercase tracking-wider text-muted-foreground mb-4 flex items-center gap-2">
+                                    <Clock className="w-4 h-4" /> Port & Refund Information
+                                </h3>
+                                <div className="grid grid-cols-2 gap-4">
+                                    <div>
+                                        <p className="text-xs text-muted-foreground font-semibold mb-1">Port</p>
+                                        <p className="font-bold text-foreground uppercase">{selectedSecurity.port}</p>
+                                    </div>
+                                    <div>
+                                        <p className="text-xs text-muted-foreground font-semibold mb-1">Refund Days</p>
+                                        <p className="font-bold text-foreground">{selectedSecurity.refundDays} days</p>
+                                    </div>
+                                    <div>
+                                        <p className="text-xs text-muted-foreground font-semibold mb-1">Refund Due Date</p>
+                                        <p className="font-mono font-bold text-foreground">{formatDate(selectedSecurity.refundDueDate)}</p>
+                                    </div>
+                                    <div>
+                                        <p className="text-xs text-muted-foreground font-semibold mb-1">Pay Order Number</p>
+                                        <p className="font-mono font-bold text-foreground">{selectedSecurity.payOrderNo}</p>
+                                    </div>
+                                </div>
+                            </div>
+
+                            {/* Status Information */}
+                            <div className="bg-muted/30 p-5 rounded-xl border border-border/50">
+                                <h3 className="text-sm font-bold uppercase tracking-wider text-muted-foreground mb-4 flex items-center gap-2">
+                                    <CheckCircle2 className="w-4 h-4" /> Status & Tracking
+                                </h3>
+                                <div className="grid grid-cols-2 gap-4">
+                                    <div>
+                                        <p className="text-xs text-muted-foreground font-semibold mb-1">Receiver Name</p>
+                                        <p className="font-bold text-foreground">{selectedSecurity.receiverName}</p>
+                                    </div>
+                                    <div>
+                                        <p className="text-xs text-muted-foreground font-semibold mb-1">Document Submitted</p>
+                                        <div className="inline-flex items-center gap-1.5">
+                                            {selectedSecurity.isDocumentSubmitted ? (
+                                                <>
+                                                    <CheckCircle2 className="w-4 h-4 text-emerald-600" />
+                                                    <span className="font-bold text-emerald-600">Yes</span>
+                                                </>
+                                            ) : (
+                                                <>
+                                                    <Clock className="w-4 h-4 text-amber-600" />
+                                                    <span className="font-bold text-amber-600">No</span>
+                                                </>
+                                            )}
+                                        </div>
+                                    </div>
+                                    <div>
+                                        <p className="text-xs text-muted-foreground font-semibold mb-1">Refund Received</p>
+                                        <div className="inline-flex items-center gap-1.5">
+                                            {selectedSecurity.isRefundReceived ? (
+                                                <>
+                                                    <CheckCircle2 className="w-4 h-4 text-emerald-600" />
+                                                    <span className="font-bold text-emerald-600">Yes</span>
+                                                </>
+                                            ) : (
+                                                <>
+                                                    <Clock className="w-4 h-4 text-amber-600" />
+                                                    <span className="font-bold text-amber-600">Pending</span>
+                                                </>
+                                            )}
+                                        </div>
+                                    </div>
+                                    {selectedSecurity.receivedAmountDate && (
+                                        <div>
+                                            <p className="text-xs text-muted-foreground font-semibold mb-1">Received Date</p>
+                                            <p className="font-mono font-bold text-foreground">{formatDate(selectedSecurity.receivedAmountDate)}</p>
+                                        </div>
+                                    )}
+                                </div>
+                            </div>
+                        </div>
+                    )}
+                </DialogContent>
+            </Dialog>
         </DashboardLayout>
     );
 }

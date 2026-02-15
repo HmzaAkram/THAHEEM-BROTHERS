@@ -27,7 +27,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { Plus, Download, Filter } from 'lucide-react';
+import { Plus, Download, Filter, Search, DollarSign, TrendingUp, CreditCard } from 'lucide-react';
 import { useState, useMemo } from 'react';
 import { useData } from '@/context/data-context';
 import { formatDate } from '@/lib/utils';
@@ -44,6 +44,11 @@ export default function PaymentsPage() {
   const [adjustment, setAdjustment] = useState('');
   const [method, setMethod] = useState('Bank Transfer');
   const [billId, setBillId] = useState(''); // Essential now
+
+  // Table Filters State
+  const [timeFilter, setTimeFilter] = useState<'overall' | 'monthly' | '3months' | '6months' | 'yearly'>('overall');
+  const [companyFilter, setCompanyFilter] = useState<string>('all');
+  const [searchQuery, setSearchQuery] = useState('');
 
   // Method specific state
   const [trackingId, setTrackingId] = useState('');
@@ -113,10 +118,54 @@ export default function PaymentsPage() {
     return bills.filter(b => b.companyId === companyId && b.status !== 'Paid');
   }, [companyId, bills]);
 
-  // Sort payments by date desc
-  const sortedPayments = useMemo(() => {
-    return [...payments].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
-  }, [payments]);
+  // Filtered Payments Logic
+  const filteredPayments = useMemo(() => {
+    let filtered = [...payments];
+
+    // Time Filter
+    if (timeFilter !== 'overall') {
+      const now = new Date();
+      let startDate = new Date();
+
+      if (timeFilter === 'monthly') {
+        startDate = new Date(now.getFullYear(), now.getMonth(), 1);
+      } else if (timeFilter === '3months') {
+        startDate.setDate(now.getDate() - 90);
+      } else if (timeFilter === '6months') {
+        startDate.setDate(now.getDate() - 180);
+      } else if (timeFilter === 'yearly') {
+        startDate = new Date(now.getFullYear(), 0, 1);
+      }
+
+      filtered = filtered.filter(p => new Date(p.date) >= startDate);
+    }
+
+    // Company Filter
+    if (companyFilter !== 'all') {
+      filtered = filtered.filter(p => p.companyId === companyFilter);
+    }
+
+    // Search Query (Reference or specific notes)
+    if (searchQuery.trim()) {
+      const q = searchQuery.toLowerCase();
+      filtered = filtered.filter(p =>
+        p.reference.toLowerCase().includes(q) ||
+        p.companyName.toLowerCase().includes(q) ||
+        p.method.toLowerCase().includes(q)
+      );
+    }
+
+    return filtered.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+  }, [payments, timeFilter, companyFilter, searchQuery]);
+
+  // Dynamic Totals for Payments
+  const tableTotals = useMemo(() => {
+    return filteredPayments.reduce((acc, p) => {
+      acc.collected += p.amount;
+      acc.adjustment += (p.adjustment || 0);
+      return acc;
+    }, { collected: 0, adjustment: 0 });
+  }, [filteredPayments]);
 
   return (
     <DashboardLayout>
@@ -290,11 +339,53 @@ export default function PaymentsPage() {
         </div>
 
         <Card className="shadow-md border-border/50">
-          <CardHeader>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-7">
             <CardTitle>Transaction History</CardTitle>
+            <div className="flex flex-wrap gap-3">
+              {/* Search Bar */}
+              <div className="relative w-64">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                <Input
+                  placeholder="Search by Ref, Company, Method..."
+                  className="pl-9 bg-muted/20 border-border/50 h-9 text-xs"
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                />
+              </div>
+
+              {/* Company Select */}
+              <Select value={companyFilter} onValueChange={setCompanyFilter}>
+                <SelectTrigger className="w-[180px] h-9 bg-muted/20 border-border/50 text-xs">
+                  <SelectValue placeholder="All Companies" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Companies</SelectItem>
+                  {companies.map(c => (
+                    <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+
+              {/* Time Filter Select */}
+              <Select value={timeFilter} onValueChange={(v: any) => setTimeFilter(v)}>
+                <SelectTrigger className="w-[140px] h-9 bg-muted/20 border-border/50 text-xs">
+                  <div className="flex items-center gap-2">
+                    <Filter className="h-3 w-3" />
+                    <SelectValue placeholder="Overall" />
+                  </div>
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="overall">Overall</SelectItem>
+                  <SelectItem value="monthly">This Month</SelectItem>
+                  <SelectItem value="3months">Last 3 Months</SelectItem>
+                  <SelectItem value="6months">Last 6 Months</SelectItem>
+                  <SelectItem value="yearly">This Year</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
           </CardHeader>
           <CardContent>
-            {sortedPayments.length === 0 ? (
+            {filteredPayments.length === 0 ? (
               <div className="text-center py-10 text-muted-foreground">
                 No payments recorded yet.
               </div>
@@ -311,7 +402,7 @@ export default function PaymentsPage() {
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {sortedPayments.map((payment) => (
+                    {filteredPayments.map((payment) => (
                       <TableRow key={payment.id} className="hover:bg-muted/50 transition-colors">
                         <TableCell className="text-sm text-muted-foreground">
                           {formatDate(payment.date)}
@@ -334,6 +425,28 @@ export default function PaymentsPage() {
                 </Table>
               </div>
             )}
+
+            {/* Filtering Summary / Totals */}
+            <div className="mt-8 grid grid-cols-1 md:grid-cols-2 gap-4 border-t pt-8">
+              <div className="bg-muted/30 p-4 rounded-2xl border border-border/50 flex items-center justify-between">
+                <div className="space-y-1">
+                  <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Filtered Collections</p>
+                  <p className="text-xl font-black text-green-600 dark:text-green-400 font-mono">PKR {tableTotals.collected.toLocaleString()}</p>
+                </div>
+                <div className="w-10 h-10 rounded-full bg-green-500/10 flex items-center justify-center">
+                  <DollarSign className="w-5 h-5 text-green-600 dark:text-green-400" />
+                </div>
+              </div>
+              <div className="bg-muted/30 p-4 rounded-2xl border border-border/50 flex items-center justify-between">
+                <div className="space-y-1">
+                  <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Filtered Adjustments</p>
+                  <p className="text-xl font-black text-amber-600 dark:text-amber-400 font-mono">PKR {tableTotals.adjustment.toLocaleString()}</p>
+                </div>
+                <div className="w-10 h-10 rounded-full bg-amber-500/10 flex items-center justify-center">
+                  <CreditCard className="w-5 h-5 text-amber-600 dark:text-amber-400" />
+                </div>
+              </div>
+            </div>
 
           </CardContent>
         </Card>

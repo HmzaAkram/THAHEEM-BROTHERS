@@ -47,6 +47,18 @@ export const InvoiceTemplate = forwardRef<HTMLDivElement, InvoiceTemplateProps>(
                         <p className="font-mono font-bold text-lg">{bill.billNo}</p>
                     </div>
                     <div>
+                        <Label className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Bill To</Label>
+                        <div className="space-y-1">
+                            <p className="font-bold text-lg text-primary">{(bill as any).company?.name || bill.companyName}</p>
+                            {(bill as any).company?.address && (
+                                <p className="text-xs text-muted-foreground max-w-[200px] leading-tight">{(bill as any).company.address}</p>
+                            )}
+                            {(bill as any).company?.phone && (
+                                <p className="text-xs text-muted-foreground">{(bill as any).company.phone}</p>
+                            )}
+                        </div>
+                    </div>
+                    <div>
                         <Label className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Date</Label>
                         <p className="font-semibold">{formatDate(bill.date)}</p>
                     </div>
@@ -178,6 +190,39 @@ export const InvoiceTemplate = forwardRef<HTMLDivElement, InvoiceTemplateProps>(
                             </div>
                         </div>
                     </div>
+                    {/* Attachments Section */}
+                    {bill.attachment && (
+                        <div className="pt-8 break-before-page no-print-break-inside avoid-page-break">
+                            <h3 className="font-bold text-sm uppercase tracking-widest text-primary mb-4 border-b pb-2">Attached Documents</h3>
+                            <div className="flex justify-center flex-col items-center gap-2">
+                                {bill.attachment.toLowerCase().endsWith('.pdf') ? (
+                                    <div className="w-full h-[800px] border rounded-lg overflow-hidden bg-slate-100 flex items-center justify-center print:hidden">
+                                        <object data={bill.attachment} type="application/pdf" className="w-full h-full">
+                                            <div className="flex flex-col items-center justify-center p-10 text-center space-y-4">
+                                                <p className="text-muted-foreground">PDF Preview not available.</p>
+                                                <a href={bill.attachment} target="_blank" rel="noopener noreferrer" className="text-primary hover:underline font-bold">
+                                                    Click here to view/download PDF
+                                                </a>
+                                            </div>
+                                        </object>
+                                    </div>
+                                ) : (
+                                    <img
+                                        src={bill.attachment}
+                                        alt="Bill Attachment"
+                                        className="max-w-full h-auto max-h-[800px] border rounded-lg shadow-sm"
+                                    />
+                                )}
+                                {/* Always show a download link for print versions if it's a PDF */}
+                                {bill.attachment.toLowerCase().endsWith('.pdf') && (
+                                    <div className="hidden print:block text-center p-4 border rounded-lg">
+                                        <p className="font-bold">Attached Document: PDF</p>
+                                        <p className="text-sm text-muted-foreground">This document has a PDF attachment. Please refer to the digital version or attached file.</p>
+                                    </div>
+                                )}
+                            </div>
+                        </div>
+                    )}
                 </div>
             </div>
         </div>

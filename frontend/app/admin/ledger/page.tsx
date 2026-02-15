@@ -20,19 +20,34 @@ import {
 } from '@/components/ui/select';
 import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
-import { Download, Printer, Filter } from 'lucide-react';
+import { Download, Printer, Filter, Check, ChevronsUpDown, Search, DollarSign, ArrowUpCircle, ArrowDownCircle, Scale } from 'lucide-react';
 import { useState, useMemo, useRef } from 'react';
 import { useData, LedgerEntry } from '@/context/data-context';
 import { Input } from '@/components/ui/input';
-import { formatDate } from '@/lib/utils';
+import { formatDate, cn } from '@/lib/utils';
 import { jsPDF } from 'jspdf';
 import { toPng } from 'html-to-image';
+import { DashboardCard } from '@/components/dashboard-card';
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from '@/components/ui/popover';
+import {
+  Command,
+  CommandEmpty,
+  CommandGroup,
+  CommandInput,
+  CommandItem,
+  CommandList,
+} from '@/components/ui/command';
 
 export default function LedgerPage() {
   const { companies, getCompanyLedger } = useData();
   const [selectedCompanyId, setSelectedCompanyId] = useState<string>('all');
   const [startDate, setStartDate] = useState('');
   const [endDate, setEndDate] = useState('');
+  const [open, setOpen] = useState(false);
   const tableRef = useRef<HTMLDivElement>(null);
 
   const { ledgerData, openingBalance } = useMemo(() => {
@@ -128,17 +143,66 @@ export default function LedgerPage() {
             <div className="grid grid-cols-1 md:grid-cols-4 gap-4 items-end">
               <div>
                 <Label className="text-sm font-medium mb-1.5 block">Select Client Company</Label>
-                <Select value={selectedCompanyId} onValueChange={setSelectedCompanyId}>
-                  <SelectTrigger>
-                    <SelectValue placeholder="Select Company" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">-- All Transactions --</SelectItem>
-                    {companies.map(c => (
-                      <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                <Popover open={open} onOpenChange={setOpen}>
+                  <PopoverTrigger asChild>
+                    <Button
+                      variant="outline"
+                      role="combobox"
+                      aria-expanded={open}
+                      className="w-full justify-between bg-white border-border/40 rounded-xl"
+                    >
+                      {selectedCompanyId === "all"
+                        ? "-- All Transactions --"
+                        : companies.find((c) => c.id === selectedCompanyId)?.name}
+                      <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-[300px] p-0 rounded-xl overflow-hidden" align="start">
+                    <Command className="rounded-xl">
+                      <CommandInput placeholder="Search company..." className="h-9" />
+                      <CommandList>
+                        <CommandEmpty>No company found.</CommandEmpty>
+                        <CommandGroup>
+                          <CommandItem
+                            value="all"
+                            onSelect={() => {
+                              setSelectedCompanyId("all");
+                              setOpen(false);
+                            }}
+                            className="cursor-pointer"
+                          >
+                            <Check
+                              className={cn(
+                                "mr-2 h-4 w-4",
+                                selectedCompanyId === "all" ? "opacity-100" : "opacity-0"
+                              )}
+                            />
+                            -- All Transactions --
+                          </CommandItem>
+                          {companies.map((c) => (
+                            <CommandItem
+                              key={c.id}
+                              value={c.name}
+                              onSelect={() => {
+                                setSelectedCompanyId(c.id);
+                                setOpen(false);
+                              }}
+                              className="cursor-pointer"
+                            >
+                              <Check
+                                className={cn(
+                                  "mr-2 h-4 w-4",
+                                  selectedCompanyId === c.id ? "opacity-100" : "opacity-0"
+                                )}
+                              />
+                              {c.name}
+                            </CommandItem>
+                          ))}
+                        </CommandGroup>
+                      </CommandList>
+                    </Command>
+                  </PopoverContent>
+                </Popover>
               </div>
 
               <div>
@@ -309,29 +373,37 @@ export default function LedgerPage() {
               </Table>
             </div>
 
-            {/* Totals Section */}
-            {selectedCompanyId !== 'all' && ledgerData.length > 0 && (
-              <div className="flex justify-end mt-6">
-                <div className="bg-muted/40 p-4 rounded-lg min-w-[300px] space-y-2 border">
-                  <div className="flex justify-between text-sm">
-                    <span className="text-muted-foreground">Opening Balance:</span>
-                    <span className="font-mono font-medium">{openingBalance.toLocaleString()}</span>
-                  </div>
-                  <div className="flex justify-between text-sm">
-                    <span className="text-muted-foreground">Total Billed (Selected):</span>
-                    <span className="font-mono font-medium text-destructive">+{totals.debit.toLocaleString()}</span>
-                  </div>
-                  <div className="flex justify-between text-sm">
-                    <span className="text-muted-foreground">Total Paid (Selected):</span>
-                    <span className="font-mono font-medium text-green-600">-{totals.credit.toLocaleString()}</span>
-                  </div>
-                  <div className="border-t pt-2 mt-2 flex justify-between font-bold text-base">
-                    <span>Closing Balance:</span>
-                    <span className={ledgerData[ledgerData.length - 1].balance > 0 ? "text-destructive" : "text-green-600"}>
-                      PKR {ledgerData[ledgerData.length - 1].balance.toLocaleString()}
-                    </span>
-                  </div>
-                </div>
+            {/* Bottom Summary Totals */}
+            {ledgerData.length > 0 && (
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mt-8 pt-8 border-t">
+                <DashboardCard
+                  title="Opening Balance"
+                  value={`PKR ${openingBalance.toLocaleString()}`}
+                  icon={Scale}
+                  change="Balance b/f"
+                  changeType="neutral"
+                />
+                <DashboardCard
+                  title="Total Billed"
+                  value={`PKR ${totals.debit.toLocaleString()}`}
+                  icon={ArrowUpCircle}
+                  change="In selected period"
+                  changeType="negative"
+                />
+                <DashboardCard
+                  title="Total Paid"
+                  value={`PKR ${totals.credit.toLocaleString()}`}
+                  icon={ArrowDownCircle}
+                  change="In selected period"
+                  changeType="positive"
+                />
+                <DashboardCard
+                  title="Closing Balance"
+                  value={`PKR ${ledgerData[ledgerData.length - 1].balance.toLocaleString()}`}
+                  icon={DollarSign}
+                  change="Current Standing"
+                  changeType={ledgerData[ledgerData.length - 1].balance > 0 ? "negative" : "positive"}
+                />
               </div>
             )}
 

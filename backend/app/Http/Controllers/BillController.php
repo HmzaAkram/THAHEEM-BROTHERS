@@ -13,9 +13,18 @@ class BillController extends Controller
     {
         $user = auth()->user();
         if ($user instanceof \App\Models\Company) {
-            return response()->json(Bill::with('items')->where('company_id', $user->id)->orderBy('id', 'desc')->get());
+            $bills = Bill::with(['items', 'company'])->where('company_id', $user->id)->orderBy('id', 'desc')->get();
+        } else {
+            $bills = Bill::with(['items', 'company'])->orderBy('id', 'desc')->get();
         }
-        return response()->json(Bill::with('items')->orderBy('id', 'desc')->get());
+
+        $bills->each(function ($bill) {
+            if ($bill->attachment) {
+                $bill->attachment = $this->ensureAbsoluteUrl($bill->attachment);
+            }
+        });
+
+        return response()->json($bills);
     }
 
     public function store(Request $request)
@@ -53,15 +62,40 @@ class BillController extends Controller
             'items.*.invoice_no' => 'nullable|string',
         ]);
 
-        return DB::transaction(function () use ($validated) {
-            $billData = collect($validated)->except('items')->toArray();
+        return DB::transaction(function () use ($validated, $request) {
+            $billData = collect($validated)->except(['items', 'attachment'])->toArray();
+            
+            // Handle Attachment Storage
+            if ($request->filled('attachment')) {
+                $attachmentData = $request->input('attachment');
+                if (str_starts_with($attachmentData, 'data:')) {
+                    // It's a base64 string
+                    $format = explode('/', explode(':', substr($attachmentData, 0, strpos($attachmentData, ';')))[1])[1];
+                    $image = str_replace(' ', '+', explode(',', $attachmentData)[1]);
+                    $fileName = 'bill_' . time() . '_' . uniqid() . '.' . $format;
+                    
+                    \Illuminate\Support\Facades\Storage::disk('public')->put('attachments/' . $fileName, base64_decode($image));
+                    $url = \Illuminate\Support\Facades\Storage::url('attachments/' . $fileName);
+                    $billData['attachment'] = str_starts_with($url, 'http') ? $url : config('app.url') . $url;
+                } else {
+                    $billData['attachment'] = $attachmentData;
+                }
+            }
+
             $bill = Bill::create($billData);
 
             foreach ($validated['items'] as $itemData) {
                 $bill->items()->create($itemData);
             }
 
-            return response()->json($bill->load('items'), 201);
+            $bill->load(['items', 'company']);
+            
+            // Ensure return absolute URL for attachment if it exists
+            if ($bill->attachment) {
+                $bill->attachment = $this->ensureAbsoluteUrl($bill->attachment);
+            }
+
+            return response()->json($bill, 201);
         });
     }
 
@@ -71,7 +105,20 @@ class BillController extends Controller
         if ($user instanceof \App\Models\Company && $bill->company_id !== $user->id) {
             return response()->json(['message' => 'Unauthorized'], 403);
         }
-        return response()->json($bill->load('items'));
+        
+        if ($bill->attachment) {
+            $bill->attachment = $this->ensureAbsoluteUrl($bill->attachment);
+        }
+
+        return response()->json($bill->load(['items', 'company']));
+    }
+
+    private function ensureAbsoluteUrl($path)
+    {
+        if (!$path || str_starts_with($path, 'http')) {
+            return $path;
+        }
+        return config('app.url') . $path;
     }
 
     public function update(Request $request, Bill $bill)

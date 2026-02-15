@@ -42,7 +42,12 @@ import {
   Package,
   Anchor,
   Briefcase,
-  AlertCircle
+  AlertCircle,
+  Search,
+  Filter,
+  DollarSign,
+  TrendingUp,
+  CreditCard
 } from 'lucide-react';
 import { useState, useMemo, useRef, useEffect } from 'react';
 import { useData, BillItem, Bill } from '@/context/data-context';
@@ -132,12 +137,17 @@ export default function BillsPage() {
   const [gdNumber, setGdNumber] = useState('');
   const [noOfContainers, setNoOfContainers] = useState('');
   const [containerNo, setContainerNo] = useState('');
-  const [portName, setPortName] = useState('');
   const [packages, setPackages] = useState('');
   const [jobNumber, setJobNumber] = useState('');
   const [via, setVia] = useState('');
   const [weight, setWeight] = useState('');
   const [attachment, setAttachment] = useState<File | null>(null);
+
+  // Table Filters State
+  const [timeFilter, setTimeFilter] = useState<'overall' | 'monthly' | '3months' | '6months' | 'yearly'>('overall');
+  const [companyFilter, setCompanyFilter] = useState<string>('all');
+  const [searchQuery, setSearchQuery] = useState('');
+
   const [items, setItems] = useState<Omit<BillItem, 'id'>[]>([
     { description: 'DUTY TAXES & ETO', notes: '', amount: 0, invoiceNo: '' },
     { description: 'CIVIL AVIATION AUTHORITY', notes: '', amount: 0, invoiceNo: '' },
@@ -187,13 +197,28 @@ export default function BillsPage() {
       return;
     }
 
+    const fileToBase64 = (file: File): Promise<string> => {
+      return new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.readAsDataURL(file);
+        reader.onload = () => resolve(reader.result as string);
+        reader.onerror = error => reject(error);
+      });
+    };
+
     setLoading(true);
     try {
+      let attachmentBase64 = undefined;
+      if (attachment) {
+        attachmentBase64 = await fileToBase64(attachment);
+      }
+
       const result = await addBill({
         billNo: `BILL-${String(bills.length + 1).padStart(3, '0')}`,
         companyId: selectedCompany.id,
         companyName: selectedCompany.name,
         date,
+        exporter,
         invoiceNo,
         invoiceDate,
         beNumber,
@@ -203,12 +228,11 @@ export default function BillsPage() {
         gdNumber,
         noOfContainers,
         containerNo,
-        portName,
         packages,
         jobNumber,
         via,
         weight,
-        attachment: attachment ? URL.createObjectURL(attachment) : undefined,
+        attachment: attachmentBase64,
         items: finalItems,
         totalAmount: totalAmount,
         serviceCharges: Number(serviceCharges) || 0,
@@ -237,7 +261,6 @@ export default function BillsPage() {
         setAdvancePayment('');
         setNoOfContainers('');
         setContainerNo('');
-        setPortName('');
         setPackages('');
         setAttachment(null);
         setItems([
@@ -256,10 +279,56 @@ export default function BillsPage() {
     }
   };
 
-  // Sort bills by date desc
-  const sortedBills = useMemo(() => {
-    return [...bills].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
-  }, [bills]);
+  // Filtered Bills Logic
+  const filteredBills = useMemo(() => {
+    let filtered = [...bills];
+
+    // Time Filter
+    if (timeFilter !== 'overall') {
+      const now = new Date();
+      let startDate = new Date();
+
+      if (timeFilter === 'monthly') {
+        startDate = new Date(now.getFullYear(), now.getMonth(), 1);
+      } else if (timeFilter === '3months') {
+        startDate.setDate(now.getDate() - 90);
+      } else if (timeFilter === '6months') {
+        startDate.setDate(now.getDate() - 180);
+      } else if (timeFilter === 'yearly') {
+        startDate = new Date(now.getFullYear(), 0, 1);
+      }
+
+      filtered = filtered.filter(bill => new Date(bill.date) >= startDate);
+    }
+
+    // Company Filter
+    if (companyFilter !== 'all') {
+      filtered = filtered.filter(bill => bill.companyId === companyFilter);
+    }
+
+    // Search Query
+    if (searchQuery.trim()) {
+      const q = searchQuery.toLowerCase();
+      filtered = filtered.filter(bill =>
+        bill.billNo.toLowerCase().includes(q) ||
+        bill.companyName.toLowerCase().includes(q) ||
+        bill.jobNumber.toLowerCase().includes(q) ||
+        bill.gdNumber?.toLowerCase().includes(q)
+      );
+    }
+
+    return filtered.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+  }, [bills, timeFilter, companyFilter, searchQuery]);
+
+  // Dynamic Totals
+  const tableTotals = useMemo(() => {
+    return filteredBills.reduce((acc, bill) => {
+      acc.billed += bill.grandTotal;
+      acc.paid += bill.paidAmount;
+      acc.balance += (bill.grandTotal - bill.paidAmount);
+      return acc;
+    }, { billed: 0, paid: 0, balance: 0 });
+  }, [filteredBills]);
 
   const handleExportPDF = async () => {
     if (!tableRef.current) return;
@@ -423,16 +492,7 @@ export default function BillsPage() {
                             </div>
                           </div>
                           {via === 'SEA' && (
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-5 mt-5 pt-5 border-t border-border/50 animate-in fade-in slide-in-from-top-2">
-                              <div className="md:col-span-2">
-                                <Label className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground mb-1.5 block">Name of the Port</Label>
-                                <Input
-                                  placeholder="Example: Karachi Port"
-                                  className="bg-white dark:bg-slate-950 border-border/50 h-10"
-                                  value={portName}
-                                  onChange={(e) => setPortName(e.target.value)}
-                                />
-                              </div>
+                            <div className="grid grid-cols-2 gap-x-6 gap-y-5 mt-5 pt-5 border-t border-border/50 animate-in fade-in slide-in-from-top-2">
                               <div>
                                 <Label className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground mb-1.5 block">No of Containers</Label>
                                 <Input
@@ -440,12 +500,14 @@ export default function BillsPage() {
                                   className="bg-white dark:bg-slate-950 border-border/50 h-10"
                                   value={noOfContainers}
                                   onChange={(e) => setNoOfContainers(e.target.value)}
+                                  onWheel={(e) => e.currentTarget.blur()}
+                                  type="number"
                                 />
                               </div>
                               <div>
-                                <Label className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground mb-1.5 block">Container Numbers</Label>
+                                <Label className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground mb-1.5 block">Container No</Label>
                                 <Input
-                                  placeholder="Example: MSCU1234567, MSCU7654321"
+                                  placeholder="Example: MSCU1234567"
                                   className="bg-white dark:bg-slate-950 border-border/50 h-10"
                                   value={containerNo}
                                   onChange={(e) => setContainerNo(e.target.value)}
@@ -471,11 +533,11 @@ export default function BillsPage() {
                                 onChange={(e) => setExporter(e.target.value)}
                               />
                             </div>
-                            <div>
+                            <div className="col-span-2">
                               <Label className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground mb-1.5 block">Arrival Date</Label>
                               <Input
                                 type="date"
-                                className="bg-white dark:bg-slate-950 border-border/50 h-10"
+                                className="bg-white dark:bg-slate-950 border-border/50 h-10 w-full"
                                 value={invoiceDate}
                                 onChange={(e) => setInvoiceDate(e.target.value)}
                               />
@@ -746,15 +808,57 @@ export default function BillsPage() {
           </div>
 
           <Card className="shadow-md border-border/50">
-            <CardHeader>
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-7">
               <CardTitle>All Invoices</CardTitle>
+              <div className="flex flex-wrap gap-3">
+                {/* Search Bar */}
+                <div className="relative w-64">
+                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                  <Input
+                    placeholder="Search by Bill, Company, Job..."
+                    className="pl-9 bg-muted/20 border-border/50 h-9 text-xs"
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                  />
+                </div>
+
+                {/* Company Select */}
+                <Select value={companyFilter} onValueChange={setCompanyFilter}>
+                  <SelectTrigger className="w-[180px] h-9 bg-muted/20 border-border/50 text-xs">
+                    <SelectValue placeholder="All Companies" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All Companies</SelectItem>
+                    {companies.map(c => (
+                      <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+
+                {/* Time Filter Select */}
+                <Select value={timeFilter} onValueChange={(v: any) => setTimeFilter(v)}>
+                  <SelectTrigger className="w-[140px] h-9 bg-muted/20 border-border/50 text-xs">
+                    <div className="flex items-center gap-2">
+                      <Filter className="h-3 w-3" />
+                      <SelectValue placeholder="Overall" />
+                    </div>
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="overall">Overall</SelectItem>
+                    <SelectItem value="monthly">This Month</SelectItem>
+                    <SelectItem value="3months">Last 3 Months</SelectItem>
+                    <SelectItem value="6months">Last 6 Months</SelectItem>
+                    <SelectItem value="yearly">This Year</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
             </CardHeader>
             <CardContent ref={tableRef} className="bg-white p-4">
               <div className="hidden print:block mb-4">
                 <h2 className="text-xl font-bold">Bills Report</h2>
                 <p className="text-sm text-gray-500">Generated on {new Date().toLocaleDateString()}</p>
               </div>
-              {sortedBills.length === 0 ? (
+              {filteredBills.length === 0 ? (
                 <div className="text-center py-10 text-muted-foreground">
                   No bills found. Create one to get started.
                 </div>
@@ -774,7 +878,7 @@ export default function BillsPage() {
                       </TableRow>
                     </TableHeader>
                     <TableBody>
-                      {sortedBills.map((item) => (
+                      {filteredBills.map((item) => (
                         <TableRow key={item.id} className="hover:bg-muted/50 transition-colors">
                           <TableCell className="font-mono text-sm font-medium">
                             {item.billNo}
@@ -789,10 +893,10 @@ export default function BillsPage() {
                             {item.jobNumber}
                           </TableCell>
                           <TableCell className="font-semibold">
-                            PKR {item.totalAmount.toLocaleString()}
+                            PKR {item.grandTotal?.toLocaleString() || '0'}
                           </TableCell>
                           <TableCell className="text-sm text-muted-foreground">
-                            PKR {item.paidAmount.toLocaleString()}
+                            PKR {item.paidAmount?.toLocaleString() || '0'}
                           </TableCell>
                           <TableCell>
                             <span
@@ -833,6 +937,37 @@ export default function BillsPage() {
                 </div>
               )}
 
+              {/* Filtering Summary / Totals */}
+              <div className="mt-8 grid grid-cols-1 md:grid-cols-3 gap-4 border-t pt-8">
+                <div className="bg-muted/30 p-4 rounded-2xl border border-border/50 flex items-center justify-between">
+                  <div className="space-y-1">
+                    <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Filtered Billed</p>
+                    <p className="text-xl font-black text-foreground font-mono">PKR {tableTotals.billed.toLocaleString()}</p>
+                  </div>
+                  <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center">
+                    <TrendingUp className="w-5 h-5 text-primary" />
+                  </div>
+                </div>
+                <div className="bg-muted/30 p-4 rounded-2xl border border-border/50 flex items-center justify-between">
+                  <div className="space-y-1">
+                    <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Filtered Collected</p>
+                    <p className="text-xl font-black text-green-600 dark:text-green-400 font-mono">PKR {tableTotals.paid.toLocaleString()}</p>
+                  </div>
+                  <div className="w-10 h-10 rounded-full bg-green-500/10 flex items-center justify-center">
+                    <DollarSign className="w-5 h-5 text-green-600 dark:text-green-400" />
+                  </div>
+                </div>
+                <div className="bg-muted/30 p-4 rounded-2xl border border-border/50 flex items-center justify-between">
+                  <div className="space-y-1">
+                    <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Pending Balance</p>
+                    <p className="text-xl font-black text-amber-600 dark:text-amber-400 font-mono">PKR {tableTotals.balance.toLocaleString()}</p>
+                  </div>
+                  <div className="w-10 h-10 rounded-full bg-amber-500/10 flex items-center justify-center">
+                    <CreditCard className="w-5 h-5 text-amber-600 dark:text-amber-400" />
+                  </div>
+                </div>
+              </div>
+
             </CardContent>
           </Card>
 
@@ -865,7 +1000,7 @@ export default function BillsPage() {
           </Dialog>
         </div>
       </DashboardLayout >
-      {/* Hidden Capture Area for PDF Generation */}
+      {/* Hidden Capture Area for PDF Generation  */}
       <div style={{ position: 'fixed', top: '200vh', left: 0 }}>
         {pdfBill && (
           <div ref={invoiceRef} className="w-[210mm] bg-white p-8">
