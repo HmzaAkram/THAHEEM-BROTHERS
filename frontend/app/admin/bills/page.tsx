@@ -51,7 +51,7 @@ import {
 } from 'lucide-react';
 import { useState, useMemo, useRef, useEffect } from 'react';
 import { useData, BillItem, Bill } from '@/context/data-context';
-import { formatDate } from '@/lib/utils';
+import { formatDate, formatCurrency } from '@/lib/utils';
 import { jsPDF } from 'jspdf';
 import { toPng } from 'html-to-image';
 import { InvoiceTemplate } from '@/components/invoice-template';
@@ -646,6 +646,7 @@ export default function BillsPage() {
                                     className="h-10 text-right font-mono [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none bg-muted/20 border-border/30"
                                     value={item.amount || ''}
                                     onChange={(e) => handleItemChange(idx, 'amount', e.target.value)}
+                                    onWheel={(e) => e.currentTarget.blur()}
                                   />
                                 </div>
 
@@ -689,6 +690,7 @@ export default function BillsPage() {
                                 className="h-10 font-mono bg-white dark:bg-slate-950 border-border/50"
                                 value={serviceCharges}
                                 onChange={(e) => setServiceCharges(e.target.value)}
+                                onWheel={(e) => e.currentTarget.blur()}
                               />
                             </div>
                             <div className="space-y-2">
@@ -699,6 +701,7 @@ export default function BillsPage() {
                                 className="h-10 font-mono bg-white dark:bg-slate-950 border-border/50 text-primary font-bold"
                                 value={salesTax}
                                 onChange={(e) => setSalesTax(e.target.value)}
+                                onWheel={(e) => e.currentTarget.blur()}
                               />
                             </div>
                             <div className="space-y-2">
@@ -709,6 +712,7 @@ export default function BillsPage() {
                                 className="h-10 font-mono bg-white dark:bg-slate-950 border-border/50 text-green-600 dark:text-green-400 font-bold"
                                 value={advancePayment}
                                 onChange={(e) => setAdvancePayment(e.target.value)}
+                                onWheel={(e) => e.currentTarget.blur()}
                               />
                             </div>
                           </div>
@@ -719,20 +723,20 @@ export default function BillsPage() {
                           <div className="space-y-3 relative">
                             <div className="flex justify-between items-center text-xs font-semibold text-muted-foreground uppercase tracking-widest">
                               <span>Subtotal Items</span>
-                              <span className="font-mono">PKR {totalAmount.toLocaleString()}</span>
+                              <span className="font-mono">{formatCurrency(totalAmount)}</span>
                             </div>
                             <div className="flex justify-between items-center text-xs font-semibold text-muted-foreground uppercase tracking-widest">
                               <span>Service Charges</span>
-                              <span className="font-mono">PKR {(Number(serviceCharges) || 0).toLocaleString()}</span>
+                              <span className="font-mono">{formatCurrency(Number(serviceCharges) || 0)}</span>
                             </div>
                             <div className="flex justify-between items-center text-xs font-semibold text-primary uppercase tracking-widest">
                               <span>SBR Sales Tax (15%)</span>
-                              <span className="font-mono">PKR {(Number(salesTax) || 0).toLocaleString()}</span>
+                              <span className="font-mono">{formatCurrency(Number(salesTax) || 0)}</span>
                             </div>
                             {Number(advancePayment) > 0 && (
                               <div className="flex justify-between items-center text-xs font-semibold text-green-600 dark:text-green-400 uppercase tracking-widest">
                                 <span>Advance Payment</span>
-                                <span className="font-mono">- PKR {(Number(advancePayment) || 0).toLocaleString()}</span>
+                                <span className="font-mono">- {formatCurrency(Number(advancePayment) || 0)}</span>
                               </div>
                             )}
                             <div className="h-px bg-gradient-to-r from-transparent via-border/50 to-transparent" />
@@ -740,8 +744,7 @@ export default function BillsPage() {
                               <div className="space-y-1">
                                 <p className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground/60">Grand Total Payable</p>
                                 <p className="text-2xl font-black text-primary font-mono tracking-tighter">
-                                  <span className="text-xs font-bold mr-1 tracking-normal">PKR</span>
-                                  {grandTotal.toLocaleString()}
+                                  {formatCurrency(grandTotal)}
                                 </p>
                               </div>
                               <AlertCircle className="w-5 h-5 text-primary/20 mb-1" />

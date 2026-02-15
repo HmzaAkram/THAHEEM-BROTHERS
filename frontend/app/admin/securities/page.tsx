@@ -54,7 +54,7 @@ import {
 import { useState, useMemo } from 'react';
 import { useData, SecurityTracking } from '@/context/data-context';
 import { Badge } from '@/components/ui/badge';
-import { formatDate } from '@/lib/utils';
+import { formatDate, formatCurrency } from '@/lib/utils';
 
 export default function SecuritiesPage() {
     const { securities, companies, addSecurity, updateSecurity } = useData();
@@ -244,6 +244,7 @@ export default function SecuritiesPage() {
                                                     className="h-11 bg-white dark:bg-slate-950 border-border/40 rounded-xl font-mono"
                                                     value={noOfContainers}
                                                     onChange={(e) => setNoOfContainers(e.target.value)}
+                                                    onWheel={(e) => e.currentTarget.blur()}
                                                 />
                                             </div>
                                             <div className="space-y-2">
@@ -263,6 +264,7 @@ export default function SecuritiesPage() {
                                                     className="h-11 bg-white dark:bg-slate-950 border-border/40 rounded-xl font-mono"
                                                     value={amountPerContainer}
                                                     onChange={(e) => setAmountPerContainer(e.target.value)}
+                                                    onWheel={(e) => e.currentTarget.blur()}
                                                 />
                                             </div>
                                             <div className="space-y-2">
@@ -286,7 +288,7 @@ export default function SecuritiesPage() {
                                             <div className="md:col-span-2 flex items-center justify-end px-6 rounded-xl bg-primary/5 border border-primary/10">
                                                 <div className="text-right">
                                                     <p className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground/60">Total Security Amount</p>
-                                                    <p className="text-xl font-black text-primary font-mono leading-none">PKR {totalAmountCalculated.toLocaleString()}</p>
+                                                    <p className="text-xl font-black text-primary font-mono leading-none">{formatCurrency(totalAmountCalculated)}</p>
                                                 </div>
                                             </div>
                                         </div>
@@ -307,6 +309,7 @@ export default function SecuritiesPage() {
                                                     className="h-11 bg-white dark:bg-slate-950 border-border/40 rounded-xl font-mono"
                                                     value={refundDays}
                                                     onChange={(e) => setRefundDays(e.target.value)}
+                                                    onWheel={(e) => e.currentTarget.blur()}
                                                 />
                                             </div>
                                             <div className="space-y-2">
@@ -453,9 +456,9 @@ export default function SecuritiesPage() {
                                                 </TableCell>
                                                 <TableCell className="text-right">
                                                     <div className="space-y-0.5">
-                                                        <p className="font-mono font-black text-slate-900 dark:text-white">{(security.noOfContainers * security.amountPerContainer).toLocaleString()}</p>
+                                                        <p className="font-mono font-black text-slate-900 dark:text-white">{formatCurrency(security.noOfContainers * security.amountPerContainer)}</p>
                                                         <p className="text-[10px] font-bold text-muted-foreground opacity-60">
-                                                            {security.amountPerContainer.toLocaleString()} / container
+                                                            {formatCurrency(security.amountPerContainer)} / container
                                                         </p>
                                                     </div>
                                                 </TableCell>
@@ -538,7 +541,7 @@ export default function SecuritiesPage() {
                                     <div>
                                         <p className="text-xs font-bold uppercase tracking-wider text-muted-foreground mb-2">Total Pending</p>
                                         <p className="text-2xl font-black text-amber-600 font-mono">
-                                            PKR {securities.filter(s => !s.isRefundReceived).reduce((sum, s) => sum + (s.noOfContainers * s.amountPerContainer), 0).toLocaleString()}
+                                            {formatCurrency(securities.filter(s => !s.isRefundReceived).reduce((sum, s) => sum + (s.noOfContainers * s.amountPerContainer), 0))}
                                         </p>
                                         <p className="text-xs font-bold text-amber-600/60 mt-1">
                                             {securities.filter(s => !s.isRefundReceived).length} pending records
@@ -550,7 +553,7 @@ export default function SecuritiesPage() {
                                     <div>
                                         <p className="text-xs font-bold uppercase tracking-wider text-muted-foreground mb-2">Total Received</p>
                                         <p className="text-2xl font-black text-emerald-600 font-mono">
-                                            PKR {securities.filter(s => s.isRefundReceived).reduce((sum, s) => sum + (s.noOfContainers * s.amountPerContainer), 0).toLocaleString()}
+                                            {formatCurrency(securities.filter(s => s.isRefundReceived).reduce((sum, s) => sum + (s.noOfContainers * s.amountPerContainer), 0))}
                                         </p>
                                         <p className="text-xs font-bold text-emerald-600/60 mt-1">
                                             {securities.filter(s => s.isRefundReceived).length} received records
@@ -562,7 +565,7 @@ export default function SecuritiesPage() {
                                     <div>
                                         <p className="text-xs font-bold uppercase tracking-wider text-primary/70 mb-2">Grand Total</p>
                                         <p className="text-2xl font-black text-primary font-mono">
-                                            PKR {securities.reduce((sum, s) => sum + (s.noOfContainers * s.amountPerContainer), 0).toLocaleString()}
+                                            {formatCurrency(securities.reduce((sum, s) => sum + (s.noOfContainers * s.amountPerContainer), 0))}
                                         </p>
                                         <p className="text-xs font-bold text-primary/60 mt-1">
                                             {securities.length} total records
@@ -628,12 +631,12 @@ export default function SecuritiesPage() {
                                     </div>
                                     <div>
                                         <p className="text-xs text-muted-foreground font-semibold mb-1">Amount Per Container</p>
-                                        <p className="font-mono font-bold text-foreground">PKR {selectedSecurity.amountPerContainer.toLocaleString()}</p>
+                                        <p className="font-mono font-bold text-foreground">{formatCurrency(selectedSecurity.amountPerContainer)}</p>
                                     </div>
                                     <div>
                                         <p className="text-xs text-muted-foreground font-semibold mb-1">Total Amount</p>
                                         <p className="font-mono font-black text-primary text-lg">
-                                            PKR {(selectedSecurity.noOfContainers * selectedSecurity.amountPerContainer).toLocaleString()}
+                                            {formatCurrency(selectedSecurity.noOfContainers * selectedSecurity.amountPerContainer)}
                                         </p>
                                     </div>
                                 </div>

@@ -306,6 +306,7 @@ export default function PaymentsPage() {
                       className="mt-1 font-mono font-bold"
                       value={amount}
                       onChange={(e) => setAmount(e.target.value)}
+                      onWheel={(e) => e.currentTarget.blur()}
                     />
                   </div>
                   <div>
@@ -317,6 +318,7 @@ export default function PaymentsPage() {
                       title="Amount waived off or adjusted"
                       value={adjustment}
                       onChange={(e) => setAdjustment(e.target.value)}
+                      onWheel={(e) => e.currentTarget.blur()}
                     />
                   </div>
                 </div>
