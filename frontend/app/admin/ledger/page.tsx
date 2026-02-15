@@ -24,7 +24,7 @@ import { Download, Printer, Filter, Check, ChevronsUpDown, Search, DollarSign, A
 import { useState, useMemo, useRef } from 'react';
 import { useData, LedgerEntry } from '@/context/data-context';
 import { Input } from '@/components/ui/input';
-import { formatDate, cn } from '@/lib/utils';
+import { formatDate, cn, formatCurrency } from '@/lib/utils';
 import { jsPDF } from 'jspdf';
 import { toPng } from 'html-to-image';
 import { DashboardCard } from '@/components/dashboard-card';
@@ -265,7 +265,7 @@ export default function LedgerPage() {
                         Opening Balance b/f
                       </TableCell>
                       <TableCell className="text-right font-bold font-mono text-sm">
-                        {openingBalance.toLocaleString()}
+                        {formatCurrency(openingBalance)}
                       </TableCell>
                     </TableRow>
                   )}
@@ -342,7 +342,7 @@ export default function LedgerPage() {
                         <TableCell className="text-right text-sm align-top pt-3">
                           {entry.debit > 0 ? (
                             <span className="text-destructive font-bold">
-                              {entry.debit.toLocaleString()}
+                              {formatCurrency(entry.debit)}
                             </span>
                           ) : (
                             <span className="text-muted-foreground/30">-</span>
@@ -353,7 +353,7 @@ export default function LedgerPage() {
                         <TableCell className="text-right text-sm align-top pt-3">
                           {entry.credit > 0 ? (
                             <span className="text-green-600 font-bold">
-                              {entry.credit.toLocaleString()}
+                              {formatCurrency(entry.credit)}
                             </span>
                           ) : (
                             <span className="text-muted-foreground/30">-</span>
@@ -363,7 +363,7 @@ export default function LedgerPage() {
                         {/* 6. Balance */}
                         {selectedCompanyId !== 'all' && (
                           <TableCell className="text-right font-mono text-sm align-top pt-3 bg-muted/10 font-bold">
-                            {entry.balance.toLocaleString()}
+                            {formatCurrency(entry.balance)}
                           </TableCell>
                         )}
                       </TableRow>
@@ -378,28 +378,28 @@ export default function LedgerPage() {
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mt-8 pt-8 border-t">
                 <DashboardCard
                   title="Opening Balance"
-                  value={`PKR ${openingBalance.toLocaleString()}`}
+                  value={formatCurrency(openingBalance)}
                   icon={Scale}
                   change="Balance b/f"
                   changeType="neutral"
                 />
                 <DashboardCard
                   title="Total Billed"
-                  value={`PKR ${totals.debit.toLocaleString()}`}
+                  value={formatCurrency(totals.debit)}
                   icon={ArrowUpCircle}
                   change="In selected period"
                   changeType="negative"
                 />
                 <DashboardCard
                   title="Total Paid"
-                  value={`PKR ${totals.credit.toLocaleString()}`}
+                  value={formatCurrency(totals.credit)}
                   icon={ArrowDownCircle}
                   change="In selected period"
                   changeType="positive"
                 />
                 <DashboardCard
                   title="Closing Balance"
-                  value={`PKR ${ledgerData[ledgerData.length - 1].balance.toLocaleString()}`}
+                  value={formatCurrency(ledgerData[ledgerData.length - 1].balance)}
                   icon={DollarSign}
                   change="Current Standing"
                   changeType={ledgerData[ledgerData.length - 1].balance > 0 ? "negative" : "positive"}

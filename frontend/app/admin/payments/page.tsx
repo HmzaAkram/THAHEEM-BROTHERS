@@ -30,7 +30,7 @@ import {
 import { Plus, Download, Filter, Search, DollarSign, TrendingUp, CreditCard } from 'lucide-react';
 import { useState, useMemo } from 'react';
 import { useData } from '@/context/data-context';
-import { formatDate } from '@/lib/utils';
+import { formatDate, formatCurrency } from '@/lib/utils';
 
 export default function PaymentsPage() {
   const { payments, companies, addPayment, bills } = useData();
@@ -215,7 +215,7 @@ export default function PaymentsPage() {
                       ) : (
                         companyBills.map(b => (
                           <SelectItem key={b.id} value={b.id}>
-                            {b.billNo} - {b.jobNumber} (Due: {(b.totalAmount - b.paidAmount).toLocaleString()})
+                            {b.billNo} - {b.jobNumber} (Due: {formatCurrency(b.totalAmount - b.paidAmount)})
                           </SelectItem>
                         ))
                       )}
@@ -417,7 +417,7 @@ export default function PaymentsPage() {
                           {payment.method}
                         </TableCell>
                         <TableCell className="text-right font-bold text-green-600">
-                          + PKR {payment.amount.toLocaleString()}
+                          + {formatCurrency(payment.amount)}
                         </TableCell>
                       </TableRow>
                     ))}
@@ -431,7 +431,7 @@ export default function PaymentsPage() {
               <div className="bg-muted/30 p-4 rounded-2xl border border-border/50 flex items-center justify-between">
                 <div className="space-y-1">
                   <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Filtered Collections</p>
-                  <p className="text-xl font-black text-green-600 dark:text-green-400 font-mono">PKR {tableTotals.collected.toLocaleString()}</p>
+                  <p className="text-xl font-black text-green-600 dark:text-green-400 font-mono">{formatCurrency(tableTotals.collected)}</p>
                 </div>
                 <div className="w-10 h-10 rounded-full bg-green-500/10 flex items-center justify-center">
                   <DollarSign className="w-5 h-5 text-green-600 dark:text-green-400" />
@@ -440,7 +440,7 @@ export default function PaymentsPage() {
               <div className="bg-muted/30 p-4 rounded-2xl border border-border/50 flex items-center justify-between">
                 <div className="space-y-1">
                   <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Filtered Adjustments</p>
-                  <p className="text-xl font-black text-amber-600 dark:text-amber-400 font-mono">PKR {tableTotals.adjustment.toLocaleString()}</p>
+                  <p className="text-xl font-black text-amber-600 dark:text-amber-400 font-mono">{formatCurrency(tableTotals.adjustment)}</p>
                 </div>
                 <div className="w-10 h-10 rounded-full bg-amber-500/10 flex items-center justify-center">
                   <CreditCard className="w-5 h-5 text-amber-600 dark:text-amber-400" />
