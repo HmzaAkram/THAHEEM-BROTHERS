@@ -20,7 +20,27 @@ export const InvoiceTemplate = forwardRef<HTMLDivElement, InvoiceTemplateProps>(
     return (
         <div ref={ref} className="bg-white p-8 max-w-4xl mx-auto">
             <div className="space-y-8 py-4">
-                {/* Header Section */}
+                {/* Brand Header */}
+                <div className="flex justify-between items-center border-b pb-6">
+                    <div className="flex items-center gap-4">
+                        <img
+                            src="/logo.PNG"
+                            alt="Thaheem Brothers"
+                            className="h-16 w-auto object-contain"
+                        />
+                        <div>
+                            <h1 className="text-2xl font-black text-slate-900 uppercase tracking-tighter leading-none">THAHEEM BROTHERS</h1>
+                            <p className="text-xs font-bold text-muted-foreground tracking-widest uppercase mt-1">Logistics & Supply Chain</p>
+                        </div>
+                    </div>
+                    <div className="text-right">
+                        <span className="bg-slate-900 text-white px-4 py-1 rounded-full text-xs font-bold uppercase tracking-widest">
+                            Official Invoice
+                        </span>
+                    </div>
+                </div>
+
+                {/* Details Grid */}
                 <div className="grid grid-cols-2 lg:grid-cols-4 gap-6 p-6 bg-muted/30 rounded-2xl border">
                     <div>
                         <Label className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Invoice No</Label>
@@ -133,6 +153,29 @@ export const InvoiceTemplate = forwardRef<HTMLDivElement, InvoiceTemplateProps>(
                             <span className="text-2xl font-black text-primary font-mono tracking-tighter">
                                 PKR {bill.grandTotal.toLocaleString()}
                             </span>
+                        </div>
+                    </div>
+                </div>
+
+                {/* Bank Details */}
+                <div className="pt-8 border-t-2 border-dashed">
+                    <h3 className="font-bold text-sm uppercase tracking-widest text-primary mb-4">Bank Account Details</h3>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6 bg-slate-50 border border-slate-200 p-6 rounded-2xl">
+                        <div>
+                            <Label className="text-[10px] font-bold text-muted-foreground uppercase">Account Title</Label>
+                            <p className="font-bold font-mono text-lg text-slate-800">TAHEEM BROTHERS</p>
+                            <Label className="text-[10px] font-bold text-muted-foreground uppercase mt-3 block">Branch</Label>
+                            <p className="font-bold font-mono text-slate-800">NEW CHALLI</p>
+                        </div>
+                        <div className="space-y-4">
+                            <div>
+                                <Label className="text-[10px] font-bold text-muted-foreground uppercase">DUBAI ISLAMIC BANK</Label>
+                                <p className="font-mono font-medium text-sm select-all text-slate-800">PK92DUIB000000571507001</p>
+                            </div>
+                            <div>
+                                <Label className="text-[10px] font-bold text-muted-foreground uppercase">AL-HABIB BANK</Label>
+                                <p className="font-mono font-medium text-sm select-all text-slate-800">PK14BAHL5028008100103201</p>
+                            </div>
                         </div>
                     </div>
                 </div>
