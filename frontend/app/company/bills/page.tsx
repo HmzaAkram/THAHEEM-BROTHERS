@@ -115,7 +115,17 @@ export default function CompanyBillsPage() {
   };
 
   if (!authHydrated || !currentCompany) {
-    // ... (existing loading state)
+    return (
+      <DashboardLayout>
+        <div className="flex h-64 items-center justify-center text-muted-foreground animate-in fade-in">
+          {!authHydrated ? (
+            <div className="w-8 h-8 border-4 border-primary border-t-transparent rounded-full animate-spin" />
+          ) : (
+            "No company data available. Please contact support."
+          )}
+        </div>
+      </DashboardLayout>
+    );
   }
 
   return (
@@ -126,7 +136,7 @@ export default function CompanyBillsPage() {
             <div>
               <h1 className="text-3xl font-bold text-foreground">My Bills</h1>
               <p className="text-muted-foreground mt-1">
-                View and download your invoices for <span className="text-primary font-semibold">{currentCompany.name}</span>
+                View and download your invoices for <span className="text-primary font-semibold">{currentCompany?.name}</span>
               </p>
             </div>
             <Button variant="outline" className="gap-2" onClick={handleExportPDF}>
@@ -141,7 +151,7 @@ export default function CompanyBillsPage() {
             </CardHeader>
             <CardContent ref={tableRef} className="bg-white p-4">
               <div className="hidden print:block mb-4">
-                <h2 className="text-xl font-bold">{currentCompany.name} - Bills Report</h2>
+                <h2 className="text-xl font-bold">{currentCompany?.name} - Bills Report</h2>
                 <p className="text-sm text-gray-500">Generated on {new Date().toLocaleDateString()}</p>
               </div>
               {companyBills.length === 0 ? (

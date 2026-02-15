@@ -53,6 +53,7 @@ export interface Bill {
   hawb?: string;
   indexNo?: string | number;
   gdNumber?: string;
+  portName?: string;
   noOfContainers?: string | number;
   containerNo?: string;
   serviceCharges?: number;

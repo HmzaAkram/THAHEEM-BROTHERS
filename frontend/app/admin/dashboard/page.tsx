@@ -13,6 +13,12 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import {
+  Tabs,
+  TabsContent,
+  TabsList,
+  TabsTrigger,
+} from "@/components/ui/tabs";
+import {
   Table,
   TableBody,
   TableCell,
@@ -20,6 +26,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import { Input } from "@/components/ui/input";
 import {
   BarChart,
   Bar,
@@ -39,7 +46,11 @@ import {
   CreditCard,
   Download,
   Printer,
-  Users
+  Users,
+  Search,
+  ArrowUpRight,
+  ArrowDownRight,
+  ChevronRight
 } from 'lucide-react';
 import { useMemo, useState, useRef } from 'react';
 import { formatDate } from '@/lib/utils';
@@ -82,8 +93,8 @@ export default function AdminDashboard() {
       ? companies.filter(c => new Date(c.createdAt) >= startDate!)
       : companies;
 
-    const totalBilled = filteredBills.reduce((sum, bill) => sum + bill.totalAmount, 0);
-    const totalCollected = filteredPayments.reduce((sum, payment) => sum + payment.amount, 0);
+    const totalBilled = filteredBills.reduce((sum, bill) => sum + (Number(bill.totalAmount) || 0), 0);
+    const totalCollected = filteredPayments.reduce((sum, payment) => sum + (Number(payment.amount) || 0), 0);
     // Outstanding logic: 
     // If we want "Outstanding created in this period", it is (BilledInPeriod - CollectedInPeriod).
     // If we want "Total Outstanding", it stays same.
@@ -116,7 +127,7 @@ export default function AdminDashboard() {
       const billDate = new Date(bill.date);
       const monthData = months.find(m => m.monthIndex === billDate.getMonth() && m.year === billDate.getFullYear());
       if (monthData) {
-        monthData.bills += bill.totalAmount;
+        monthData.bills += (Number(bill.totalAmount) || 0);
       }
     });
 
@@ -124,7 +135,7 @@ export default function AdminDashboard() {
       const paymentDate = new Date(payment.date);
       const monthData = months.find(m => m.monthIndex === paymentDate.getMonth() && m.year === paymentDate.getFullYear());
       if (monthData) {
-        monthData.payments += payment.amount;
+        monthData.payments += (Number(payment.amount) || 0);
       }
     });
 
@@ -132,25 +143,33 @@ export default function AdminDashboard() {
   }, [bills, payments]);
 
   // Recent Actions (merged and sorted)
-  const recentActions = useMemo(() => {
-    const recentBills = bills.map(b => ({
+  const recentBills = useMemo(() => {
+    return bills.map(b => ({
       type: 'BILL',
       title: `Invoice #${b.billNo} Created`,
       subtitle: `${b.companyName} • ${formatDate(b.createdAt)}`,
-      amount: b.totalAmount,
+      amount: Number(b.totalAmount) || 0,
       date: new Date(b.createdAt),
       id: b.id
-    }));
+    }))
+      .sort((a, b) => b.date.getTime() - a.date.getTime())
+      .slice(0, 10);
+  }, [bills]);
 
-    const recentPayments = payments.map(p => ({
+  const recentPayments = useMemo(() => {
+    return payments.map(p => ({
       type: 'PAYMENT',
       title: `Payment Received`,
       subtitle: `${p.companyName} • ${formatDate(p.createdAt)}`,
-      amount: p.amount,
+      amount: Number(p.amount) || 0,
       date: new Date(p.createdAt),
       id: p.id
-    }));
+    }))
+      .sort((a, b) => b.date.getTime() - a.date.getTime())
+      .slice(0, 10);
+  }, [payments]);
 
+  const recentActions = useMemo(() => {
     const newCompanies = companies.map(c => ({
       type: 'COMPANY',
       title: `New Company Added`,
@@ -163,7 +182,37 @@ export default function AdminDashboard() {
     return [...recentBills, ...recentPayments, ...newCompanies]
       .sort((a, b) => b.date.getTime() - a.date.getTime())
       .slice(0, 5);
-  }, [bills, payments, companies]);
+  }, [recentBills, recentPayments, companies]);
+
+  // Company Overview Search and Stats
+  const [companySearch, setCompanySearch] = useState('');
+
+  const companyFinancials = useMemo(() => {
+    return companies.map(company => {
+      const companyBills = bills.filter(b => String(b.companyId) === String(company.id));
+      const companyPayments = payments.filter(p => String(p.companyId) === String(company.id));
+
+      const debit = companyBills.reduce((sum, b) => sum + (Number(b.totalAmount) || 0), 0);
+      const credit = companyPayments.reduce((sum, p) => sum + (Number(p.amount) || 0), 0);
+      const balance = debit - credit;
+
+      return {
+        id: company.id,
+        name: company.name,
+        identifier: company.identifier,
+        debit,
+        credit,
+        balance
+      };
+    });
+  }, [companies, bills, payments]);
+
+  const filteredCompanies = useMemo(() => {
+    return companyFinancials.filter(c =>
+      c.name.toLowerCase().includes(companySearch.toLowerCase()) ||
+      (c.identifier && c.identifier.toLowerCase().includes(companySearch.toLowerCase()))
+    );
+  }, [companyFinancials, companySearch]);
 
   const filterLabel = useMemo(() => {
     switch (filterType) {
@@ -306,119 +355,197 @@ export default function AdminDashboard() {
         </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          <Card className="lg:col-span-2 shadow-xl border-0 bg-white/50 dark:bg-slate-900/50 backdrop-blur-md ring-1 ring-black/5 dark:ring-white/10">
-            <CardHeader>
-              <CardTitle className="text-xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-primary to-blue-500">
-                Financial Overview
-              </CardTitle>
-              <p className="text-xs text-muted-foreground">Revenue vs Collections over the last 6 months</p>
+          {/* Companies Overview Section */}
+          <Card className="lg:col-span-2 shadow-xl border-0 bg-white/50 dark:bg-slate-900/50 backdrop-blur-md ring-1 ring-black/5 dark:ring-white/10 overflow-hidden flex flex-col">
+            <CardHeader className="pb-4">
+              <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+                <div>
+                  <CardTitle className="text-xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-slate-900 to-slate-600 dark:from-white dark:to-slate-400">
+                    Companies Overview
+                  </CardTitle>
+                  <p className="text-xs text-muted-foreground">Financial health across your client base</p>
+                </div>
+                <div className="relative w-full md:w-64">
+                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                  <Input
+                    placeholder="Search companies..."
+                    value={companySearch}
+                    onChange={(e) => setCompanySearch(e.target.value)}
+                    className="pl-9 bg-white/50 dark:bg-slate-950/50 border-border/50 h-9 rounded-lg"
+                  />
+                </div>
+              </div>
             </CardHeader>
-            <CardContent>
-              <div className="h-[350px] w-full">
-                <ResponsiveContainer width="100%" height="100%">
-                  <BarChart data={monthlyData} margin={{ top: 20, right: 30, left: 20, bottom: 5 }}>
-                    <defs>
-                      <linearGradient id="colorBills" x1="0" y1="0" x2="0" y2="1">
-                        <stop offset="5%" stopColor="hsl(var(--primary))" stopOpacity={0.8} />
-                        <stop offset="95%" stopColor="hsl(var(--primary))" stopOpacity={0.2} />
-                      </linearGradient>
-                      <linearGradient id="colorPayments" x1="0" y1="0" x2="0" y2="1">
-                        <stop offset="5%" stopColor="#10b981" stopOpacity={0.8} />
-                        <stop offset="95%" stopColor="#10b981" stopOpacity={0.2} />
-                      </linearGradient>
-                    </defs>
-                    <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="var(--border)" opacity={0.5} />
-                    <XAxis
-                      dataKey="month"
-                      stroke="var(--muted-foreground)"
-                      fontSize={12}
-                      tickLine={false}
-                      axisLine={false}
-                    />
-                    <YAxis
-                      stroke="var(--muted-foreground)"
-                      fontSize={12}
-                      tickLine={false}
-                      axisLine={false}
-                      tickFormatter={(value: number) => `PKR ${value / 1000}k`}
-                    />
-                    <Tooltip
-                      cursor={{ fill: 'var(--muted)', opacity: 0.2 }}
-                      contentStyle={{
-                        backgroundColor: 'var(--card)',
-                        border: '1px solid var(--border)',
-                        borderRadius: '12px',
-                        boxShadow: '0 10px 25px -5px rgba(0, 0, 0, 0.1), 0 8px 10px -6px rgba(0, 0, 0, 0.1)'
-                      }}
-                    />
-                    <Legend wrapperStyle={{ paddingTop: '20px' }} iconType="circle" />
-                    <Bar
-                      dataKey="bills"
-                      fill="url(#colorBills)"
-                      name="Billed"
-                      radius={[6, 6, 0, 0]}
-                      barSize={24}
-                    />
-                    <Bar
-                      dataKey="payments"
-                      fill="url(#colorPayments)"
-                      name="Collected"
-                      radius={[6, 6, 0, 0]}
-                      barSize={24}
-                    />
-                  </BarChart>
-                </ResponsiveContainer>
+            <CardContent className="flex-1 p-0 overflow-auto">
+              <div className="min-w-[600px]">
+                <Table>
+                  <TableHeader className="bg-muted/30 sticky top-0 z-10">
+                    <TableRow className="hover:bg-transparent border-b-0">
+                      <TableHead className="py-3 px-6 font-bold text-xs uppercase tracking-wider">Company Name</TableHead>
+                      <TableHead className="py-3 px-4 font-bold text-xs uppercase tracking-wider">Total Debit</TableHead>
+                      <TableHead className="py-3 px-4 font-bold text-xs uppercase tracking-wider">Total Credit</TableHead>
+                      <TableHead className="py-3 px-6 font-bold text-xs uppercase tracking-wider text-right">Balance</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {filteredCompanies.length === 0 ? (
+                      <TableRow>
+                        <TableCell colSpan={4} className="h-64 text-center">
+                          <div className="flex flex-col items-center justify-center text-muted-foreground/50">
+                            <Users className="w-12 h-12 mb-3 opacity-20" />
+                            <p className="font-semibold">No companies found</p>
+                            <p className="text-xs">Try adjusting your search</p>
+                          </div>
+                        </TableCell>
+                      </TableRow>
+                    ) : (
+                      filteredCompanies.map((c) => (
+                        <TableRow key={c.id} className="hover:bg-primary/5 transition-colors border-b border-border/40 group">
+                          <TableCell className="py-4 px-6">
+                            <div>
+                              <p className="font-bold text-sm text-foreground group-hover:text-primary transition-colors">{c.name}</p>
+                              {c.identifier && <p className="text-[10px] text-muted-foreground uppercase font-black opacity-60">{c.identifier}</p>}
+                            </div>
+                          </TableCell>
+                          <TableCell className="py-4 px-4 font-mono text-xs font-bold text-slate-700 dark:text-slate-300">
+                            PKR {c.debit.toLocaleString()}
+                          </TableCell>
+                          <TableCell className="py-4 px-4 font-mono text-xs font-bold text-emerald-600">
+                            PKR {c.credit.toLocaleString()}
+                          </TableCell>
+                          <TableCell className="py-4 px-6 text-right">
+                            <div className="flex flex-col items-end">
+                              <span className={`text-sm font-black font-mono tracking-tighter ${c.balance > 0 ? 'text-rose-600' : 'text-emerald-600'
+                                }`}>
+                                PKR {c.balance.toLocaleString()}
+                              </span>
+                              <div className={`mt-0.5 flex items-center gap-1 text-[10px] font-bold uppercase ${c.balance > 0 ? 'text-rose-500/70' : 'text-emerald-500/70'
+                                }`}>
+                                {c.balance > 0 ? (
+                                  <>Receivable <ArrowUpRight className="w-2.5 h-2.5" /></>
+                                ) : (
+                                  <>Cleared <ArrowDownRight className="w-2.5 h-2.5" /></>
+                                )}
+                              </div>
+                            </div>
+                          </TableCell>
+                        </TableRow>
+                      ))
+                    )}
+                  </TableBody>
+                </Table>
               </div>
             </CardContent>
           </Card>
 
-          <Card className="shadow-xl border-0 bg-white/50 dark:bg-slate-900/50 backdrop-blur-md ring-1 ring-black/5 dark:ring-white/10 flex flex-col">
-            <CardHeader>
+          <Card className="shadow-xl border-0 bg-white/50 dark:bg-slate-900/50 backdrop-blur-md ring-1 ring-black/5 dark:ring-white/10 flex flex-col h-[600px]">
+            <CardHeader className="pb-2 border-b border-border/50">
               <CardTitle className="text-xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-blue-600 to-indigo-500">
                 Recent Activity
               </CardTitle>
             </CardHeader>
-            <CardContent className="flex-1 overflow-auto pr-2">
-              <div className="space-y-4">
-                {recentActions.length === 0 ? (
-                  <div className="flex flex-col items-center justify-center py-10 text-muted-foreground opacity-50">
-                    <FileText className="w-10 h-10 mb-2" />
-                    <p>No recent activity.</p>
-                  </div>
-                ) : (
-                  recentActions.map((action, i) => (
-                    <div key={action.id} className="flex items-start justify-between group p-3 rounded-lg hover:bg-white/50 dark:hover:bg-slate-800/50 transition-all duration-200 border border-transparent hover:border-border/50 shadow-sm hover:shadow-md">
-                      <div className="flex gap-4 items-center">
-                        <div className={`p-2 rounded-full ring-2 ring-opacity-20 ${action.type === 'BILL' ? 'bg-blue-100 text-blue-600 ring-blue-500' :
-                          action.type === 'PAYMENT' ? 'bg-green-100 text-green-600 ring-green-500' :
-                            'bg-orange-100 text-orange-600 ring-orange-500'
-                          }`}>
-                          {action.type === 'BILL' && <FileText className="w-4 h-4" />}
-                          {action.type === 'PAYMENT' && <DollarSign className="w-4 h-4" />}
-                          {action.type === 'COMPANY' && <Users className="w-4 h-4" />}
-                        </div>
-                        <div>
-                          <p className="font-semibold text-sm text-foreground group-hover:text-primary transition-colors">
-                            {action.title}
-                          </p>
-                          <p className="text-xs text-muted-foreground">
-                            {action.subtitle}
-                          </p>
-                        </div>
+            <CardContent className="flex-1 overflow-auto p-4">
+              <Tabs defaultValue="all" className="w-full">
+                <TabsList className="grid w-full grid-cols-3 mb-6 h-10 bg-muted/50 p-1">
+                  <TabsTrigger value="all" className="text-[10px] font-black py-1.5 uppercase">General</TabsTrigger>
+                  <TabsTrigger value="bills" className="text-[10px] font-black py-1.5 uppercase">Bills</TabsTrigger>
+                  <TabsTrigger value="payments" className="text-[10px] font-black py-1.5 uppercase">Payments</TabsTrigger>
+                </TabsList>
+
+                <TabsContent value="all" className="mt-0 focus-visible:ring-0">
+                  <div className="space-y-3">
+                    {recentActions.length === 0 ? (
+                      <div className="flex flex-col items-center justify-center py-10 text-muted-foreground opacity-50">
+                        <FileText className="w-10 h-10 mb-2" />
+                        <p>No recent activity.</p>
                       </div>
-                      {action.amount > 0 && (
-                        <span className={`text-sm font-bold font-mono ${action.type === 'PAYMENT' ? 'text-green-600' : 'text-foreground'
-                          }`}>
-                          {action.type === 'PAYMENT' ? '+' : ''}
-                          {action.amount.toLocaleString()}
-                        </span>
-                      )}
-                    </div>
-                  ))
-                )}
-              </div>
+                    ) : (
+                      recentActions.map((action) => (
+                        <div key={action.id} className="flex items-start justify-between group p-3 rounded-lg hover:bg-white dark:hover:bg-slate-800 transition-all duration-200 border border-transparent hover:border-border/50 shadow-sm hover:shadow-md">
+                          <div className="flex gap-4 items-center">
+                            <div className={`p-2 rounded-full ring-2 ring-opacity-20 ${action.type === 'BILL' ? 'bg-blue-100 text-blue-600 ring-blue-500' :
+                              action.type === 'PAYMENT' ? 'bg-green-100 text-green-600 ring-green-500' :
+                                'bg-orange-100 text-orange-600 ring-orange-500'
+                              }`}>
+                              {action.type === 'BILL' && <FileText className="w-4 h-4" />}
+                              {action.type === 'PAYMENT' && <DollarSign className="w-4 h-4" />}
+                              {action.type === 'COMPANY' && <Users className="w-4 h-4" />}
+                            </div>
+                            <div>
+                              <p className="font-semibold text-sm text-foreground group-hover:text-primary transition-colors">
+                                {action.title}
+                              </p>
+                              <p className="text-xs text-muted-foreground">
+                                {action.subtitle}
+                              </p>
+                            </div>
+                          </div>
+                        </div>
+                      ))
+                    )}
+                  </div>
+                </TabsContent>
+
+                <TabsContent value="bills" className="mt-0 focus-visible:ring-0">
+                  <div className="space-y-3">
+                    {recentBills.length === 0 ? (
+                      <div className="flex flex-col items-center justify-center py-10 text-muted-foreground opacity-50">
+                        <FileText className="w-10 h-10 mb-2" />
+                        <p>No recent bills.</p>
+                      </div>
+                    ) : (
+                      recentBills.map((action) => (
+                        <div key={action.id} className="flex items-start justify-between group p-3 rounded-lg hover:bg-white dark:hover:bg-slate-800 transition-all duration-200 border border-transparent hover:border-border/50 shadow-sm hover:shadow-md">
+                          <div className="flex gap-4 items-center">
+                            <div className="p-2 rounded-full ring-2 ring-opacity-20 bg-blue-100 text-blue-600 ring-blue-500">
+                              <FileText className="w-4 h-4" />
+                            </div>
+                            <div>
+                              <p className="font-semibold text-sm text-foreground group-hover:text-primary transition-colors">
+                                {action.title}
+                              </p>
+                              <p className="text-xs text-muted-foreground">
+                                {action.subtitle}
+                              </p>
+                            </div>
+                          </div>
+                        </div>
+                      ))
+                    )}
+                  </div>
+                </TabsContent>
+
+                <TabsContent value="payments" className="mt-0 focus-visible:ring-0">
+                  <div className="space-y-3">
+                    {recentPayments.length === 0 ? (
+                      <div className="flex flex-col items-center justify-center py-10 text-muted-foreground opacity-50">
+                        <DollarSign className="w-10 h-10 mb-2" />
+                        <p>No recent payments.</p>
+                      </div>
+                    ) : (
+                      recentPayments.map((action) => (
+                        <div key={action.id} className="flex items-start justify-between group p-3 rounded-lg hover:bg-white dark:hover:bg-slate-800 transition-all duration-200 border border-transparent hover:border-border/50 shadow-sm hover:shadow-md">
+                          <div className="flex gap-4 items-center">
+                            <div className="p-2 rounded-full ring-2 ring-opacity-20 bg-green-100 text-green-600 ring-green-500">
+                              <DollarSign className="w-4 h-4" />
+                            </div>
+                            <div>
+                              <p className="font-semibold text-sm text-foreground group-hover:text-primary transition-colors">
+                                {action.title}
+                              </p>
+                              <p className="text-xs text-muted-foreground">
+                                {action.subtitle}
+                              </p>
+                            </div>
+                          </div>
+                        </div>
+                      ))
+                    )}
+                  </div>
+                </TabsContent>
+              </Tabs>
             </CardContent>
-            <div className="p-6 pt-0 mt-auto">
+            <div className="p-6 pt-0 mt-auto border-t border-border/10">
               <Button variant="ghost" className="w-full text-muted-foreground hover:text-primary hover:bg-primary/5 group" size="sm">
                 View All Activity
                 <span className="inline-block transition-transform group-hover:translate-x-1 ml-1">→</span>
@@ -426,6 +553,73 @@ export default function AdminDashboard() {
             </div>
           </Card>
         </div>
+
+        {/* Financial Overview moved down */}
+        <Card className="shadow-xl border-0 bg-white/50 dark:bg-slate-900/50 backdrop-blur-md ring-1 ring-black/5 dark:ring-white/10">
+          <CardHeader>
+            <CardTitle className="text-xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-primary to-blue-500">
+              Financial Overview
+            </CardTitle>
+            <p className="text-xs text-muted-foreground">Revenue vs Collections over the last 6 months</p>
+          </CardHeader>
+          <CardContent>
+            <div className="h-[350px] w-full">
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart data={monthlyData} margin={{ top: 20, right: 30, left: 20, bottom: 5 }}>
+                  <defs>
+                    <linearGradient id="colorBills" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="5%" stopColor="hsl(var(--primary))" stopOpacity={0.8} />
+                      <stop offset="95%" stopColor="hsl(var(--primary))" stopOpacity={0.2} />
+                    </linearGradient>
+                    <linearGradient id="colorPayments" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="5%" stopColor="#10b981" stopOpacity={0.8} />
+                      <stop offset="95%" stopColor="#10b981" stopOpacity={0.2} />
+                    </linearGradient>
+                  </defs>
+                  <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="var(--border)" opacity={0.5} />
+                  <XAxis
+                    dataKey="month"
+                    stroke="var(--muted-foreground)"
+                    fontSize={12}
+                    tickLine={false}
+                    axisLine={false}
+                  />
+                  <YAxis
+                    stroke="var(--muted-foreground)"
+                    fontSize={12}
+                    tickLine={false}
+                    axisLine={false}
+                    tickFormatter={(value: number) => `PKR ${value / 1000}k`}
+                  />
+                  <Tooltip
+                    cursor={{ fill: 'var(--muted)', opacity: 0.2 }}
+                    contentStyle={{
+                      backgroundColor: 'var(--card)',
+                      border: '1px solid var(--border)',
+                      borderRadius: '12px',
+                      boxShadow: '0 10px 25px -5px rgba(0, 0, 0, 0.1), 0 8px 10px -6px rgba(0, 0, 0, 0.1)'
+                    }}
+                  />
+                  <Legend wrapperStyle={{ paddingTop: '20px' }} iconType="circle" />
+                  <Bar
+                    dataKey="bills"
+                    fill="url(#colorBills)"
+                    name="Billed"
+                    radius={[6, 6, 0, 0]}
+                    barSize={24}
+                  />
+                  <Bar
+                    dataKey="payments"
+                    fill="url(#colorPayments)"
+                    name="Collected"
+                    radius={[6, 6, 0, 0]}
+                    barSize={24}
+                  />
+                </BarChart>
+              </ResponsiveContainer>
+            </div>
+          </CardContent>
+        </Card>
 
         {/* Print Only: Detailed Pending Bills */}
         <div className="hidden print:block mt-8">

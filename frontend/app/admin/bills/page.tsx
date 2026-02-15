@@ -132,6 +132,7 @@ export default function BillsPage() {
   const [gdNumber, setGdNumber] = useState('');
   const [noOfContainers, setNoOfContainers] = useState('');
   const [containerNo, setContainerNo] = useState('');
+  const [portName, setPortName] = useState('');
   const [packages, setPackages] = useState('');
   const [jobNumber, setJobNumber] = useState('');
   const [via, setVia] = useState('');
@@ -202,6 +203,7 @@ export default function BillsPage() {
         gdNumber,
         noOfContainers,
         containerNo,
+        portName,
         packages,
         jobNumber,
         via,
@@ -235,6 +237,7 @@ export default function BillsPage() {
         setAdvancePayment('');
         setNoOfContainers('');
         setContainerNo('');
+        setPortName('');
         setPackages('');
         setAttachment(null);
         setItems([
@@ -401,7 +404,7 @@ export default function BillsPage() {
                               />
                             </div>
                             <div>
-                              <Label className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground mb-1.5 block">IGM (Inside)</Label>
+                              <Label className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground mb-1.5 block">IGM</Label>
                               <Input
                                 placeholder="01"
                                 className="bg-white dark:bg-slate-950 border-border/50 h-10"
@@ -420,7 +423,16 @@ export default function BillsPage() {
                             </div>
                           </div>
                           {via === 'SEA' && (
-                            <div className="grid grid-cols-2 gap-x-6 gap-y-5 mt-5 pt-5 border-t border-border/50 animate-in fade-in slide-in-from-top-2">
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-5 mt-5 pt-5 border-t border-border/50 animate-in fade-in slide-in-from-top-2">
+                              <div className="md:col-span-2">
+                                <Label className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground mb-1.5 block">Name of the Port</Label>
+                                <Input
+                                  placeholder="Example: Karachi Port"
+                                  className="bg-white dark:bg-slate-950 border-border/50 h-10"
+                                  value={portName}
+                                  onChange={(e) => setPortName(e.target.value)}
+                                />
+                              </div>
                               <div>
                                 <Label className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground mb-1.5 block">No of Containers</Label>
                                 <Input
@@ -431,9 +443,9 @@ export default function BillsPage() {
                                 />
                               </div>
                               <div>
-                                <Label className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground mb-1.5 block">Container No</Label>
+                                <Label className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground mb-1.5 block">Container Numbers</Label>
                                 <Input
-                                  placeholder="Example: MSCU1234567"
+                                  placeholder="Example: MSCU1234567, MSCU7654321"
                                   className="bg-white dark:bg-slate-950 border-border/50 h-10"
                                   value={containerNo}
                                   onChange={(e) => setContainerNo(e.target.value)}
