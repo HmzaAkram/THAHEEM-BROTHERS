@@ -19,16 +19,21 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { Label } from '@/components/ui/label';
+import { Badge } from '@/components/ui/badge';
 import { Download, Printer, Filter } from 'lucide-react';
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useRef } from 'react';
 import { useData, LedgerEntry } from '@/context/data-context';
-import { Input } from '@/components/ui/input'; // Added Input component
+import { Input } from '@/components/ui/input';
+import { formatDate } from '@/lib/utils';
+import { jsPDF } from 'jspdf';
+import { toPng } from 'html-to-image';
 
 export default function LedgerPage() {
   const { companies, getCompanyLedger } = useData();
   const [selectedCompanyId, setSelectedCompanyId] = useState<string>('all');
   const [startDate, setStartDate] = useState('');
   const [endDate, setEndDate] = useState('');
+  const tableRef = useRef<HTMLDivElement>(null);
 
   const { ledgerData, openingBalance } = useMemo(() => {
     let allEntries: LedgerEntry[] = [];
@@ -77,10 +82,6 @@ export default function LedgerPage() {
       return { ...entry, balance: running };
     });
 
-    // Ledger usually oldest first (chronological). Let's stick to chronological for "Ledger" view.
-    // User audio mentioned specific order? "Company Name -> Payment Method". 
-    // Let's keep chronological as standard for ledger.
-
     return { ledgerData: dataWithBalance, openingBalance: openingBal };
   }, [selectedCompanyId, companies, getCompanyLedger, startDate, endDate]);
 
@@ -90,6 +91,23 @@ export default function LedgerPage() {
       credit: acc.credit + item.credit
     }), { debit: 0, credit: 0 });
   }, [ledgerData]);
+
+  const handleExportPDF = async () => {
+    if (!tableRef.current) return;
+
+    try {
+      const dataUrl = await toPng(tableRef.current, { cacheBust: true, style: { background: 'white', padding: '20px' } });
+      const pdf = new jsPDF('p', 'mm', 'a4');
+      const imgProps = pdf.getImageProperties(dataUrl);
+      const pdfWidth = pdf.internal.pageSize.getWidth();
+      const pdfHeight = (imgProps.height * pdfWidth) / imgProps.width;
+
+      pdf.addImage(dataUrl, 'PNG', 0, 0, pdfWidth, pdfHeight);
+      pdf.save(`General_Ledger_${selectedCompanyId !== 'all' ? companies.find(c => c.id === selectedCompanyId)?.name : 'All'}_${new Date().toISOString().split('T')[0]}.pdf`);
+    } catch (err) {
+      console.error('Failed to export PDF', err);
+    }
+  };
 
   return (
     <DashboardLayout>
@@ -142,7 +160,7 @@ export default function LedgerPage() {
               </div>
 
               <div className="flex gap-2">
-                <Button variant="outline" className="flex-1 gap-2 bg-transparent hover:bg-muted">
+                <Button variant="outline" className="flex-1 gap-2 bg-transparent hover:bg-muted" onClick={handleExportPDF}>
                   <Download className="w-4 h-4" />
                   Export
                 </Button>
@@ -157,7 +175,7 @@ export default function LedgerPage() {
 
         {/* Ledger Table */}
         <Card className="shadow-md border-border/50">
-          <CardContent className="pt-6">
+          <CardContent ref={tableRef} className="pt-6">
             <div className="rounded-md border bg-card">
               <Table>
                 <TableHeader>
@@ -177,7 +195,7 @@ export default function LedgerPage() {
                   {startDate && selectedCompanyId !== 'all' && (
                     <TableRow className="bg-muted/20">
                       <TableCell className="text-sm font-medium text-muted-foreground">
-                        {new Date(startDate).toLocaleDateString()}
+                        {formatDate(startDate)}
                       </TableCell>
                       <TableCell colSpan={4} className="font-medium italic text-muted-foreground">
                         Opening Balance b/f

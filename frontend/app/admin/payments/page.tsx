@@ -30,10 +30,12 @@ import {
 import { Plus, Download, Filter } from 'lucide-react';
 import { useState, useMemo } from 'react';
 import { useData } from '@/context/data-context';
+import { formatDate } from '@/lib/utils';
 
 export default function PaymentsPage() {
   const { payments, companies, addPayment, bills } = useData();
   const [isDialogOpen, setIsDialogOpen] = useState(false);
+  const [loading, setLoading] = useState(false);
 
   // Form State
   const [companyId, setCompanyId] = useState('');
@@ -49,7 +51,7 @@ export default function PaymentsPage() {
   const [payOrderNo, setPayOrderNo] = useState('');
   const [description, setDescription] = useState('');
 
-  const handleSubmit = () => {
+  const handleSubmit = async () => {
     if (!companyId || !amount || !date || !billId) {
       alert("Please fill all required fields (Company, Bill, Amount, Date)");
       return;
@@ -66,31 +68,43 @@ export default function PaymentsPage() {
     else if (method === 'Advance') finalReference = `ADV: ${description}`;
     else finalReference = 'Cash';
 
-    addPayment({
-      companyId: selectedCompany.id,
-      companyName: selectedCompany.name,
-      date,
-      amount: Number(amount),
-      adjustment: Number(adjustment) || 0,
-      reference: finalReference,
-      method,
-      billId,
-      trackingId,
-      chequeNo,
-      payOrderNo,
-      description
-    });
+    setLoading(true);
+    try {
+      const result = await addPayment({
+        companyId: selectedCompany.id,
+        companyName: selectedCompany.name,
+        date,
+        amount: Number(amount),
+        adjustment: Number(adjustment) || 0,
+        reference: finalReference,
+        method,
+        billId,
+        trackingId,
+        chequeNo,
+        payOrderNo,
+        description
+      });
 
-    setIsDialogOpen(false);
-    // Reset Form
-    setCompanyId('');
-    setAmount('');
-    setAdjustment('');
-    setBillId('');
-    setTrackingId('');
-    setChequeNo('');
-    setPayOrderNo('');
-    setDescription('');
+      if (result.ok) {
+        setIsDialogOpen(false);
+        // Reset Form
+        setCompanyId('');
+        setAmount('');
+        setAdjustment('');
+        setBillId('');
+        setTrackingId('');
+        setChequeNo('');
+        setPayOrderNo('');
+        setDescription('');
+      } else {
+        alert("Failed to record payment: " + result.message);
+      }
+    } catch (error) {
+      console.error("Failed to record payment:", error);
+      alert("An unexpected error occurred while recording the payment.");
+    } finally {
+      setLoading(false);
+    }
   };
 
   // Filter bills for selected company
@@ -259,8 +273,8 @@ export default function PaymentsPage() {
                 </div>
 
                 <div className="flex gap-2 pt-4">
-                  <Button className="flex-1 bg-green-600 hover:bg-green-700" onClick={handleSubmit}>
-                    Save Payment
+                  <Button className="flex-1 bg-green-600 hover:bg-green-700" onClick={handleSubmit} disabled={loading}>
+                    {loading ? "Recording..." : "Save Payment"}
                   </Button>
                   <Button
                     variant="outline"
@@ -300,7 +314,7 @@ export default function PaymentsPage() {
                     {sortedPayments.map((payment) => (
                       <TableRow key={payment.id} className="hover:bg-muted/50 transition-colors">
                         <TableCell className="text-sm text-muted-foreground">
-                          {new Date(payment.date).toLocaleDateString()}
+                          {formatDate(payment.date)}
                         </TableCell>
                         <TableCell className="font-medium">
                           {payment.companyName}

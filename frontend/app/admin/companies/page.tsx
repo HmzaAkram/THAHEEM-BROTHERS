@@ -29,6 +29,7 @@ export default function CompaniesPage() {
   const { companies, addCompany, deleteCompany, getCompanyBalance } = useData();
   const [searchTerm, setSearchTerm] = useState('');
   const [isDialogOpen, setIsDialogOpen] = useState(false);
+  const [loading, setLoading] = useState(false);
   const router = useRouter();
 
   // New Company Form State
@@ -53,18 +54,33 @@ export default function CompaniesPage() {
     setFormData((prev) => ({ ...prev, [id]: value }));
   };
 
-  const handleSubmit = () => {
+  const handleSubmit = async () => {
     if (!formData.name || !formData.email) return; // Basic validation
-    addCompany({
-      name: formData.name,
-      email: formData.email,
-      phone: formData.phone || '',
-      address: formData.address || '',
-      password: formData.password || 'password123',
-      status: 'Active',
-    });
-    setFormData({ name: '', ntn: '', email: '', phone: '', address: '', username: '', password: '' });
-    setIsDialogOpen(false);
+    setLoading(true);
+    try {
+      const result = await addCompany({
+        name: formData.name,
+        ntn: formData.ntn,
+        email: formData.email,
+        phone: formData.phone || '',
+        address: formData.address || '',
+        username: formData.username,
+        password: formData.password,
+        status: 'Active',
+      }) as any;
+
+      if (result.ok) {
+        setFormData({ name: '', ntn: '', email: '', phone: '', address: '', username: '', password: '' });
+        setIsDialogOpen(false);
+      } else {
+        alert(result.message || "Failed to create company");
+      }
+    } catch (error) {
+      console.error("Critical failure adding company:", error);
+      alert("A critical error occurred while adding the company.");
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
@@ -164,14 +180,14 @@ export default function CompaniesPage() {
                       type="text"
                       value={formData.password}
                       onChange={handleInputChange}
-                      placeholder="Default: password123"
+                      placeholder="Enter password"
                       className="mt-1"
                     />
                   </div>
                 </div>
                 <div className="flex gap-2 pt-4">
-                  <Button className="flex-1" onClick={handleSubmit}>
-                    Save Company
+                  <Button className="flex-1" onClick={handleSubmit} disabled={loading}>
+                    {loading ? "Creating..." : "Create Company"}
                   </Button>
                   <Button
                     variant="outline"
@@ -203,6 +219,7 @@ export default function CompaniesPage() {
               <Table>
                 <TableHeader>
                   <TableRow className="hover:bg-transparent">
+                    <TableHead className="w-[80px]">ID</TableHead>
                     <TableHead>Company Name</TableHead>
                     <TableHead>Email / Login</TableHead>
                     <TableHead>Phone</TableHead>
@@ -223,6 +240,9 @@ export default function CompaniesPage() {
                       const balance = getCompanyBalance(company.id);
                       return (
                         <TableRow key={company.id} className="group hover:bg-muted/30 transition-colors">
+                          <TableCell className="font-mono text-xs text-primary font-bold">
+                            {company.identifier || `C${company.id}`}
+                          </TableCell>
                           <TableCell className="font-medium text-foreground">
                             {company.name}
                           </TableCell>

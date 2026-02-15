@@ -1,0 +1,115 @@
+<?php
+
+namespace App\Http\Controllers;
+
+use App\Models\Company;
+use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Hash;
+
+class CompanyController extends Controller
+{
+    public function index()
+    {
+        $user = auth()->user();
+        if ($user instanceof \App\Models\Company) {
+            return response()->json([$user]);
+        }
+        return response()->json(Company::all());
+    }
+
+    public function store(Request $request)
+    {
+        $user = auth()->user();
+        if (!$user instanceof \App\Models\User || $user->role !== 'admin') {
+            return response()->json(['message' => 'Unauthorized. Admin access required.'], 403);
+        }
+
+        try {
+            $validated = $request->validate([
+                'name' => 'required|string|max:255',
+                'email' => 'nullable|email',
+                'phone' => 'nullable|string',
+                'address' => 'nullable|string',
+                'city' => 'nullable|string',
+                'ntn' => 'nullable|string',
+                'username' => 'nullable|string',
+                'password' => 'nullable|string',
+                'status' => 'nullable|string',
+            ]);
+
+            // Generate C-ID identifier (e.g., C1, C2, C3)
+            // Resilience: Only add if column exists to avoid SQL errors
+            if (\Illuminate\Support\Facades\Schema::hasColumn('companies', 'identifier')) {
+                $lastCompany = Company::orderBy('id', 'desc')->first();
+                $nextId = $lastCompany ? ($lastCompany->id + 1) : 1;
+                $validated['identifier'] = 'C' . $nextId;
+            }
+
+            // Passwords stored in plain text for admin visibility as requested
+            // if (isset($validated['password'])) {
+            //     $validated['password'] = Hash::make($validated['password']);
+            // }
+
+            $company = Company::create($validated);
+
+
+            return response()->json($company, 201);
+        } catch (\Illuminate\Validation\ValidationException $e) {
+            return response()->json([
+                'message' => 'Validation failed: ' . implode(', ', \Illuminate\Support\Arr::flatten($e->errors())),
+                'errors' => $e->errors()
+            ], 422);
+        } catch (\Exception $e) {
+            return response()->json([
+                'message' => 'Backend error: ' . $e->getMessage(),
+                'trace' => $e->getTraceAsString()
+            ], 500);
+        }
+    }
+
+    public function show(Company $company)
+    {
+        return response()->json($company->load(['bills', 'payments', 'securities']));
+    }
+
+    public function update(Request $request, Company $company)
+    {
+        $user = auth()->user();
+        if (!$user instanceof \App\Models\User || $user->role !== 'admin') {
+            return response()->json(['message' => 'Unauthorized. Admin access required.'], 403);
+        }
+
+        $validated = $request->validate([
+            'name' => 'required|string|max:255',
+            'email' => 'nullable|email',
+            'phone' => 'nullable|string',
+            'address' => 'nullable|string',
+            'city' => 'nullable|string',
+            'ntn' => 'nullable|string',
+            'username' => 'nullable|string',
+            'password' => 'nullable|string',
+            'status' => 'nullable|string',
+        ]);
+
+        // Passwords stored in plain text for admin visibility as requested
+        // if (isset($validated['password'])) {
+        //     $validated['password'] = Hash::make($validated['password']);
+        // }
+
+        $company->update($validated);
+
+
+        return response()->json($company);
+    }
+
+    public function destroy(Company $company)
+    {
+        $user = auth()->user();
+        if (!$user instanceof \App\Models\User || $user->role !== 'admin') {
+            return response()->json(['message' => 'Unauthorized. Admin access required.'], 403);
+        }
+
+        $company->delete();
+        return response()->json(null, 204);
+    }
+}

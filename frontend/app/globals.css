@@ -120,3 +120,73 @@
     @apply bg-clip-text text-transparent bg-gradient-to-r from-primary to-blue-500;
   }
 }
+
+@media print {
+
+  .no-print,
+  button,
+  [role="button"],
+  .sidebar-container,
+  aside,
+  .print-hidden {
+    display: none !important;
+  }
+
+  body {
+    background: white !important;
+    color: black !important;
+  }
+
+  main {
+    margin: 0 !important;
+    padding: 0 !important;
+    width: 100% !important;
+  }
+
+  .print-only {
+    display: block !important;
+  }
+
+  /* Ensure text is black for clarity */
+  h1,
+  h2,
+  h3,
+  h4,
+  p,
+  span,
+  td,
+  th {
+    color: black !important;
+    background-clip: unset !important;
+    -webkit-background-clip: unset !important;
+    text-shadow: none !important;
+  }
+
+  .card,
+  .card-content {
+    border: none !important;
+    box-shadow: none !important;
+    padding: 0.5rem 0 !important;
+    background: transparent !important;
+  }
+
+  .recharts-responsive-container {
+    width: 100% !important;
+    height: 350px !important;
+    page-break-inside: avoid;
+  }
+
+  table {
+    page-break-inside: auto;
+    width: 100% !important;
+  }
+
+  tr {
+    page-break-inside: avoid;
+    page-break-after: auto;
+  }
+
+  thead {
+    display: table-header-group;
+  }
+}

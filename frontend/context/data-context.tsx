@@ -1,10 +1,13 @@
 'use client';
 
-import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
+import React, { createContext, useContext, useState, useEffect, ReactNode, useCallback } from 'react';
+import { useAuth } from './auth-context';
+import ApiService from '@/lib/api';
 
 // Types
 export interface Company {
   id: string;
+  identifier?: string;
   name: string;
   ntn?: string;
   email: string;
@@ -39,6 +42,7 @@ export interface Bill {
   totalAmount: number;
   paidAmount: number;
   status: BillStatus;
+  calculatedStatus: BillStatus;
   attachment?: string;
   via?: string;
   weight?: string | number;
@@ -47,7 +51,7 @@ export interface Bill {
   packages?: string | number;
   igm?: string;
   hawb?: string;
-  index?: string | number;
+  indexNo?: string | number;
   gdNumber?: string;
   noOfContainers?: string | number;
   containerNo?: string;
@@ -115,9 +119,9 @@ interface DataContextType {
   addCompany: (company: Omit<Company, 'id' | 'createdAt'>) => void;
   updateCompany: (id: string, data: Partial<Company>) => void;
   deleteCompany: (id: string) => void;
-  addBill: (bill: Omit<Bill, 'id' | 'createdAt' | 'paidAmount' | 'status'>) => void;
-  addPayment: (payment: Omit<Payment, 'id' | 'createdAt'>) => void;
-  addSecurity: (security: Omit<SecurityTracking, 'id' | 'createdAt' | 'status'>) => void;
+  addBill: (bill: Omit<Bill, 'id' | 'createdAt' | 'paidAmount' | 'status' | 'calculatedStatus'>) => Promise<any>;
+  addPayment: (payment: Omit<Payment, 'id' | 'createdAt'>) => Promise<any>;
+  addSecurity: (security: Omit<SecurityTracking, 'id' | 'createdAt' | 'status'>) => Promise<any>;
   updateSecurity: (id: string, data: Partial<SecurityTracking>) => void;
   securities: SecurityTracking[];
   getCompanyLedger: (companyId: string) => LedgerEntry[];
@@ -128,368 +132,122 @@ interface DataContextType {
     outstanding: number;
     activeCompanies: number;
   };
+  refreshData: () => Promise<void>;
 }
 
 const DataContext = createContext<DataContextType | undefined>(undefined);
 
-// Mock Initial Data
-const INITIAL_COMPANIES: Company[] = [
-  {
-    id: 'c1',
-    name: 'Pacific Textiles Mills',
-    ntn: '7890123-1',
-    email: 'info@pacifictextiles.com',
-    phone: '+92 300 5550011',
-    address: 'Plot 12, SITE Area, Karachi',
-    username: 'pacific',
-    password: 'password123',
-    status: 'Active',
-    createdAt: '2025-01-01',
-  },
-  {
-    id: 'c2',
-    name: 'Global Electronics Pvt Ltd',
-    ntn: '4567890-2',
-    email: 'accounts@globalelectronics.pk',
-    phone: '+92 321 5550022',
-    address: 'Sector I-9/3, Islamabad',
-    username: 'global',
-    password: 'password123',
-    status: 'Active',
-    createdAt: '2025-02-15',
-  },
-  {
-    id: 'c3',
-    name: 'Fresh Foods Distributors',
-    ntn: '1234567-3',
-    email: 'finance@freshfoods.com',
-    phone: '+92 333 5550033',
-    address: 'Multan Road, Lahore',
-    username: 'fresh',
-    password: 'password123',
-    status: 'Active',
-    createdAt: '2025-03-01',
-  },
-];
-
-const INITIAL_BILLS: Bill[] = [
-  // Pacific Textiles Bills
-  {
-    id: 'b1',
-    billNo: 'BILL-001',
-    companyId: 'c1',
-    companyName: 'Pacific Textiles Mills',
-    date: '2025-01-15',
-    invoiceNo: 'INV-2025-001',
-    invoiceDate: '2025-01-14',
-    jobNumber: 'JOB-25-001',
-    via: 'Sea',
-    weight: '12000 kg',
-    exporter: 'Pacific Exports',
-    items: [
-      { id: 'i1', description: 'Customs Duty', amount: 450000 },
-      { id: 'i2', description: 'Port Charges', amount: 25000 },
-      { id: 'i3', description: 'Agency Fee', amount: 15000 },
-    ],
-    totalAmount: 490000,
-    grandTotal: 490000,
-    paidAmount: 490000,
-    status: 'Paid',
-    createdAt: '2025-01-15',
-  },
-  {
-    id: 'b2',
-    billNo: 'BILL-004',
-    companyId: 'c1',
-    companyName: 'Pacific Textiles Mills',
-    date: '2025-02-20',
-    invoiceNo: 'INV-2025-004',
-    invoiceDate: '2025-02-19',
-    jobNumber: 'JOB-25-012',
-    via: 'Air',
-    weight: '500 kg',
-    items: [
-      { id: 'i4', description: 'Air Freight', amount: 180000 },
-      { id: 'i5', description: 'Handling', amount: 5000 },
-    ],
-    totalAmount: 185000,
-    grandTotal: 185000,
-    paidAmount: 100000,
-    status: 'Partial',
-    createdAt: '2025-02-20',
-  },
-  {
-    id: 'b3',
-    billNo: 'BILL-008',
-    companyId: 'c1',
-    companyName: 'Pacific Textiles Mills',
-    date: '2025-03-10',
-    invoiceNo: 'INV-2025-008',
-    invoiceDate: '2025-03-09',
-    jobNumber: 'JOB-25-025',
-    via: 'Sea',
-    weight: '24000 kg',
-    items: [
-      { id: 'i6', description: 'Customs & Duties', amount: 650000 },
-    ],
-    totalAmount: 650000,
-    grandTotal: 650000,
-    paidAmount: 0,
-    status: 'Unpaid',
-    createdAt: '2025-03-10',
-  },
-
-  // Global Electronics Bills
-  {
-    id: 'b4',
-    billNo: 'BILL-002',
-    companyId: 'c2',
-    companyName: 'Global Electronics Pvt Ltd',
-    date: '2025-02-05',
-    invoiceNo: 'INV-2025-002',
-    invoiceDate: '2025-02-04',
-    jobNumber: 'JOB-25-005',
-    via: 'Air',
-    weight: '800 kg',
-    items: [
-      { id: 'i7', description: 'Clearance Charges', amount: 120000 },
-      { id: 'i8', description: 'Delivery Order', amount: 15000 },
-    ],
-    totalAmount: 135000,
-    grandTotal: 135000,
-    paidAmount: 135000,
-    status: 'Paid',
-    createdAt: '2025-02-05',
-  },
-  {
-    id: 'b5',
-    billNo: 'BILL-005',
-    companyId: 'c2',
-    companyName: 'Global Electronics Pvt Ltd',
-    date: '2025-03-01',
-    invoiceNo: 'INV-2025-005',
-    invoiceDate: '2025-02-28',
-    jobNumber: 'JOB-25-018',
-    via: 'Sea',
-    weight: '5000 kg',
-    items: [
-      { id: 'i9', description: 'Import Duties', amount: 320000 },
-      { id: 'i10', description: 'Sales Tax', amount: 85000 },
-    ],
-    totalAmount: 405000,
-    grandTotal: 405000,
-    paidAmount: 0,
-    status: 'Unpaid',
-    createdAt: '2025-03-01',
-  },
-
-  // Fresh Foods Bills
-  {
-    id: 'b6',
-    billNo: 'BILL-003',
-    companyId: 'c3',
-    companyName: 'Fresh Foods Distributors',
-    date: '2025-03-15',
-    invoiceNo: 'INV-2025-003',
-    invoiceDate: '2025-03-14',
-    jobNumber: 'JOB-25-030',
-    via: 'Land',
-    weight: 'Truck Load',
-    items: [
-      { id: 'i11', description: 'Cross Border Fee', amount: 45000 },
-      { id: 'i12', description: 'Customs', amount: 25000 },
-    ],
-    totalAmount: 70000,
-    grandTotal: 70000,
-    paidAmount: 70000,
-    status: 'Paid',
-    createdAt: '2025-03-15',
-  },
-];
-
-const INITIAL_PAYMENTS: Payment[] = [
-  // Pacific Payments
-  {
-    id: 'p1',
-    companyId: 'c1',
-    companyName: 'Pacific Textiles Mills',
-    date: '2025-01-20',
-    amount: 490000,
-    reference: 'CHQ-998877',
-    method: 'Cheque',
-    chequeNo: '998877',
-    billId: 'b1',
-    createdAt: '2025-01-20',
-  },
-  {
-    id: 'p2',
-    companyId: 'c1',
-    companyName: 'Pacific Textiles Mills',
-    date: '2025-02-25',
-    amount: 100000,
-    reference: 'FT-112233',
-    method: 'Bank Transfer',
-    trackingId: 'TRX-123456',
-    billId: 'b2',
-    createdAt: '2025-02-25',
-  },
-
-  // Global Payments
-  {
-    id: 'p3',
-    companyId: 'c2',
-    companyName: 'Global Electronics Pvt Ltd',
-    date: '2025-02-10',
-    amount: 135000,
-    reference: 'PO-554433',
-    method: 'Pay Order',
-    payOrderNo: '554433',
-    billId: 'b4',
-    createdAt: '2025-02-10',
-  },
-
-  // Fresh Foods Payment
-  {
-    id: 'p4',
-    companyId: 'c3',
-    companyName: 'Fresh Foods Distributors',
-    date: '2025-03-18',
-    amount: 70000,
-    reference: 'Cash',
-    method: 'Cash',
-    description: 'Handed to Ali (Manager)',
-    billId: 'b6',
-    createdAt: '2025-03-18',
-  },
-];
+// Initial data removed for backend integration
+const INITIAL_COMPANIES: Company[] = [];
+const INITIAL_BILLS: Bill[] = [];
+const INITIAL_PAYMENTS: Payment[] = [];
 
 export function DataProvider({ children }: { children: ReactNode }) {
+  const { isAuthenticated, isHydrated: isAuthHydrated } = useAuth();
   const [companies, setCompanies] = useState<Company[]>([]);
   const [bills, setBills] = useState<Bill[]>([]);
   const [payments, setPayments] = useState<Payment[]>([]);
   const [securities, setSecurities] = useState<SecurityTracking[]>([]);
   const [isLoaded, setIsLoaded] = useState(false);
 
-  // Load data from localStorage on mount
+  const refreshData = useCallback(async () => {
+    if (!isAuthenticated) return;
+
+    try {
+      const token = localStorage.getItem('auth_token');
+      const [companiesRes, billsRes, paymentsRes, securitiesRes] = await Promise.all([
+        ApiService.get('/companies', token),
+        ApiService.get('/bills', token),
+        ApiService.get('/payments', token),
+        ApiService.get('/securities', token),
+      ]);
+
+      if (companiesRes.ok) setCompanies((companiesRes as any).data);
+      if (billsRes.ok) setBills((billsRes as any).data);
+      if (paymentsRes.ok) setPayments((paymentsRes as any).data);
+      if (securitiesRes.ok) setSecurities((securitiesRes as any).data);
+
+      setIsLoaded(true);
+    } catch (error) {
+      console.error('Error fetching data:', error);
+    }
+  }, [isAuthenticated]);
+
+  // Load data on mount / auth change
   useEffect(() => {
-    const loadedCompanies = localStorage.getItem('companies');
-    const loadedBills = localStorage.getItem('bills');
-    const loadedPayments = localStorage.getItem('payments');
+    if (isAuthHydrated && isAuthenticated) {
+      refreshData();
+    }
+  }, [isAuthenticated, isAuthHydrated, refreshData]);
 
-    if (loadedCompanies) {
-      setCompanies(JSON.parse(loadedCompanies));
+  const addCompany = async (companyData: Omit<Company, 'id' | 'createdAt'>) => {
+    const token = localStorage.getItem('auth_token');
+    const result = await ApiService.post('/companies', companyData, token);
+    if (result.ok) {
+      setCompanies(prev => [...prev, (result as any).data]);
+      return { ok: true };
     } else {
-      setCompanies(INITIAL_COMPANIES);
-      localStorage.setItem('companies', JSON.stringify(INITIAL_COMPANIES));
-    }
-
-    if (loadedBills) {
-      setBills(JSON.parse(loadedBills));
-    } else {
-      setBills(INITIAL_BILLS);
-      localStorage.setItem('bills', JSON.stringify(INITIAL_BILLS));
-    }
-
-    if (loadedPayments) {
-      setPayments(JSON.parse(loadedPayments));
-    } else {
-      setPayments(INITIAL_PAYMENTS);
-      localStorage.setItem('payments', JSON.stringify(INITIAL_PAYMENTS));
-    }
-
-    const loadedSecurities = localStorage.getItem('securities');
-    if (loadedSecurities) {
-      setSecurities(JSON.parse(loadedSecurities));
-    }
-    setIsLoaded(true);
-  }, []);
-
-  // Save to localStorage whenever data changes
-  useEffect(() => {
-    if (isLoaded) {
-      localStorage.setItem('companies', JSON.stringify(companies));
-      localStorage.setItem('bills', JSON.stringify(bills));
-      localStorage.setItem('payments', JSON.stringify(payments));
-      localStorage.setItem('securities', JSON.stringify(securities));
-    }
-  }, [companies, bills, payments, securities, isLoaded]);
-
-  const addCompany = (companyData: Omit<Company, 'id' | 'createdAt'>) => {
-    const newCompany: Company = {
-      ...companyData,
-      id: Math.random().toString(36).substr(2, 9),
-      createdAt: new Date().toISOString(),
-    };
-    setCompanies([...companies, newCompany]);
-  };
-
-  const updateCompany = (id: string, data: Partial<Company>) => {
-    setCompanies(prev => prev.map(company =>
-      company.id === id ? { ...company, ...data } : company
-    ));
-  };
-
-  const deleteCompany = (id: string) => {
-    setCompanies(prev => prev.filter(company => company.id !== id));
-  };
-
-  const addBill = (billData: Omit<Bill, 'id' | 'createdAt' | 'paidAmount' | 'status'>) => {
-    const newBill: Bill = {
-      ...billData,
-      id: Math.random().toString(36).substr(2, 9),
-      paidAmount: 0,
-      status: 'Unpaid',
-      createdAt: new Date().toISOString(),
-    };
-    setBills([...bills, newBill]);
-  };
-
-  const addPayment = (paymentData: Omit<Payment, 'id' | 'createdAt'>) => {
-    const newPayment: Payment = {
-      ...paymentData,
-      id: Math.random().toString(36).substr(2, 9),
-      createdAt: new Date().toISOString(),
-    };
-    setPayments([...payments, newPayment]);
-
-    // Update bill status logic (simple FIFO or specific bill targeting)
-    // For now, let's just update the specific bill if provided, otherwise leave it
-    if (paymentData.billId) {
-      setBills(prevBills => prevBills.map(bill => {
-        if (bill.id === paymentData.billId) {
-          const newPaidAmount = bill.paidAmount + paymentData.amount;
-          let newStatus: BillStatus = 'Unpaid';
-          if (newPaidAmount >= bill.totalAmount) newStatus = 'Paid';
-          else if (newPaidAmount > 0) newStatus = 'Partial';
-
-          return { ...bill, paidAmount: newPaidAmount, status: newStatus };
-        }
-        return bill;
-      }));
-    } else {
-      // Logic to auto-allocate payment to oldest unpaid bills could go here
-      // prioritizing "fully automated" requirement
+      console.error('Failed to add company:', result.message, (result as any).data);
+      return { ok: false, message: result.message };
     }
   };
 
-  const addSecurity = (securityData: Omit<SecurityTracking, 'id' | 'createdAt' | 'status'>) => {
-    const newSecurity: SecurityTracking = {
-      ...securityData,
-      id: Math.random().toString(36).substr(2, 9),
-      status: 'Pending',
-      createdAt: new Date().toISOString(),
-    };
-    setSecurities([...securities, newSecurity]);
+  const updateCompany = async (id: string, data: Partial<Company>) => {
+    const token = localStorage.getItem('auth_token');
+    const result = await ApiService.put(`/companies/${id}`, data, token);
+    if (result.ok) {
+      setCompanies(prev => prev.map(c => c.id === id ? (result as any).data : c));
+    }
   };
 
-  const updateSecurity = (id: string, data: Partial<SecurityTracking>) => {
-    setSecurities(prev => prev.map(s =>
-      s.id === id ? { ...s, ...data } : s
-    ));
+  const deleteCompany = async (id: string) => {
+    const token = localStorage.getItem('auth_token');
+    const result = await ApiService.delete(`/companies/${id}`, token);
+    if (result.ok) {
+      setCompanies(prev => prev.filter(company => company.id !== id));
+    }
+  };
+
+  const addBill = async (billData: Omit<Bill, 'id' | 'createdAt' | 'paidAmount' | 'status' | 'calculatedStatus'>) => {
+    const token = localStorage.getItem('auth_token');
+    const result = await ApiService.post('/bills', billData, token);
+    if (result.ok) {
+      setBills(prev => [...prev, (result as any).data]);
+    }
+    return result;
+  };
+
+  const addPayment = async (paymentData: Omit<Payment, 'id' | 'createdAt'>) => {
+    const token = localStorage.getItem('auth_token');
+    const result = await ApiService.post('/payments', paymentData, token);
+    if (result.ok) {
+      setPayments(prev => [...prev, (result as any).data]);
+      // Refresh bills to update their status from the backend calculation
+      const billsRes = await ApiService.get('/bills', token);
+      if (billsRes.ok) setBills((billsRes as any).data);
+    }
+    return result;
+  };
+
+  const addSecurity = async (securityData: Omit<SecurityTracking, 'id' | 'createdAt' | 'status'>) => {
+    const token = localStorage.getItem('auth_token');
+    const result = await ApiService.post('/securities', securityData, token);
+    if (result.ok) {
+      setSecurities(prev => [...prev, (result as any).data]);
+    }
+    return result;
+  };
+
+  const updateSecurity = async (id: string, data: Partial<SecurityTracking>) => {
+    const token = localStorage.getItem('auth_token');
+    const result = await ApiService.put(`/securities/${id}`, data, token);
+    if (result.ok) {
+      setSecurities(prev => prev.map(s => s.id === id ? (result as any).data : s));
+    }
   };
 
   const getCompanyLedger = (companyId: string): LedgerEntry[] => {
-    const companyBills = bills.filter(b => b.companyId === companyId).map(b => ({
+    const companyBills = bills.filter(b => b.companyId == companyId).map(b => ({
       id: b.id + '_debit',
       date: b.date,
       description: `Invoice #${b.billNo}`,
@@ -505,9 +263,9 @@ export function DataProvider({ children }: { children: ReactNode }) {
       jobNumber: b.jobNumber
     }));
 
-    const companyPayments = payments.filter(p => p.companyId === companyId).map(p => {
+    const companyPayments = payments.filter(p => p.companyId == companyId).map(p => {
       // Find linked bill to get Job Number if available
-      const linkedBill = bills.find(b => b.id === p.billId);
+      const linkedBill = bills.find(b => b.id == p.billId);
 
       return {
         id: p.id + '_credit',
@@ -569,6 +327,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
         getCompanyLedger,
         getCompanyBalance,
         getDashboardStats,
+        refreshData,
       }}
     >
       {children}

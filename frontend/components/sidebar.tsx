@@ -13,16 +13,21 @@ import {
   X,
   LogOut,
   ShieldCheck,
+  Database,
 } from 'lucide-react';
 import { useState } from 'react';
 import { Button } from '@/components/ui/button';
 
 interface SidebarProps {
-  role: 'admin' | 'company';
+  user: {
+    name: string;
+    role: 'admin' | 'company' | string;
+  } | null;
   onLogout: () => void;
 }
 
-export function Sidebar({ role, onLogout }: SidebarProps) {
+export function Sidebar({ user, onLogout }: SidebarProps) {
+  const role = user?.role.toLowerCase() || 'user';
   const [isOpen, setIsOpen] = useState(true);
   const pathname = usePathname();
 
@@ -34,6 +39,7 @@ export function Sidebar({ role, onLogout }: SidebarProps) {
     { href: '/admin/ledger', label: 'Ledger', icon: BookOpen },
     { href: '/admin/reports', label: 'Reports', icon: FileBarChart },
     { href: '/admin/securities', label: 'Securities', icon: ShieldCheck },
+    { href: '/admin/backup', label: 'Backup', icon: Database },
   ];
 
   const companyLinks = [

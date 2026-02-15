@@ -10,8 +10,8 @@ const _geist = Geist({ subsets: ['latin'] })
 const _geistMono = Geist_Mono({ subsets: ['latin'] })
 
 export const metadata: Metadata = {
-  title: 'Billing & Accounts Management System',
-  description: 'Professional Clearing & Forwarding Billing System',
+  title: 'THAHEEM BROTHERS - Billing & Accounts Management',
+  description: 'Professional Clearing & Forwarding Billing System for THAHEEM BROTHERS Shipping & Logistics',
   generator: 'v0.app',
 }
 
@@ -22,7 +22,7 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en">
-      <body className="font-sans antialiased">
+      <body className="font-sans antialiased" suppressHydrationWarning>
         <AuthProvider>
           <DataProvider>
             {children}

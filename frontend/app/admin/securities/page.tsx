@@ -45,10 +45,12 @@ import {
 import { useState, useMemo } from 'react';
 import { useData, SecurityTracking } from '@/context/data-context';
 import { Badge } from '@/components/ui/badge';
+import { formatDate } from '@/lib/utils';
 
 export default function SecuritiesPage() {
     const { securities, companies, addSecurity, updateSecurity } = useData();
     const [isDialogOpen, setIsDialogOpen] = useState(false);
+    const [loading, setLoading] = useState(false);
     const [searchTerm, setSearchTerm] = useState('');
 
     // Form State
@@ -72,7 +74,7 @@ export default function SecuritiesPage() {
         s.containerNo.toLowerCase().includes(searchTerm.toLowerCase())
     );
 
-    const handleSubmit = () => {
+    const handleSubmit = async () => {
         if (!companyId || !gdNumber || !noOfContainers || !amountPerContainer) {
             alert("Please fill required fields");
             return;
@@ -81,38 +83,50 @@ export default function SecuritiesPage() {
         const selectedCompany = companies.find(c => c.id === companyId);
         if (!selectedCompany) return;
 
-        addSecurity({
-            companyId,
-            companyName: selectedCompany.name,
-            gdNumber,
-            noOfContainers: Number(noOfContainers),
-            containerNo,
-            amountPerContainer: Number(amountPerContainer),
-            refundDays: Number(refundDays),
-            port,
-            isDocumentSubmitted,
-            refundDueDate,
-            isRefundReceived,
-            receivedAmountDate: receivedAmountDate || undefined,
-            payOrderNo,
-            receiverName,
-        });
+        setLoading(true);
+        try {
+            const result = await addSecurity({
+                companyId,
+                companyName: selectedCompany.name,
+                gdNumber,
+                noOfContainers: Number(noOfContainers),
+                containerNo,
+                amountPerContainer: Number(amountPerContainer),
+                refundDays: Number(refundDays),
+                port,
+                isDocumentSubmitted,
+                refundDueDate,
+                isRefundReceived,
+                receivedAmountDate: receivedAmountDate || undefined,
+                payOrderNo,
+                receiverName,
+            });
 
-        setIsDialogOpen(false);
-        // Reset Form
-        setCompanyId('');
-        setGdNumber('');
-        setNoOfContainers('1');
-        setContainerNo('');
-        setAmountPerContainer('');
-        setRefundDays('7');
-        setPort('');
-        setIsDocumentSubmitted(false);
-        setRefundDueDate(new Date().toISOString().split('T')[0]);
-        setIsRefundReceived(false);
-        setReceivedAmountDate('');
-        setPayOrderNo('');
-        setReceiverName('');
+            if (result.ok) {
+                setIsDialogOpen(false);
+                // Reset Form
+                setCompanyId('');
+                setGdNumber('');
+                setNoOfContainers('1');
+                setContainerNo('');
+                setAmountPerContainer('');
+                setRefundDays('7');
+                setPort('');
+                setIsDocumentSubmitted(false);
+                setRefundDueDate(new Date().toISOString().split('T')[0]);
+                setIsRefundReceived(false);
+                setReceivedAmountDate('');
+                setPayOrderNo('');
+                setReceiverName('');
+            } else {
+                alert("Failed to add security record: " + result.message);
+            }
+        } catch (error) {
+            console.error("Failed to add security:", error);
+            alert("An unexpected error occurred while saving the security record.");
+        } finally {
+            setLoading(false);
+        }
     };
 
     const totalAmountCalculated = Number(noOfContainers) * Number(amountPerContainer);
@@ -342,8 +356,9 @@ export default function SecuritiesPage() {
                                         <Button
                                             className="px-10 h-12 rounded-2xl font-black bg-primary hover:bg-primary/90 shadow-xl shadow-primary/20 transition-all active:scale-95 text-base"
                                             onClick={handleSubmit}
+                                            disabled={loading}
                                         >
-                                            Save Security Record
+                                            {loading ? "Saving..." : "Save Security Record"}
                                         </Button>
                                     </div>
                                 </div>
@@ -380,7 +395,7 @@ export default function SecuritiesPage() {
                                 <TableBody>
                                     {filteredSecurities.length === 0 ? (
                                         <TableRow>
-                                            <TableCell colSpan={7} className="h-40 text-center text-muted-foreground pr-8 pl-8">
+                                            <TableCell colSpan={8} className="h-40 text-center text-muted-foreground pr-8 pl-8">
                                                 <div className="flex flex-col items-center gap-2 opacity-50">
                                                     <ShieldCheck className="w-12 h-12" />
                                                     <p className="font-medium">No security records found</p>
@@ -421,11 +436,7 @@ export default function SecuritiesPage() {
                                                 <TableCell>
                                                     <div className="flex items-center gap-2 text-xs font-bold text-slate-600 dark:text-slate-400">
                                                         <Calendar className="w-3.5 h-3.5 opacity-60" />
-                                                        {new Date(security.refundDueDate).toLocaleDateString('en-GB', {
-                                                            day: '2-digit',
-                                                            month: 'short',
-                                                            year: '2-digit'
-                                                        })}
+                                                        {formatDate(security.refundDueDate)}
                                                     </div>
                                                 </TableCell>
                                                 <TableCell>
@@ -447,9 +458,15 @@ export default function SecuritiesPage() {
                                                         variant="ghost"
                                                         size="icon"
                                                         className="h-9 w-9 rounded-xl text-muted-foreground hover:bg-white hover:text-primary hover:shadow-md transition-all active:scale-95"
-                                                        onClick={() => {
+                                                        onClick={async () => {
                                                             if (window.confirm("Mark as refund received?")) {
-                                                                updateSecurity(security.id, { isRefundReceived: true, status: 'Completed' });
+                                                                try {
+                                                                    const result = await updateSecurity(security.id, { isRefundReceived: true, status: 'Completed' });
+                                                                    // add check if result.ok here if updateSecurity is updated to return result
+                                                                } catch (err) {
+                                                                    console.error("Failed to update security:", err);
+                                                                    alert("Failed to update security record.");
+                                                                }
                                                             }
                                                         }}
                                                         disabled={security.isRefundReceived}

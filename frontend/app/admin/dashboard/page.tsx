@@ -13,6 +13,14 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
+import {
   BarChart,
   Bar,
   XAxis,
@@ -33,11 +41,15 @@ import {
   Printer,
   Users
 } from 'lucide-react';
-import { useMemo, useState } from 'react';
+import { useMemo, useState, useRef } from 'react';
+import { formatDate } from '@/lib/utils';
+import { jsPDF } from 'jspdf';
+import { toPng } from 'html-to-image';
 
 export default function AdminDashboard() {
   const { bills, payments, companies } = useData();
   const [filterType, setFilterType] = useState('overall');
+  const reportRef = useRef<HTMLDivElement>(null);
 
   // Compute Filtered Stats
   const filteredStats = useMemo(() => {
@@ -124,7 +136,7 @@ export default function AdminDashboard() {
     const recentBills = bills.map(b => ({
       type: 'BILL',
       title: `Invoice #${b.billNo} Created`,
-      subtitle: `${b.companyName} • ${new Date(b.createdAt).toLocaleDateString()}`,
+      subtitle: `${b.companyName} • ${formatDate(b.createdAt)}`,
       amount: b.totalAmount,
       date: new Date(b.createdAt),
       id: b.id
@@ -133,7 +145,7 @@ export default function AdminDashboard() {
     const recentPayments = payments.map(p => ({
       type: 'PAYMENT',
       title: `Payment Received`,
-      subtitle: `${p.companyName} • ${new Date(p.createdAt).toLocaleDateString()}`,
+      subtitle: `${p.companyName} • ${formatDate(p.createdAt)}`,
       amount: p.amount,
       date: new Date(p.createdAt),
       id: p.id
@@ -142,7 +154,7 @@ export default function AdminDashboard() {
     const newCompanies = companies.map(c => ({
       type: 'COMPANY',
       title: `New Company Added`,
-      subtitle: `${c.name} • ${new Date(c.createdAt).toLocaleDateString()}`,
+      subtitle: `${c.name} • ${formatDate(c.createdAt)}`,
       amount: 0,
       date: new Date(c.createdAt),
       id: c.id
@@ -163,9 +175,65 @@ export default function AdminDashboard() {
     }
   }, [filterType]);
 
+  const handlePrint = () => {
+    window.print();
+  };
+
+  const handleExport = async () => {
+    if (!reportRef.current) return;
+
+    try {
+      // 1. Show the print header temporarily for the capture
+      const header = reportRef.current.querySelector('.print-header');
+      const footer = reportRef.current.querySelector('.print-only'); // if any
+      if (header) header.classList.remove('hidden');
+      if (footer) footer.classList.remove('hidden');
+
+      // 2. Capture the element as PNG
+      // We use a slight delay or specify quality for better results
+      const dataUrl = await toPng(reportRef.current, {
+        backgroundColor: '#f8fafc',
+        style: {
+          padding: '20px',
+        }
+      });
+
+      // 3. Reset visibility
+      if (header) header.classList.add('hidden');
+      if (footer) footer.classList.add('hidden');
+
+      // 4. Create jsPDF
+      const pdf = new jsPDF('p', 'mm', 'a4');
+      const imgProps = pdf.getImageProperties(dataUrl);
+      const pdfWidth = pdf.internal.pageSize.getWidth();
+      const pdfHeight = (imgProps.height * pdfWidth) / imgProps.width;
+
+      pdf.addImage(dataUrl, 'PNG', 0, 0, pdfWidth, pdfHeight);
+
+      const dateStr = new Date().toISOString().split('T')[0];
+      pdf.save(`Business_Report_${dateStr}.pdf`);
+    } catch (error) {
+      console.error('Export failed:', error);
+    }
+  };
+
   return (
     <DashboardLayout>
-      <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
+      <div ref={reportRef} className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500 bg-slate-50 p-4 rounded-xl">
+        {/* Print Only Header */}
+        <div className="hidden print:block print-header mb-8 pb-4 border-b-2 border-slate-900">
+          <div className="flex justify-between items-center">
+            <div>
+              <h1 className="text-2xl font-black text-slate-900 uppercase tracking-tighter">THAHEEM BROTHERS</h1>
+              <p className="text-sm font-bold text-slate-600">Business Performance Report</p>
+            </div>
+            <div className="text-right">
+              <p className="text-sm font-bold text-slate-900">Date: {formatDate(new Date())}</p>
+              <p className="text-xs text-slate-600 uppercase tracking-widest font-black">{filterLabel}</p>
+            </div>
+          </div>
+        </div>
+
         <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
           <div>
             <h1 className="text-4xl font-extrabold tracking-tight text-foreground bg-gradient-to-r from-primary to-blue-600 bg-clip-text text-transparent drop-shadow-sm">
@@ -188,11 +256,18 @@ export default function AdminDashboard() {
                 <SelectItem value="yearly">Yearly Stats</SelectItem>
               </SelectContent>
             </Select>
-            <Button variant="outline" className="gap-2 shadow-sm hover:bg-muted/80 transition-colors">
+            <Button
+              variant="outline"
+              className="gap-2 shadow-sm hover:bg-muted/80 transition-colors"
+              onClick={handlePrint}
+            >
               <Printer className="w-4 h-4" />
               Print
             </Button>
-            <Button className="gap-2 shadow-md bg-primary hover:bg-blue-600 transition-all hover:scale-105 active:scale-95">
+            <Button
+              className="gap-2 shadow-md bg-primary hover:bg-blue-600 transition-all hover:scale-105 active:scale-95"
+              onClick={handleExport}
+            >
               <Download className="w-4 h-4" />
               Export Report
             </Button>
@@ -350,6 +425,46 @@ export default function AdminDashboard() {
               </Button>
             </div>
           </Card>
+        </div>
+
+        {/* Print Only: Detailed Pending Bills */}
+        <div className="hidden print:block mt-8">
+          <h2 className="text-xl font-bold mb-4 border-b pb-2">Detail of Pending Bills (Unpaid)</h2>
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>Date</TableHead>
+                <TableHead>Bill No</TableHead>
+                <TableHead>Company</TableHead>
+                <TableHead>Job No</TableHead>
+                <TableHead className="text-right">Balance Due</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {bills.filter(b => b.status !== 'Paid').length === 0 ? (
+                <TableRow>
+                  <TableCell colSpan={5} className="text-center py-4 text-muted-foreground">No pending bills</TableCell>
+                </TableRow>
+              ) : (
+                bills.filter(b => b.status !== 'Paid').map((bill) => (
+                  <TableRow key={bill.id}>
+                    <TableCell className="text-xs">{formatDate(bill.date)}</TableCell>
+                    <TableCell className="text-xs font-bold">{bill.billNo}</TableCell>
+                    <TableCell className="text-xs">{bill.companyName}</TableCell>
+                    <TableCell className="text-xs font-mono">{bill.jobNumber}</TableCell>
+                    <TableCell className="text-xs text-right font-bold">
+                      PKR {(bill.totalAmount - (bill.paidAmount || 0)).toLocaleString()}
+                    </TableCell>
+                  </TableRow>
+                ))
+              )}
+            </TableBody>
+          </Table>
+          <div className="mt-4 text-right">
+            <p className="text-sm font-black">
+              Total Outstanding: PKR {bills.reduce((s, b) => s + (b.totalAmount - (b.paidAmount || 0)), 0).toLocaleString()}
+            </p>
+          </div>
         </div>
       </div>
     </DashboardLayout>

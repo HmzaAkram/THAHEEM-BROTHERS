@@ -1,0 +1,68 @@
+<?php
+
+namespace App\Http\Controllers;
+
+use Illuminate\Http\Request;
+use App\Models\User;
+use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\Auth;
+
+class AuthController extends Controller
+{
+    public function login(Request $request)
+    {
+        $request->validate([
+            'email' => 'required', // Can be email or username
+            'password' => 'required',
+        ]);
+
+        $login = $request->input('email');
+        $password = $request->input('password');
+
+        // 1. Check User model (Admin)
+        $user = \App\Models\User::where('email', $login)->first();
+        if ($user && Hash::check($password, $user->password)) {
+            $token = $user->createToken('auth_token')->plainTextToken;
+            return response()->json([
+                'access_token' => $token,
+                'token_type' => 'Bearer',
+                'user' => $user
+            ]);
+        }
+
+        // 2. Check Company model (Company Owner)
+        $company = \App\Models\Company::where('username', $login)
+            ->orWhere('email', $login)
+            ->first();
+
+        // Plain text comparison for companies to allow admin visibility
+        if ($company && $password === $company->password) {
+            $token = $company->createToken('auth_token')->plainTextToken;
+            return response()->json([
+                'access_token' => $token,
+                'token_type' => 'Bearer',
+                'user' => $company // Frontend expects 'user' key
+            ]);
+        }
+
+
+        return response()->json([
+            'message' => 'Invalid login details'
+        ], 401);
+    }
+
+
+    public function logout(Request $request)
+    {
+        $request->user()->currentAccessToken()->delete();
+
+        return response()->json([
+            'message' => 'Logged out successfully'
+        ]);
+    }
+
+    public function me(Request $request)
+    {
+        return response()->json($request->user());
+    }
+}

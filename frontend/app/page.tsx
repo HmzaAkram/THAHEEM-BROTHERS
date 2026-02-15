@@ -20,7 +20,7 @@ export default function HomePage() {
             <div className="w-full h-full bg-[url('https://images.unsplash.com/photo-1586528116311-ad8dd3c8310d?ixlib=rb-4.0.3&auto=format&fit=crop&w=2070&q=80')] bg-cover bg-center" />
           </div>
 
-          <div className="container relative z-20 px-4 text-center">
+          <div className="container mx-auto relative z-20 px-4 text-center">
             <h1 className="text-4xl md:text-6xl font-extrabold tracking-tight text-white mb-6 animate-in slide-in-from-bottom-5 duration-700">
               Global Logistics <span className="text-primary">Partner</span>
             </h1>
@@ -44,7 +44,7 @@ export default function HomePage() {
 
         {/* Global Presence Section */}
         <section className="py-24 bg-white">
-          <div className="container px-4">
+          <div className="container mx-auto px-4">
             <div className="text-center max-w-3xl mx-auto mb-16">
               <h2 className="text-3xl font-bold mb-4">Connecting You to the World</h2>
               <p className="text-muted-foreground text-lg">
@@ -68,7 +68,7 @@ export default function HomePage() {
 
         {/* Why Choose Us - Detailed */}
         <section className="py-24 bg-slate-50">
-          <div className="container px-4">
+          <div className="container mx-auto px-4">
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-16 items-center">
               <div className="space-y-8">
                 <div>
@@ -120,7 +120,7 @@ export default function HomePage() {
 
         {/* Services Overview Grid */}
         <section className="py-24 bg-background">
-          <div className="container px-4">
+          <div className="container mx-auto px-4">
             <div className="text-center max-w-3xl mx-auto mb-16">
               <h2 className="text-3xl font-bold mb-4">Our Core Services</h2>
               <p className="text-muted-foreground">
@@ -167,7 +167,7 @@ export default function HomePage() {
         <section className="py-24 relative overflow-hidden">
           <div className="absolute inset-0 bg-[url('https://images.unsplash.com/photo-1494412574643-35d324698420?ixlib=rb-4.0.3&auto=format&fit=crop&w=2070&q=80')] bg-cover bg-center fixed-bg" />
           <div className="absolute inset-0 bg-slate-900/90" />
-          <div className="container px-4 relative z-10">
+          <div className="container mx-auto px-4 relative z-10">
             <div className="grid grid-cols-2 lg:grid-cols-4 gap-12 text-center">
               {[
                 { label: "Years Experience", value: "28+" },
@@ -186,7 +186,7 @@ export default function HomePage() {
 
         {/* Trusted Partners / CTA */}
         <section className="py-24 bg-slate-900 text-white">
-          <div className="container px-4 text-center">
+          <div className="container mx-auto px-4 text-center">
             <h2 className="text-3xl font-bold mb-8">Ready to Optimize Your Logistics?</h2>
             <p className="text-slate-300 max-w-2xl mx-auto mb-10 text-lg">
               Join hundreds of businesses that trust Thaheem Brothers for their supply chain needs. Get a competitive quote today.

@@ -41,6 +41,7 @@ import {
     Tooltip,
     ResponsiveContainer,
 } from 'recharts';
+import { formatDate } from '@/lib/utils';
 
 export default function CompanyDetailsPage() {
     const params = useParams();
@@ -48,7 +49,7 @@ export default function CompanyDetailsPage() {
     const { companies, getCompanyLedger, updateCompany } = useData();
     const companyId = params.id as string;
 
-    const company = companies.find((c) => c.id === companyId);
+    const company = companies.find((c) => c.id == companyId);
     const ledger = useMemo(() => getCompanyLedger(companyId), [companyId, getCompanyLedger]);
 
     const [isEditing, setIsEditing] = useState(false);
@@ -64,7 +65,7 @@ export default function CompanyDetailsPage() {
     // Chart Data preparation (cumulative balance over time)
     const chartData = useMemo(() => {
         return ledger.map(entry => ({
-            date: new Date(entry.date).toLocaleDateString(),
+            date: formatDate(entry.date),
             balance: entry.balance
         }));
     }, [ledger]);
@@ -106,6 +107,9 @@ export default function CompanyDetailsPage() {
                         </h1>
                         <p className="text-muted-foreground">Detailed view of {company.name}</p>
                     </div>
+                    <Badge variant="outline" className="text-xl px-4 py-1 font-mono border-primary/20 text-primary bg-primary/5">
+                        {company.identifier || `C${company.id}`}
+                    </Badge>
                     <div className="ml-auto flex gap-2">
                         {!isEditing ? (
                             <Button variant="outline" className="gap-2" onClick={handleEditClick}>
@@ -115,7 +119,7 @@ export default function CompanyDetailsPage() {
                             <>
                                 <Button variant="ghost" onClick={() => setIsEditing(false)}>Cancel</Button>
                                 <Button className="gap-2" onClick={handleSaveClick}>
-                                    <Save className="w-4 h-4" /> Save Changes
+                                    <Save className="w-4 h-4" /> Save Company
                                 </Button>
                             </>
                         )}
@@ -339,7 +343,7 @@ export default function CompanyDetailsPage() {
                                     <TableBody>
                                         {ledger.slice().reverse().slice(0, 5).map((entry) => (
                                             <TableRow key={entry.id}>
-                                                <TableCell className="font-medium text-xs">{new Date(entry.date).toLocaleDateString()}</TableCell>
+                                                <TableCell className="font-medium text-xs">{formatDate(entry.date)}</TableCell>
                                                 <TableCell>
                                                     <div className="flex flex-col">
                                                         <span className="font-medium">{entry.description}</span>

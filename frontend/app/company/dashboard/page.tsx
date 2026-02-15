@@ -5,6 +5,8 @@ import { DashboardCard } from '@/components/dashboard-card';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { useData } from '@/context/data-context';
+import { useAuth } from '@/context/auth-context';
+import { formatDate } from '@/lib/utils';
 import {
   LineChart,
   Line,
@@ -24,20 +26,29 @@ const statusStyles = {
   Unpaid: 'bg-red-100 text-red-800 border-red-200',
 };
 
+import { CheckCircle2 } from 'lucide-react';
+import { Badge } from '@/components/ui/badge';
+
 export default function CompanyDashboard() {
+  const { user, isHydrated: authHydrated } = useAuth();
   const { companies, bills, payments, getCompanyBalance } = useData();
 
-  // SIMULATE LOGGED IN USER (Get first company)
-  const currentCompany = companies[0];
+  // SIMULATE LOGGED IN USER (Get current user company or first one)
+  const currentCompany = useMemo(() => {
+    if (user?.role === 'company' && user.id) {
+      return companies.find(c => String(c.id) === String(user.id)) || companies[0];
+    }
+    return companies[0];
+  }, [user, companies]);
 
   const companyBills = useMemo(() => {
     if (!currentCompany) return [];
-    return bills.filter(b => b.companyId === currentCompany.id).sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+    return bills.filter(b => String(b.companyId) === String(currentCompany.id)).sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
   }, [bills, currentCompany]);
 
   const companyPayments = useMemo(() => {
     if (!currentCompany) return [];
-    return payments.filter(p => p.companyId === currentCompany.id);
+    return payments.filter(p => String(p.companyId) === String(currentCompany.id));
   }, [payments, currentCompany]);
 
   const stats = useMemo(() => {
@@ -70,11 +81,38 @@ export default function CompanyDashboard() {
     return months;
   }, [companyBills, currentCompany]);
 
-  if (!currentCompany) {
+  const recentActivity = useMemo(() => {
+    const combined = [
+      ...companyBills.map(b => ({
+        id: b.id,
+        type: 'BILL' as const,
+        title: `Invoice #${b.billNo} Created`,
+        subtitle: `Invoice Date: ${formatDate(b.date)}`,
+        date: b.createdAt,
+        amount: b.totalAmount,
+        status: b.calculatedStatus,
+        isNew: (new Date().getTime() - new Date(b.createdAt).getTime()) < 48 * 60 * 60 * 1000
+      })),
+      ...companyPayments.map(p => ({
+        id: p.id,
+        type: 'PAYMENT' as const,
+        title: `Payment Confirmed`,
+        subtitle: `Received: ${formatDate(p.date)}`,
+        date: p.createdAt,
+        amount: p.amount,
+        status: 'Paid' as const,
+        isNew: false
+      }))
+    ];
+
+    return combined.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()).slice(0, 10);
+  }, [companyBills, companyPayments]);
+
+  if (!authHydrated || !currentCompany) {
     return (
       <DashboardLayout>
         <div className="flex h-full items-center justify-center p-10 text-muted-foreground animate-in fade-in">
-          No company data available. Please add a company in the admin panel first.
+          {!authHydrated ? "Loading..." : "No company data available. Please add a company in the admin panel first."}
         </div>
       </DashboardLayout>
     )
@@ -103,7 +141,21 @@ export default function CompanyDashboard() {
           </div>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+          {recentActivity.find(a => a.type === 'PAYMENT') && (
+            <Card className="lg:col-span-1 shadow-xl border-green-500/20 bg-green-500/5 dark:bg-green-500/10 backdrop-blur-md flex flex-col justify-center p-6 border-2 border-dashed relative overflow-hidden group">
+              <div className="absolute top-0 right-0 p-2 opacity-10 group-hover:opacity-20 transition-opacity">
+                <CheckCircle2 className="w-12 h-12 text-green-600" />
+              </div>
+              <p className="text-green-600 text-xs font-black uppercase tracking-widest mb-1">Last Payment Success</p>
+              <h3 className="text-xl font-black text-foreground">
+                PKR {recentActivity.find(a => a.type === 'PAYMENT')?.amount.toLocaleString()}
+              </h3>
+              <p className="text-muted-foreground text-[10px] font-medium mt-1 uppercase">
+                {new Date(recentActivity.find(a => a.type === 'PAYMENT')?.date || '').toLocaleDateString('en-GB', { day: '2-digit', month: 'short' })}
+              </p>
+            </Card>
+          )}
           <DashboardCard
             title="Total Billed"
             value={`PKR ${(stats.billed / 1000).toFixed(1)}K`}
@@ -184,34 +236,47 @@ export default function CompanyDashboard() {
 
           <Card className="shadow-xl border-0 bg-white/50 dark:bg-slate-900/50 backdrop-blur-md ring-1 ring-black/5 dark:ring-white/10 flex flex-col">
             <CardHeader>
-              <CardTitle className="text-base font-semibold uppercase tracking-wider text-muted-foreground">Recent Invoices</CardTitle>
+              <CardTitle className="text-base font-semibold uppercase tracking-wider text-muted-foreground">Recent Activity</CardTitle>
             </CardHeader>
             <CardContent className="flex-1 overflow-auto pr-2">
               <div className="space-y-3">
-                {companyBills.slice(0, 5).map((bill, idx) => (
-                  <div
-                    key={idx}
-                    className="flex items-center justify-between p-3 rounded-lg hover:bg-white/60 dark:hover:bg-slate-800/60 transition-all duration-200 border border-transparent hover:border-primary/20 hover:scale-[1.01] group"
-                  >
-                    <div className="flex-1">
-                      <p className="font-bold text-sm text-foreground group-hover:text-primary transition-colors">{bill.billNo}</p>
-                      <p className="text-xs text-muted-foreground">
-                        {new Date(bill.date).toLocaleDateString()}
-                      </p>
-                    </div>
-                    <div className="text-right">
-                      <p className="font-bold text-sm">PKR {bill.totalAmount.toLocaleString()}</p>
-                      <span
-                        className={`text-[10px] font-bold uppercase px-2 py-0.5 rounded-full inline-block mt-1 ${bill.status === 'Paid' ? 'bg-green-100 text-green-700' :
-                          bill.status === 'Partial' ? 'bg-yellow-100 text-yellow-700' :
-                            'bg-red-100 text-red-700'
-                          }`}
-                      >
-                        {bill.status}
-                      </span>
-                    </div>
+                {recentActivity.length === 0 ? (
+                  <div className="text-center py-6 text-muted-foreground italic text-sm">
+                    No recent activity found.
                   </div>
-                ))}
+                ) : (
+                  recentActivity.map((activity, idx) => (
+                    <div
+                      key={`${activity.type}-${activity.id}`}
+                      className="flex items-center justify-between p-3 rounded-lg hover:bg-white/60 dark:hover:bg-slate-800/60 transition-all duration-200 border border-transparent hover:border-primary/20 hover:scale-[1.01] group"
+                    >
+                      <div className="flex-1">
+                        <div className="flex items-center gap-2">
+                          <p className="font-bold text-sm text-foreground group-hover:text-primary transition-colors">{activity.title}</p>
+                          {activity.isNew && (
+                            <span className="bg-primary text-white text-[8px] font-black px-1.5 py-0.5 rounded animate-pulse">NEW</span>
+                          )}
+                        </div>
+                        <p className="text-xs text-muted-foreground">
+                          {new Date(activity.date).toLocaleDateString()}
+                        </p>
+                      </div>
+                      <div className="text-right">
+                        <p className={`font-bold text-sm ${activity.type === 'BILL' ? 'text-foreground' : 'text-green-600'}`}>
+                          {activity.type === 'BILL' ? '-' : '+'} PKR {activity.amount.toLocaleString()}
+                        </p>
+                        <span
+                          className={`text-[10px] font-bold uppercase px-2 py-0.5 rounded-full inline-block mt-1 ${activity.status === 'Paid' ? 'bg-green-100 text-green-700' :
+                            activity.status === 'Partial' ? 'bg-yellow-100 text-yellow-700' :
+                              'bg-red-100 text-red-700'
+                            }`}
+                        >
+                          {activity.status}
+                        </span>
+                      </div>
+                    </div>
+                  ))
+                )}
               </div>
             </CardContent>
             <div className="p-6 pt-0 mt-auto">

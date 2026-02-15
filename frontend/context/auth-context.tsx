@@ -6,13 +6,13 @@ interface User {
   id: string;
   name: string;
   email: string;
-  role: UserRole;
+  role: 'admin' | 'company' | string;
 }
 
 interface AuthContextType {
   user: User | null;
-  role: UserRole | null; // Keep for backward compatibility if needed, but derive from user
-  login: (userData: User) => void;
+  isAuthenticated: boolean;
+  login: (userData: User, token?: string) => void;
   logout: () => void;
   isHydrated: boolean;
 }
@@ -32,22 +32,24 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setIsHydrated(true);
   }, []);
 
-  const login = (userData: User) => {
+  const login = (userData: User, token?: string) => {
     setUser(userData);
+    if (token) {
+      localStorage.setItem('auth_token', token);
+    }
     localStorage.setItem('currentUser', JSON.stringify(userData));
-    localStorage.setItem('userRole', userData.role); // Keep for compatibility
   };
 
   const logout = () => {
     setUser(null);
     localStorage.removeItem('currentUser');
-    localStorage.removeItem('userRole');
+    localStorage.removeItem('auth_token');
   };
 
   return (
     <AuthContext.Provider value={{
       user,
-      role: user?.role || null,
+      isAuthenticated: !!user,
       login,
       logout,
       isHydrated

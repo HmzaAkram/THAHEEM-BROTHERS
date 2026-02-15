@@ -31,54 +31,155 @@ import {
   ResponsiveContainer,
 } from 'recharts';
 import { Download, Printer } from 'lucide-react';
-import { useState } from 'react';
-
-const outstandingData = [
-  { company: 'THAHEEM BROTHERS', outstanding: 0, bills: 7, daysOverdue: 0, lastDueDate: '2026-02-10' },
-  { company: 'Import Traders', outstanding: 65500, bills: 3, daysOverdue: 10, lastDueDate: '2026-02-02' },
-  { company: 'Global Freight Co', outstanding: 450000, bills: 1, daysOverdue: 38, lastDueDate: '2026-01-05' },
-  { company: 'Karachi Logistics', outstanding: 0, bills: 1, daysOverdue: 0, lastDueDate: '2026-02-08' },
-  { company: 'Orient Shipping', outstanding: 320000, bills: 2, daysOverdue: 28, lastDueDate: '2026-01-15' },
-  {
-    company: 'Metro Cargo Services',
-    outstanding: 0,
-    bills: 1,
-    daysOverdue: 0,
-    lastDueDate: '2026-02-09',
-  },
-  { company: 'Express Imports Ltd', outstanding: 100000, bills: 2, daysOverdue: 18, lastDueDate: '2026-01-25' },
-  {
-    company: 'Trade Hub International',
-    outstanding: 435000,
-    bills: 1,
-    daysOverdue: 45,
-    lastDueDate: '2025-12-28',
-  },
-];
-
-const timeSeriesData = [
-  { month: 'Jan', outstanding: 850000 },
-  { month: 'Feb', outstanding: 935000 },
-  { month: 'Mar', outstanding: 780000 },
-  { month: 'Apr', outstanding: 1050000 },
-  { month: 'May', outstanding: 1200000 },
-  { month: 'Jun', outstanding: 945000 },
-];
+import { useData } from '@/context/data-context';
+import { useMemo, useState, useRef } from 'react';
+import { formatDate } from '@/lib/utils';
+import { jsPDF } from 'jspdf';
+import { toPng } from 'html-to-image';
 
 export default function ReportsPage() {
+  const { companies, bills, payments } = useData();
   const [dateFrom, setDateFrom] = useState('2026-01-01');
-  const [dateTo, setDateTo] = useState('2026-02-12');
+  const [dateTo, setDateTo] = useState(new Date().toISOString().split('T')[0]);
   const [reportType, setReportType] = useState('outstanding');
+  const [selectedCompanyId, setSelectedCompanyId] = useState('all');
+  const reportRef = useRef<HTMLDivElement>(null);
 
-  const totalOutstanding = outstandingData.reduce(
-    (sum, item) => sum + item.outstanding,
-    0
-  );
+  const { outstandingData, totalOutstanding, timeSeriesData, filteredBills, filteredPayments, companyLedger } = useMemo(() => {
+    // 1. Filter raw data based on dates
+    const start = new Date(dateFrom);
+    const end = new Date(dateTo);
+    end.setHours(23, 59, 59, 999);
+
+    const fBills = bills.filter(b => {
+      const d = new Date(b.date);
+      return d >= start && d <= end;
+    });
+
+    const fPayments = payments.filter(p => {
+      const d = new Date(p.date);
+      return d >= start && d <= end;
+    });
+
+    // 2. Company Ledger Data (if type is company)
+    const companyLedger = reportType === 'company' && selectedCompanyId !== 'all'
+      ? [...fBills.filter(b => String(b.companyId) === selectedCompanyId).map(b => ({ ...b, type: 'BILL' })),
+      ...fPayments.filter(p => String(p.companyId) === selectedCompanyId).map(p => ({ ...p, type: 'PAYMENT' }))]
+        .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime())
+      : [];
+
+    // 3. Calculate Outstanding
+    // Note: For "Outstanding Report", usually we show ALL outstanding, 
+    // but we can filter the "Last Due" or "Bills Count" within range.
+    const companyStats = companies.map(c => {
+      const companyBills = bills.filter(b => b.companyId === c.id);
+      const companyPayments = payments.filter(p => p.companyId === c.id);
+
+      const billed = companyBills.reduce((sum, b) => sum + b.totalAmount, 0);
+      const paid = companyPayments.reduce((sum, p) => sum + p.amount, 0);
+      const outstanding = billed - paid;
+
+      // Unpaid bills within range for report clarity
+      const unpaidBills = companyBills.filter(b => b.status !== 'Paid');
+      unpaidBills.sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+
+      let daysOverdue = 0;
+      let lastDueDate = '-';
+
+      if (unpaidBills.length > 0) {
+        const oldestUnpaid = unpaidBills[0];
+        const dueDate = new Date(oldestUnpaid.date);
+        dueDate.setDate(dueDate.getDate() + 30);
+        const today = new Date();
+        if (today > dueDate) {
+          daysOverdue = Math.floor((today.getTime() - dueDate.getTime()) / (1000 * 3600 * 24));
+        }
+        lastDueDate = oldestUnpaid.date;
+      }
+
+      return {
+        company: c.name,
+        outstanding,
+        billsCount: companyBills.length,
+        daysOverdue,
+        lastDueDate
+      };
+    }).filter(s => s.outstanding > 0 || s.billsCount > 0);
+
+    const total = companyStats.reduce((sum, item) => sum + item.outstanding, 0);
+
+    // 3. Time Series (Monthly Billing Trend)
+    const monthsData: { month: string; outstanding: number; year: number; monthIdx: number }[] = [];
+    for (let i = 5; i >= 0; i--) {
+      const d = new Date();
+      d.setMonth(d.getMonth() - i);
+      monthsData.push({
+        month: d.toLocaleString('default', { month: 'short' }),
+        outstanding: 0,
+        year: d.getFullYear(),
+        monthIdx: d.getMonth()
+      });
+    }
+
+    bills.forEach(b => {
+      const d = new Date(b.date);
+      const m = monthsData.find(mo => mo.monthIdx === d.getMonth() && mo.year === d.getFullYear());
+      if (m) m.outstanding += b.totalAmount;
+    });
+
+    return {
+      outstandingData: companyStats,
+      totalOutstanding: total,
+      timeSeriesData: monthsData,
+      filteredBills: fBills,
+      filteredPayments: fPayments,
+      companyLedger
+    };
+  }, [companies, bills, payments, dateFrom, dateTo, reportType, selectedCompanyId]);
+
+  const handlePrint = () => {
+    window.print();
+  };
+
+  const handleExport = async () => {
+    if (!reportRef.current) return;
+
+    try {
+      const dataUrl = await toPng(reportRef.current, { cacheBust: true, style: { background: 'white', padding: '20px' } });
+      const pdf = new jsPDF('p', 'mm', 'a4');
+      const imgProps = pdf.getImageProperties(dataUrl);
+      const pdfWidth = pdf.internal.pageSize.getWidth();
+      const pdfHeight = (imgProps.height * pdfWidth) / imgProps.width;
+
+      pdf.addImage(dataUrl, 'PNG', 0, 0, pdfWidth, pdfHeight);
+
+      const reportName = reportType.charAt(0).toUpperCase() + reportType.slice(1);
+      const dateStr = new Date().toISOString().split('T')[0];
+      pdf.save(`${reportName}_Report_${dateStr}.pdf`);
+    } catch (err) {
+      console.error('Failed to export PDF', err);
+    }
+  };
 
   return (
     <DashboardLayout>
       <div className="space-y-6">
-        <div>
+        {/* Print Only Header */}
+        <div className="hidden print:block print-header mb-8 pb-4 border-b-2 border-slate-900">
+          <div className="flex justify-between items-center">
+            <div>
+              <h1 className="text-2xl font-black text-slate-900 uppercase tracking-tighter">THAHEEM BROTHERS</h1>
+              <p className="text-sm font-bold text-slate-600">Administrative Report</p>
+            </div>
+            <div className="text-right">
+              <p className="text-sm font-bold text-slate-900">Generated: {formatDate(new Date())}</p>
+              <p className="text-xs text-slate-600 font-bold">Range: {formatDate(dateFrom)} to {formatDate(dateTo)}</p>
+              <p className="text-xs text-slate-600 uppercase tracking-widest font-black mt-1">Type: {reportType}</p>
+            </div>
+          </div>
+        </div>
+
+        <div className="flex items-center justify-between no-print">
           <h1 className="text-3xl font-bold text-foreground">Reports</h1>
           <p className="text-muted-foreground mt-1">
             Generate and view system reports
@@ -136,6 +237,23 @@ export default function ReportsPage() {
                 />
               </div>
 
+              {reportType === 'company' && (
+                <div>
+                  <Label className="text-sm">Select Company</Label>
+                  <Select value={selectedCompanyId} onValueChange={setSelectedCompanyId}>
+                    <SelectTrigger className="mt-1">
+                      <SelectValue placeholder="All Companies" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">All Companies</SelectItem>
+                      {companies.map(c => (
+                        <SelectItem key={c.id} value={String(c.id)}>{c.name}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              )}
+
               <div className="flex items-end gap-2">
                 <Button className="flex-1">Generate</Button>
               </div>
@@ -144,72 +262,173 @@ export default function ReportsPage() {
         </Card>
 
         {/* Swapped: Table First */}
-        <Card>
+        <Card className="no-scrollbar">
           <CardHeader>
             <div className="flex items-center justify-between">
-              <CardTitle className="text-base">Outstanding by Company</CardTitle>
+              <CardTitle className="text-base">
+                {reportType === 'outstanding' && 'Outstanding by Company'}
+                {reportType === 'bills' && 'Bills Report'}
+                {reportType === 'payments' && 'Payments Report'}
+                {reportType === 'company' && 'Company Ledger'}
+              </CardTitle>
               <div className="flex gap-2">
-                <Button variant="outline" size="sm" className="gap-2 bg-transparent">
+                <Button variant="outline" size="sm" className="gap-2 bg-transparent" onClick={handleExport}>
                   <Download className="w-4 h-4" />
                   Export
                 </Button>
-                <Button variant="outline" size="sm" className="gap-2 bg-transparent">
+                <Button variant="outline" size="sm" className="gap-2 bg-transparent" onClick={handlePrint}>
                   <Printer className="w-4 h-4" />
                   Print
                 </Button>
               </div>
             </div>
           </CardHeader>
-          <CardContent>
+          <CardContent ref={reportRef}>
             <div className="overflow-x-auto">
               <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Company</TableHead>
-                    <TableHead className="text-right">Outstanding</TableHead>
-                    <TableHead className="text-right"># Bills</TableHead>
-                    <TableHead className="text-right">Last Due</TableHead> {/* New Column */}
-                    <TableHead className="text-right">Days Overdue</TableHead>
-                    <TableHead className="text-right">Status</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {outstandingData.map((item, idx) => (
-                    <TableRow key={idx}>
-                      <TableCell className="font-medium">{item.company}</TableCell>
-                      <TableCell className="text-right font-semibold">
-                        PKR {item.outstanding.toLocaleString()}
-                      </TableCell>
-                      <TableCell className="text-right">{item.bills}</TableCell>
-                      <TableCell className="text-right text-muted-foreground">{item.lastDueDate}</TableCell> {/* New Cell */}
-                      <TableCell className="text-right">
-                        {item.daysOverdue > 0 ? (
-                          <span className="text-red-600 font-semibold">
-                            {item.daysOverdue} days
-                          </span>
-                        ) : (
-                          <span className="text-green-600">Current</span>
-                        )}
-                      </TableCell>
-                      <TableCell className="text-right">
-                        <span
-                          className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${item.outstanding > 300000
-                            ? 'bg-red-100 text-red-800'
-                            : item.outstanding > 100000
-                              ? 'bg-yellow-100 text-yellow-800'
-                              : 'bg-green-100 text-green-800'
-                            }`}
-                        >
-                          {item.outstanding > 300000
-                            ? 'High Risk'
-                            : item.outstanding > 100000
-                              ? 'Medium'
-                              : 'Low Risk'}
-                        </span>
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
+                {reportType === 'outstanding' && (
+                  <>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Company</TableHead>
+                        <TableHead className="text-right">Outstanding</TableHead>
+                        <TableHead className="text-right"># Bills</TableHead>
+                        <TableHead className="text-right">Last Due</TableHead>
+                        <TableHead className="text-right">Days Overdue</TableHead>
+                        <TableHead className="text-right">Status</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {outstandingData.map((item, idx) => (
+                        <TableRow key={idx}>
+                          <TableCell className="font-medium">{item.company}</TableCell>
+                          <TableCell className="text-right font-semibold">
+                            PKR {item.outstanding.toLocaleString()}
+                          </TableCell>
+                          <TableCell className="text-right">{item.billsCount}</TableCell>
+                          <TableCell className="text-right text-muted-foreground">{formatDate(item.lastDueDate)}</TableCell>
+                          <TableCell className="text-right">
+                            {item.daysOverdue > 0 ? (
+                              <span className="text-red-600 font-semibold">
+                                {item.daysOverdue} days
+                              </span>
+                            ) : (
+                              <span className="text-green-600">Current</span>
+                            )}
+                          </TableCell>
+                          <TableCell className="text-right">
+                            <span
+                              className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${item.outstanding > 300000
+                                ? 'bg-red-100 text-red-800'
+                                : item.outstanding > 100000
+                                  ? 'bg-yellow-100 text-yellow-800'
+                                  : 'bg-green-100 text-green-800'
+                                }`}
+                            >
+                              {item.outstanding > 300000 ? 'High Risk' : item.outstanding > 100000 ? 'Medium' : 'Low Risk'}
+                            </span>
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </>
+                )}
+
+                {reportType === 'bills' && (
+                  <>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Date</TableHead>
+                        <TableHead>Bill No</TableHead>
+                        <TableHead>Company</TableHead>
+                        <TableHead>Job No</TableHead>
+                        <TableHead className="text-right">Amount</TableHead>
+                        <TableHead className="text-right">Status</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {filteredBills.length === 0 ? (
+                        <TableRow><TableCell colSpan={6} className="text-center py-8 text-muted-foreground">No bills in this range</TableCell></TableRow>
+                      ) : (
+                        filteredBills.map((bill) => (
+                          <TableRow key={bill.id}>
+                            <TableCell>{formatDate(bill.date)}</TableCell>
+                            <TableCell className="font-mono font-bold">{bill.billNo}</TableCell>
+                            <TableCell>{bill.companyName}</TableCell>
+                            <TableCell className="font-mono text-xs">{bill.jobNumber}</TableCell>
+                            <TableCell className="text-right font-bold">PKR {bill.totalAmount.toLocaleString()}</TableCell>
+                            <TableCell className="text-right">
+                              <span className={`px-2 py-0.5 rounded-full text-[10px] uppercase font-black border ${bill.status === 'Paid' ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}>
+                                {bill.status}
+                              </span>
+                            </TableCell>
+                          </TableRow>
+                        ))
+                      )}
+                    </TableBody>
+                  </>
+                )}
+
+                {reportType === 'payments' && (
+                  <>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Date</TableHead>
+                        <TableHead>Reference</TableHead>
+                        <TableHead>Company</TableHead>
+                        <TableHead>Method</TableHead>
+                        <TableHead className="text-right">Amount</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {filteredPayments.length === 0 ? (
+                        <TableRow><TableCell colSpan={5} className="text-center py-8 text-muted-foreground">No payments in this range</TableCell></TableRow>
+                      ) : (
+                        filteredPayments.map((payment) => (
+                          <TableRow key={payment.id}>
+                            <TableCell>{formatDate(payment.date)}</TableCell>
+                            <TableCell className="font-mono font-bold text-xs">{payment.reference || 'N/A'}</TableCell>
+                            <TableCell>{payment.companyName}</TableCell>
+                            <TableCell className="text-xs uppercase font-bold">{payment.method}</TableCell>
+                            <TableCell className="text-right font-bold text-green-600">PKR {payment.amount.toLocaleString()}</TableCell>
+                          </TableRow>
+                        ))
+                      )}
+                    </TableBody>
+                  </>
+                )}
+                {reportType === 'company' && (
+                  <>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Date</TableHead>
+                        <TableHead>Type</TableHead>
+                        <TableHead>Ref / Bill No</TableHead>
+                        <TableHead className="text-right">Debit</TableHead>
+                        <TableHead className="text-right">Credit</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {companyLedger.length === 0 ? (
+                        <TableRow><TableCell colSpan={5} className="text-center py-8 text-muted-foreground">No entries for this company in range</TableCell></TableRow>
+                      ) : (
+                        companyLedger.map((entry: any, idx: number) => (
+                          <TableRow key={idx}>
+                            <TableCell>{formatDate(entry.date)}</TableCell>
+                            <TableCell className="text-[10px] uppercase font-black">{entry.type}</TableCell>
+                            <TableCell className="font-mono text-xs">{entry.billNo || entry.reference || '-'}</TableCell>
+                            <TableCell className="text-right font-bold text-red-600">
+                              {entry.type === 'BILL' ? `PKR ${entry.totalAmount.toLocaleString()}` : '-'}
+                            </TableCell>
+                            <TableCell className="text-right font-bold text-green-600">
+                              {entry.type === 'PAYMENT' ? `PKR ${entry.amount.toLocaleString()}` : '-'}
+                            </TableCell>
+                          </TableRow>
+                        ))
+                      )}
+                    </TableBody>
+                  </>
+                )}
               </Table>
             </div>
           </CardContent>
@@ -252,32 +471,47 @@ export default function ReportsPage() {
               <CardTitle className="text-base">Summary Statistics</CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
+              {reportType === 'outstanding' || reportType === 'company' ? (
+                <>
+                  <div>
+                    <p className="text-xs text-muted-foreground">Total Outstanding</p>
+                    <p className="text-2xl font-bold text-primary mt-1">
+                      PKR {totalOutstanding.toLocaleString()}
+                    </p>
+                  </div>
+                  <div>
+                    <p className="text-xs text-muted-foreground">Overdue Invoices</p>
+                    <p className="text-2xl font-bold text-red-600 mt-1">
+                      {outstandingData.filter((item: any) => item.daysOverdue > 0).length}
+                    </p>
+                  </div>
+                </>
+              ) : (
+                <>
+                  <div>
+                    <p className="text-xs text-muted-foreground">
+                      {reportType === 'bills' ? 'Total Billed (in range)' : 'Total Collected (in range)'}
+                    </p>
+                    <p className={`text-2xl font-bold mt-1 ${reportType === 'payments' ? 'text-green-600' : 'text-primary'}`}>
+                      PKR {reportType === 'bills'
+                        ? filteredBills.reduce((s: number, b: any) => s + b.totalAmount, 0).toLocaleString()
+                        : filteredPayments.reduce((s: number, p: any) => s + p.amount, 0).toLocaleString()}
+                    </p>
+                  </div>
+                  <div>
+                    <p className="text-xs text-muted-foreground">
+                      {reportType === 'bills' ? 'Bill Count' : 'Payment Count'}
+                    </p>
+                    <p className="text-2xl font-bold text-slate-900 mt-1">
+                      {reportType === 'bills' ? filteredBills.length : filteredPayments.length}
+                    </p>
+                  </div>
+                </>
+              )}
               <div>
-                <p className="text-xs text-muted-foreground">
-                  Total Outstanding
-                </p>
-                <p className="text-2xl font-bold text-primary mt-1">
-                  PKR {totalOutstanding.toLocaleString()}
-                </p>
-              </div>
-              <div>
-                <p className="text-xs text-muted-foreground">
-                  Overdue Invoices
-                </p>
-                <p className="text-2xl font-bold text-red-600 mt-1">
-                  {outstandingData.filter((item) => item.daysOverdue > 0).length}
-                </p>
-              </div>
-              <div>
-                <p className="text-xs text-muted-foreground">
-                  Avg Days Overdue
-                </p>
-                <p className="text-2xl font-bold text-orange-600 mt-1">
-                  {(
-                    outstandingData.reduce((sum, item) => sum + item.daysOverdue, 0) /
-                    outstandingData.length
-                  ).toFixed(0)}{' '}
-                  days
+                <p className="text-xs text-muted-foreground">Report Range</p>
+                <p className="text-sm font-bold text-slate-700 mt-1">
+                  {formatDate(dateFrom)} to {formatDate(dateTo)}
                 </p>
               </div>
             </CardContent>
