@@ -31,6 +31,8 @@ import { Plus, Download, Filter, Search, DollarSign, TrendingUp, CreditCard } fr
 import { useState, useMemo } from 'react';
 import { useData } from '@/context/data-context';
 import { formatDate, formatCurrency } from '@/lib/utils';
+import { CompanySelect } from '@/components/company-select';
+import { GenericSearchSelect } from '@/components/search-select';
 
 export default function PaymentsPage() {
   const { payments, companies, addPayment, bills } = useData();
@@ -118,6 +120,13 @@ export default function PaymentsPage() {
     return bills.filter(b => b.companyId === companyId && b.status !== 'Paid');
   }, [companyId, bills]);
 
+  const billOptions = useMemo(() => {
+    return companyBills.map(b => ({
+      id: b.id,
+      label: `${b.billNo} - ${b.jobNumber} (Due: ${formatCurrency(b.totalAmount - b.paidAmount)})`
+    }));
+  }, [companyBills]);
+
   // Filtered Payments Logic
   const filteredPayments = useMemo(() => {
     let filtered = [...payments];
@@ -191,36 +200,27 @@ export default function PaymentsPage() {
               <div className="space-y-4 pt-4">
                 <div>
                   <Label>Select Company</Label>
-                  <Select onValueChange={setCompanyId} value={companyId}>
-                    <SelectTrigger className="mt-1">
-                      <SelectValue placeholder="Choose client..." />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {companies.map(c => (
-                        <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
+                  <CompanySelect
+                    companies={companies}
+                    value={companyId}
+                    onValueChange={(val) => {
+                      setCompanyId(val);
+                      setBillId(''); // Reset bill when company changes
+                    }}
+                    className="mt-1"
+                  />
                 </div>
 
                 <div>
                   <Label>Link to Invoice / Job (Required)</Label>
-                  <Select onValueChange={setBillId} value={billId}>
-                    <SelectTrigger className="mt-1">
-                      <SelectValue placeholder="Select Invoice to pay..." />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {companyBills.length === 0 ? (
-                        <SelectItem value="none" disabled>No pending bills found</SelectItem>
-                      ) : (
-                        companyBills.map(b => (
-                          <SelectItem key={b.id} value={b.id}>
-                            {b.billNo} - {b.jobNumber} (Due: {formatCurrency(b.totalAmount - b.paidAmount)})
-                          </SelectItem>
-                        ))
-                      )}
-                    </SelectContent>
-                  </Select>
+                  <GenericSearchSelect
+                    options={billOptions}
+                    value={billId}
+                    onValueChange={setBillId}
+                    placeholder={companyId ? "Select Invoice to pay..." : "Select company first"}
+                    emptyText={companyId ? "No pending bills found" : "Select company first"}
+                    className="mt-1"
+                  />
                 </div>
 
                 <div className="grid grid-cols-2 gap-4">
@@ -356,17 +356,14 @@ export default function PaymentsPage() {
               </div>
 
               {/* Company Select */}
-              <Select value={companyFilter} onValueChange={setCompanyFilter}>
-                <SelectTrigger className="w-[180px] h-9 bg-muted/20 border-border/50 text-xs">
-                  <SelectValue placeholder="All Companies" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">All Companies</SelectItem>
-                  {companies.map(c => (
-                    <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              <CompanySelect
+                companies={companies}
+                value={companyFilter}
+                onValueChange={setCompanyFilter}
+                showAllOption
+                placeholder="All Companies"
+                className="w-[200px] h-9 bg-muted/20 border-border/50 text-xs"
+              />
 
               {/* Time Filter Select */}
               <Select value={timeFilter} onValueChange={(v: any) => setTimeFilter(v)}>

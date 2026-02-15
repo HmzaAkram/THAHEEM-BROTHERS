@@ -55,6 +55,7 @@ import { useState, useMemo } from 'react';
 import { useData, SecurityTracking } from '@/context/data-context';
 import { Badge } from '@/components/ui/badge';
 import { formatDate, formatCurrency } from '@/lib/utils';
+import { CompanySelect } from '@/components/company-select';
 
 export default function SecuritiesPage() {
     const { securities, companies, addSecurity, updateSecurity } = useData();
@@ -206,16 +207,12 @@ export default function SecuritiesPage() {
                                         <div className="grid grid-cols-1 md:grid-cols-2 gap-6 bg-slate-50 dark:bg-white/5 p-6 rounded-2xl border border-border/50">
                                             <div className="space-y-2">
                                                 <Label className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground/60">Select Company</Label>
-                                                <Select value={companyId} onValueChange={setCompanyId}>
-                                                    <SelectTrigger className="h-11 bg-white dark:bg-slate-950 border-border/40 rounded-xl">
-                                                        <SelectValue placeholder="Search Company" />
-                                                    </SelectTrigger>
-                                                    <SelectContent>
-                                                        {companies.map((company) => (
-                                                            <SelectItem key={company.id} value={company.id}>{company.name}</SelectItem>
-                                                        ))}
-                                                    </SelectContent>
-                                                </Select>
+                                                <CompanySelect
+                                                    companies={companies}
+                                                    value={companyId}
+                                                    onValueChange={setCompanyId}
+                                                    className="h-11"
+                                                />
                                             </div>
                                             <div className="space-y-2">
                                                 <Label className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground/60">GD Number</Label>

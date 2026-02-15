@@ -21,33 +21,20 @@ import {
 import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
 import { Download, Printer, Filter, Check, ChevronsUpDown, Search, DollarSign, ArrowUpCircle, ArrowDownCircle, Scale } from 'lucide-react';
-import { useState, useMemo, useRef } from 'react';
+import { useRef, useState, useMemo } from 'react';
 import { useData, LedgerEntry } from '@/context/data-context';
 import { Input } from '@/components/ui/input';
 import { formatDate, cn, formatCurrency } from '@/lib/utils';
 import { jsPDF } from 'jspdf';
 import { toPng } from 'html-to-image';
 import { DashboardCard } from '@/components/dashboard-card';
-import {
-  Popover,
-  PopoverContent,
-  PopoverTrigger,
-} from '@/components/ui/popover';
-import {
-  Command,
-  CommandEmpty,
-  CommandGroup,
-  CommandInput,
-  CommandItem,
-  CommandList,
-} from '@/components/ui/command';
+import { CompanySelect } from '@/components/company-select';
 
 export default function LedgerPage() {
   const { companies, getCompanyLedger } = useData();
   const [selectedCompanyId, setSelectedCompanyId] = useState<string>('all');
   const [startDate, setStartDate] = useState('');
   const [endDate, setEndDate] = useState('');
-  const [open, setOpen] = useState(false);
   const tableRef = useRef<HTMLDivElement>(null);
 
   const { ledgerData, openingBalance } = useMemo(() => {
@@ -143,66 +130,14 @@ export default function LedgerPage() {
             <div className="grid grid-cols-1 md:grid-cols-4 gap-4 items-end">
               <div>
                 <Label className="text-sm font-medium mb-1.5 block">Select Client Company</Label>
-                <Popover open={open} onOpenChange={setOpen}>
-                  <PopoverTrigger asChild>
-                    <Button
-                      variant="outline"
-                      role="combobox"
-                      aria-expanded={open}
-                      className="w-full justify-between bg-white border-border/40 rounded-xl"
-                    >
-                      {selectedCompanyId === "all"
-                        ? "-- All Transactions --"
-                        : companies.find((c) => c.id === selectedCompanyId)?.name}
-                      <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
-                    </Button>
-                  </PopoverTrigger>
-                  <PopoverContent className="w-[300px] p-0 rounded-xl overflow-hidden" align="start">
-                    <Command className="rounded-xl">
-                      <CommandInput placeholder="Search company..." className="h-9" />
-                      <CommandList>
-                        <CommandEmpty>No company found.</CommandEmpty>
-                        <CommandGroup>
-                          <CommandItem
-                            value="all"
-                            onSelect={() => {
-                              setSelectedCompanyId("all");
-                              setOpen(false);
-                            }}
-                            className="cursor-pointer"
-                          >
-                            <Check
-                              className={cn(
-                                "mr-2 h-4 w-4",
-                                selectedCompanyId === "all" ? "opacity-100" : "opacity-0"
-                              )}
-                            />
-                            -- All Transactions --
-                          </CommandItem>
-                          {companies.map((c) => (
-                            <CommandItem
-                              key={c.id}
-                              value={c.name}
-                              onSelect={() => {
-                                setSelectedCompanyId(c.id);
-                                setOpen(false);
-                              }}
-                              className="cursor-pointer"
-                            >
-                              <Check
-                                className={cn(
-                                  "mr-2 h-4 w-4",
-                                  selectedCompanyId === c.id ? "opacity-100" : "opacity-0"
-                                )}
-                              />
-                              {c.name}
-                            </CommandItem>
-                          ))}
-                        </CommandGroup>
-                      </CommandList>
-                    </Command>
-                  </PopoverContent>
-                </Popover>
+                <CompanySelect
+                  companies={companies}
+                  value={selectedCompanyId}
+                  onValueChange={setSelectedCompanyId}
+                  showAllOption
+                  allOptionLabel="-- All Transactions --"
+                  className="w-full justify-between bg-white border-border/40 rounded-xl"
+                />
               </div>
 
               <div>

@@ -55,6 +55,7 @@ import { formatDate, formatCurrency } from '@/lib/utils';
 import { jsPDF } from 'jspdf';
 import { toPng } from 'html-to-image';
 import { InvoiceTemplate } from '@/components/invoice-template';
+import { CompanySelect } from '@/components/company-select';
 
 const statusStyles = {
   Paid: 'bg-green-100 text-green-800 border-green-200',
@@ -386,16 +387,12 @@ export default function BillsPage() {
                         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                           <div className="md:col-span-1">
                             <Label className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground mb-1.5 block">Client Company</Label>
-                            <Select onValueChange={setCompanyId} value={companyId}>
-                              <SelectTrigger className="bg-white dark:bg-slate-950 border-border/50 focus:ring-primary/20 transition-all h-10">
-                                <SelectValue placeholder="Select Client" />
-                              </SelectTrigger>
-                              <SelectContent>
-                                {companies.map(c => (
-                                  <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>
-                                ))}
-                              </SelectContent>
-                            </Select>
+                            <CompanySelect
+                              companies={companies}
+                              value={companyId}
+                              onValueChange={setCompanyId}
+                              className="h-10"
+                            />
                           </div>
                           <div>
                             <Label className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground mb-1.5 block">Date</Label>
