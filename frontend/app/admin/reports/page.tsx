@@ -33,7 +33,7 @@ import {
 import { Download, Printer } from 'lucide-react';
 import { useData } from '@/context/data-context';
 import { useMemo, useState, useRef } from 'react';
-import { formatDate } from '@/lib/utils';
+import { formatDate, formatCurrency } from '@/lib/utils';
 import { jsPDF } from 'jspdf';
 import { toPng } from 'html-to-image';
 
@@ -303,7 +303,7 @@ export default function ReportsPage() {
                         <TableRow key={idx}>
                           <TableCell className="font-medium">{item.company}</TableCell>
                           <TableCell className="text-right font-semibold">
-                            PKR {item.outstanding.toLocaleString()}
+                            {formatCurrency(item.outstanding)}
                           </TableCell>
                           <TableCell className="text-right">{item.billsCount}</TableCell>
                           <TableCell className="text-right text-muted-foreground">{formatDate(item.lastDueDate)}</TableCell>
@@ -356,7 +356,7 @@ export default function ReportsPage() {
                             <TableCell className="font-mono font-bold">{bill.billNo}</TableCell>
                             <TableCell>{bill.companyName}</TableCell>
                             <TableCell className="font-mono text-xs">{bill.jobNumber}</TableCell>
-                            <TableCell className="text-right font-bold">PKR {bill.totalAmount.toLocaleString()}</TableCell>
+                            <TableCell className="text-right font-bold">{formatCurrency(bill.totalAmount)}</TableCell>
                             <TableCell className="text-right">
                               <span className={`px-2 py-0.5 rounded-full text-[10px] uppercase font-black border ${bill.status === 'Paid' ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}>
                                 {bill.status}
@@ -390,7 +390,7 @@ export default function ReportsPage() {
                             <TableCell className="font-mono font-bold text-xs">{payment.reference || 'N/A'}</TableCell>
                             <TableCell>{payment.companyName}</TableCell>
                             <TableCell className="text-xs uppercase font-bold">{payment.method}</TableCell>
-                            <TableCell className="text-right font-bold text-green-600">PKR {payment.amount.toLocaleString()}</TableCell>
+                            <TableCell className="text-right font-bold text-green-600">{formatCurrency(payment.amount)}</TableCell>
                           </TableRow>
                         ))
                       )}
@@ -418,10 +418,10 @@ export default function ReportsPage() {
                             <TableCell className="text-[10px] uppercase font-black">{entry.type}</TableCell>
                             <TableCell className="font-mono text-xs">{entry.billNo || entry.reference || '-'}</TableCell>
                             <TableCell className="text-right font-bold text-red-600">
-                              {entry.type === 'BILL' ? `PKR ${entry.totalAmount.toLocaleString()}` : '-'}
+                              {entry.type === 'BILL' ? formatCurrency(entry.totalAmount) : '-'}
                             </TableCell>
                             <TableCell className="text-right font-bold text-green-600">
-                              {entry.type === 'PAYMENT' ? `PKR ${entry.amount.toLocaleString()}` : '-'}
+                              {entry.type === 'PAYMENT' ? formatCurrency(entry.amount) : '-'}
                             </TableCell>
                           </TableRow>
                         ))
@@ -493,9 +493,9 @@ export default function ReportsPage() {
                       {reportType === 'bills' ? 'Total Billed (in range)' : 'Total Collected (in range)'}
                     </p>
                     <p className={`text-2xl font-bold mt-1 ${reportType === 'payments' ? 'text-green-600' : 'text-primary'}`}>
-                      PKR {reportType === 'bills'
-                        ? filteredBills.reduce((s: number, b: any) => s + b.totalAmount, 0).toLocaleString()
-                        : filteredPayments.reduce((s: number, p: any) => s + p.amount, 0).toLocaleString()}
+                      {reportType === 'bills'
+                        ? formatCurrency(filteredBills.reduce((s: number, b: any) => s + b.totalAmount, 0))
+                        : formatCurrency(filteredPayments.reduce((s: number, p: any) => s + p.amount, 0))}
                     </p>
                   </div>
                   <div>

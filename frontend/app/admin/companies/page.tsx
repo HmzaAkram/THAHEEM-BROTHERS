@@ -25,6 +25,7 @@ import { useState, useMemo } from 'react';
 import { useData } from '@/context/data-context';
 import { useRouter } from 'next/navigation';
 import { DashboardCard } from '@/components/dashboard-card';
+import { formatDate, formatCurrency } from '@/lib/utils';
 import {
   Select,
   SelectContent,
@@ -381,7 +382,7 @@ export default function CompaniesPage() {
                             </TableCell>
                             <TableCell>{company.phone}</TableCell>
                             <TableCell className={`font-bold ${balance > 0 ? 'text-red-600' : 'text-green-600'}`}>
-                              PKR {balance.toLocaleString()}
+                              {formatCurrency(balance)}
                             </TableCell>
                             <TableCell>
                               <span
@@ -453,14 +454,14 @@ export default function CompaniesPage() {
               />
               <DashboardCard
                 title="Total Outstanding"
-                value={`PKR ${companyTotals.outstanding.toLocaleString()}`}
+                value={formatCurrency(companyTotals.outstanding)}
                 icon={DollarSign}
                 change="Filtered Context"
                 changeType="negative"
               />
               <DashboardCard
                 title="Total Collected"
-                value={`PKR ${companyTotals.collected.toLocaleString()}`}
+                value={formatCurrency(companyTotals.collected)}
                 icon={CreditCard}
                 change="In selected period"
                 changeType="positive"

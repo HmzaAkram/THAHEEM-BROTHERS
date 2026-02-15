@@ -64,7 +64,7 @@ import {
   Clock
 } from 'lucide-react';
 import { useMemo, useState, useRef } from 'react';
-import { formatDate } from '@/lib/utils';
+import { formatDate, formatCurrency } from '@/lib/utils';
 import { jsPDF } from 'jspdf';
 import { toPng } from 'html-to-image';
 
@@ -347,21 +347,21 @@ export default function AdminDashboard() {
           />
           <DashboardCard
             title={filterType === 'overall' ? "Total Billed" : "Billed"}
-            value={`PKR ${(filteredStats.totalBilled / 1000).toFixed(1)}K`}
+            value={formatCurrency(filteredStats.totalBilled)}
             icon={FileText}
             change={filterLabel}
             changeType="neutral"
           />
           <DashboardCard
             title={filterType === 'overall' ? "Total Collected" : "Collected"}
-            value={`PKR ${(filteredStats.totalCollected / 1000).toFixed(1)}K`}
+            value={formatCurrency(filteredStats.totalCollected)}
             icon={CreditCard}
             change={filterLabel}
             changeType="positive"
           />
           <DashboardCard
             title={filterType === 'overall' ? "Outstanding Balance" : "Outstanding"}
-            value={`PKR ${(filteredStats.outstanding / 1000).toFixed(1)}K`}
+            value={formatCurrency(filteredStats.outstanding)}
             icon={DollarSign}
             change={filterLabel}
             changeType={filteredStats.outstanding > 0 ? "negative" : "positive"}
@@ -424,16 +424,16 @@ export default function AdminDashboard() {
                               </div>
                             </TableCell>
                             <TableCell className="py-4 px-4 font-mono text-xs font-bold text-slate-700 dark:text-slate-300">
-                              PKR {c.debit.toLocaleString()}
+                              {formatCurrency(c.debit)}
                             </TableCell>
                             <TableCell className="py-4 px-4 font-mono text-xs font-bold text-emerald-600">
-                              PKR {c.credit.toLocaleString()}
+                              {formatCurrency(c.credit)}
                             </TableCell>
                             <TableCell className="py-4 px-6 text-right">
                               <div className="flex flex-col items-end">
                                 <span className={`text-sm font-black font-mono tracking-tighter ${c.balance > 0 ? 'text-rose-600' : 'text-emerald-600'
                                   }`}>
-                                  PKR {c.balance.toLocaleString()}
+                                  {formatCurrency(c.balance)}
                                 </span>
                                 <div className={`mt-0.5 flex items-center gap-1 text-[10px] font-bold uppercase ${c.balance > 0 ? 'text-rose-500/70' : 'text-emerald-500/70'
                                   }`}>
@@ -632,7 +632,7 @@ export default function AdminDashboard() {
                             </span>
                           </TableCell>
                           <TableCell className="py-4 px-4 text-right">
-                            <p className="font-mono font-bold text-sm text-foreground">PKR {totalAmount.toLocaleString()}</p>
+                            <p className="font-mono font-bold text-sm text-foreground">{formatCurrency(totalAmount)}</p>
                           </TableCell>
                           <TableCell className="py-4 px-4 text-center">
                             {security.isRefundReceived ? (
@@ -690,21 +690,21 @@ export default function AdminDashboard() {
                   <div className="flex items-center justify-between p-3 rounded-lg bg-white dark:bg-slate-900 border border-border/30">
                     <div>
                       <p className="text-xs font-bold uppercase tracking-wider text-muted-foreground mb-1">Total Pending</p>
-                      <p className="text-lg font-black text-amber-600 font-mono">PKR {securities.filter(s => !s.isRefundReceived).reduce((sum, s) => sum + (s.noOfContainers * s.amountPerContainer), 0).toLocaleString()}</p>
+                      <p className="text-lg font-black text-amber-600 font-mono">{formatCurrency(securities.filter(s => !s.isRefundReceived).reduce((sum, s) => sum + (s.noOfContainers * s.amountPerContainer), 0))}</p>
                     </div>
                     <Clock className="w-8 h-8 text-amber-500/30" />
                   </div>
                   <div className="flex items-center justify-between p-3 rounded-lg bg-white dark:bg-slate-900 border border-border/30">
                     <div>
                       <p className="text-xs font-bold uppercase tracking-wider text-muted-foreground mb-1">Total Received</p>
-                      <p className="text-lg font-black text-emerald-600 font-mono">PKR {securities.filter(s => s.isRefundReceived).reduce((sum, s) => sum + (s.noOfContainers * s.amountPerContainer), 0).toLocaleString()}</p>
+                      <p className="text-lg font-black text-emerald-600 font-mono">{formatCurrency(securities.filter(s => s.isRefundReceived).reduce((sum, s) => sum + (s.noOfContainers * s.amountPerContainer), 0))}</p>
                     </div>
                     <CheckCircle2 className="w-8 h-8 text-emerald-500/30" />
                   </div>
                   <div className="flex items-center justify-between p-3 rounded-lg bg-primary/5 border-2 border-primary/20">
                     <div>
                       <p className="text-xs font-bold uppercase tracking-wider text-primary/70 mb-1">Grand Total</p>
-                      <p className="text-lg font-black text-primary font-mono">PKR {securities.reduce((sum, s) => sum + (s.noOfContainers * s.amountPerContainer), 0).toLocaleString()}</p>
+                      <p className="text-lg font-black text-primary font-mono">{formatCurrency(securities.reduce((sum, s) => sum + (s.noOfContainers * s.amountPerContainer), 0))}</p>
                     </div>
                     <Shield className="w-8 h-8 text-primary/30" />
                   </div>
