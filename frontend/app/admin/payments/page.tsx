@@ -161,8 +161,8 @@ export default function PaymentsPage() {
   // Dynamic Totals for Payments
   const tableTotals = useMemo(() => {
     return filteredPayments.reduce((acc, p) => {
-      acc.collected += p.amount;
-      acc.adjustment += (p.adjustment || 0);
+      acc.collected += Number(p.amount) || 0;
+      acc.adjustment += Number(p.adjustment) || 0;
       return acc;
     }, { collected: 0, adjustment: 0 });
   }, [filteredPayments]);
@@ -400,29 +400,53 @@ export default function PaymentsPage() {
                       <TableHead>Company</TableHead>
                       <TableHead>Reference</TableHead>
                       <TableHead>Method</TableHead>
-                      <TableHead className="text-right">Amount</TableHead>
+                      <TableHead className="text-right">Advance Paid</TableHead>
+                      <TableHead className="text-right">Adjustment</TableHead>
+                      <TableHead className="text-right">Cash Paid</TableHead>
+                      <TableHead className="text-right font-black text-primary">Total Paid</TableHead>
+                      <TableHead className="text-right font-black">Bill Total</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {filteredPayments.map((payment) => (
-                      <TableRow key={payment.id} className="hover:bg-muted/50 transition-colors">
-                        <TableCell className="text-sm text-muted-foreground">
-                          {formatDate(payment.date)}
-                        </TableCell>
-                        <TableCell className="font-medium">
-                          {payment.companyName}
-                        </TableCell>
-                        <TableCell className="font-mono text-sm">
-                          {payment.reference}
-                        </TableCell>
-                        <TableCell className="text-sm">
-                          {payment.method}
-                        </TableCell>
-                        <TableCell className="text-right font-bold text-green-600">
-                          + {formatCurrency(payment.amount)}
-                        </TableCell>
-                      </TableRow>
-                    ))}
+                    {filteredPayments.map((payment) => {
+                      const linkedBill = bills.find(b => String(b.id) === String(payment.billId));
+
+                      return (
+                        <TableRow key={payment.id} className="hover:bg-muted/50 transition-colors">
+                          <TableCell className="text-sm text-muted-foreground">
+                            {formatDate(payment.date)}
+                          </TableCell>
+                          <TableCell className="font-medium">
+                            {payment.companyName}
+                          </TableCell>
+                          <TableCell className="font-mono text-sm">
+                            {payment.reference}
+                          </TableCell>
+                          <TableCell className="text-sm">
+                            {payment.method}
+                          </TableCell>
+                          <TableCell className="text-right text-muted-foreground whitespace-nowrap">
+                            {linkedBill ? Math.round(linkedBill.advancePayment || 0).toLocaleString() : '-'}
+                          </TableCell>
+                          <TableCell className="text-right font-medium text-amber-600 whitespace-nowrap">
+                            {payment.adjustment ? Math.round(payment.adjustment || 0).toLocaleString() : '-'}
+                          </TableCell>
+                          <TableCell className="text-right font-bold text-green-600 whitespace-nowrap">
+                            {Math.round(payment.amount).toLocaleString()}
+                          </TableCell>
+                          <TableCell className="text-right font-black text-green-700 bg-green-50/50 dark:bg-green-900/10 whitespace-nowrap">
+                            {formatCurrency(
+                              Number(linkedBill?.advancePayment || 0) +
+                              Number(payment.amount || 0) +
+                              Number(payment.adjustment || 0)
+                            )}
+                          </TableCell>
+                          <TableCell className="text-right font-black text-primary bg-muted/20 whitespace-nowrap">
+                            {linkedBill ? formatCurrency(linkedBill.grandTotal) : '-'}
+                          </TableCell>
+                        </TableRow>
+                      );
+                    })}
                   </TableBody>
                 </Table>
               </div>
