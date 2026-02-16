@@ -469,8 +469,9 @@ export default function PaymentsPage() {
                     <TableRow className="bg-secondary/50">
                       <TableHead>Date</TableHead>
                       <TableHead>Company</TableHead>
-                      <TableHead>Reference</TableHead>
+                      <TableHead>Job No</TableHead>
                       <TableHead>Method</TableHead>
+                      <TableHead>Reference</TableHead>
                       <TableHead className="text-right">Advance Paid</TableHead>
                       <TableHead className="text-right">Adjustment</TableHead>
                       <TableHead className="text-right">Cash Paid</TableHead>
@@ -490,11 +491,14 @@ export default function PaymentsPage() {
                           <TableCell className="font-medium">
                             {payment.companyName}
                           </TableCell>
-                          <TableCell className="font-mono text-sm">
-                            {payment.reference}
+                          <TableCell className="text-sm font-mono text-muted-foreground">
+                            {linkedBill?.jobNumber || '-'}
                           </TableCell>
                           <TableCell className="text-sm">
                             {payment.method}
+                          </TableCell>
+                          <TableCell className="font-mono text-sm">
+                            {payment.reference}
                           </TableCell>
                           <TableCell className="text-right text-muted-foreground whitespace-nowrap">
                             {linkedBill ? Math.round(linkedBill.advancePayment || 0).toLocaleString() : '-'}
@@ -513,7 +517,7 @@ export default function PaymentsPage() {
                             )}
                           </TableCell>
                           <TableCell className="text-right font-black text-primary bg-muted/20 whitespace-nowrap">
-                            {linkedBill ? formatCurrency((linkedBill.grandTotal || 0) + (linkedBill.advancePayment || 0)) : '-'}
+                            {linkedBill ? formatCurrency(linkedBill.grandTotal || 0) : '-'}
                           </TableCell>
                         </TableRow>
                       );
