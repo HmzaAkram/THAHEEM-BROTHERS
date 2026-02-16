@@ -110,12 +110,15 @@ export default function CompaniesPage() {
       }
 
       // Sum totals
-      const billed = companyBills.reduce((s, b) => s + (b.grandTotal || 0), 0);
-      const collected = companyPayments.reduce((s, p) => s + (p.amount || 0), 0);
+      const billed = companyBills.reduce((s, b) => s + (Number(b.grandTotal) || 0), 0);
+      const advances = companyBills.reduce((s, b) => s + (Number(b.advancePayment) || 0), 0);
+      const paymentReceived = companyPayments.reduce((s, p) => s + (Number(p.amount) || 0) + (Number(p.adjustment) || 0), 0);
+
+      const totalCollected = advances + paymentReceived;
 
       acc.billed += billed;
-      acc.collected += collected;
-      acc.outstanding += (billed - collected);
+      acc.collected += totalCollected;
+      acc.outstanding += (billed - totalCollected);
       return acc;
     }, { billed: 0, collected: 0, outstanding: 0, count: filteredCompanies.length });
   }, [filteredCompanies, bills, payments, dateFrom, dateTo]);

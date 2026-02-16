@@ -239,11 +239,12 @@ export default function LedgerPage() {
                                 <div className="flex flex-col gap-0.5">
                                   <div className="flex items-center gap-2">
                                     <span className="font-medium text-foreground/80">
-                                      Payment Received ({entry.method})
+                                      {/* ADVANCE PAYMENT: If no method, it's an advance */}
+                                      {(entry as any).method ? `Payment Received (${(entry as any).method})` : 'Advance Received'}
                                     </span>
-                                    {entry.paymentRef && (
+                                    {(entry as any).paymentRef && (
                                       <span className="text-xs bg-secondary px-1.5 py-0.5 rounded font-mono text-foreground">
-                                        {entry.paymentRef}
+                                        {(entry as any).paymentRef}
                                       </span>
                                     )}
                                   </div>

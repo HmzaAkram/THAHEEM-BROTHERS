@@ -87,12 +87,22 @@ export default function ReportsPage() {
 
       let daysOverdue = 0;
       let lastDueDate = '-';
+      let overdueCount = 0;
 
       if (unpaidBills.length > 0) {
+        const today = new Date();
+        unpaidBills.forEach(bill => {
+          const d = new Date(bill.date);
+          d.setDate(d.getDate() + 30); // 30 days credit period
+          if (today > d) {
+            overdueCount++;
+          }
+        });
+
         const oldestUnpaid = unpaidBills[0];
         const dueDate = new Date(oldestUnpaid.date);
         dueDate.setDate(dueDate.getDate() + 30);
-        const today = new Date();
+
         if (today > dueDate) {
           daysOverdue = Math.floor((today.getTime() - dueDate.getTime()) / (1000 * 3600 * 24));
         }
@@ -104,11 +114,13 @@ export default function ReportsPage() {
         outstanding,
         billsCount: companyBills.length,
         daysOverdue,
-        lastDueDate
+        lastDueDate,
+        overdueCount
       };
     }).filter(s => s.outstanding > 0 || s.billsCount > 0);
 
     const total = companyStats.reduce((sum, item) => sum + item.outstanding, 0);
+    const totalOverdueInvoices = companyStats.reduce((sum, item) => sum + item.overdueCount, 0);
 
     // 3. Time Series (Monthly Billing Trend)
     const monthsData: { month: string; outstanding: number; year: number; monthIdx: number }[] = [];
@@ -132,6 +144,7 @@ export default function ReportsPage() {
     return {
       outstandingData: companyStats,
       totalOutstanding: total,
+      totalOverdueInvoices,
       timeSeriesData: monthsData,
       filteredBills: fBills,
       filteredPayments: fPayments,
@@ -484,7 +497,7 @@ export default function ReportsPage() {
                   <div>
                     <p className="text-xs text-muted-foreground">Overdue Invoices</p>
                     <p className="text-2xl font-bold text-red-600 mt-1">
-                      {outstandingData.filter((item: any) => item.daysOverdue > 0).length}
+                      {(outstandingData as any).reduce ? (outstandingData as any).reduce((sum: number, item: any) => sum + (item.overdueCount || 0), 0) : 0}
                     </p>
                   </div>
                 </>
