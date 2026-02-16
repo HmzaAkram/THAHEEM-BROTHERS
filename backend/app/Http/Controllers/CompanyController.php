@@ -19,7 +19,9 @@ class CompanyController extends Controller
         // Load aggregated sums for bills and payments to avoid multiple queries
         return response()->json(
             Company::withSum('bills', 'grand_total')
+                ->withSum('bills', 'advance_payment')
                 ->withSum('payments', 'amount')
+                ->withSum('payments', 'adjustment')
                 ->get()
         );
     }

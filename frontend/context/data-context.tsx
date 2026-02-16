@@ -305,33 +305,57 @@ export function DataProvider({ children }: { children: ReactNode }) {
 
   const getCompanyLedger = (companyId: string): LedgerEntry[] => {
     // BUG FIX: Use numeric equality to prevent type confusion
-    const companyBills = bills.filter(b => Number(b.companyId) === Number(companyId)).map(b => ({
-      id: b.id + '_debit',
-      date: b.date,
-      description: `Invoice #${b.billNo}`,
-      debit: b.totalAmount,
-      credit: 0,
-      balance: 0, // Calculated later
-      companyId: b.companyId,
-      companyName: b.companyName,
-      referenceId: b.id,
-      type: 'BILL' as const,
-      timestamp: new Date(b.date).getTime(),
-      billNo: b.billNo,
-      jobNumber: b.jobNumber
-    }));
+    const companyBills = bills.filter(b => Number(b.companyId) === Number(companyId)).flatMap(b => {
+      const entries: LedgerEntry[] = [];
+
+      // 1. Add Debit Entry (Gross Bill)
+      entries.push({
+        id: b.id + '_debit',
+        date: b.date,
+        description: `Invoice #${b.billNo}`,
+        debit: b.grandTotal,
+        credit: 0,
+        balance: 0,
+        companyId: b.companyId,
+        companyName: b.companyName,
+        referenceId: b.id,
+        type: 'BILL' as const,
+        timestamp: new Date(b.date).getTime(),
+        billNo: b.billNo,
+        jobNumber: b.jobNumber
+      });
+
+      // 2. Add Credit Entry if Advance was paid
+      if (b.advancePayment && b.advancePayment > 0) {
+        entries.push({
+          id: b.id + '_advance',
+          date: b.date,
+          description: `Advance Payment - Bill #${b.billNo}`,
+          debit: 0,
+          credit: b.advancePayment,
+          balance: 0,
+          companyId: b.companyId,
+          companyName: b.companyName,
+          referenceId: b.id,
+          type: 'PAYMENT' as const,
+          timestamp: new Date(b.date).getTime() + 1, // Slightly after bill
+          billNo: b.billNo,
+          jobNumber: b.jobNumber
+        });
+      }
+
+      return entries;
+    });
 
     const companyPayments = payments.filter(p => Number(p.companyId) === Number(companyId)).map(p => {
-      // Find linked bill to get Job Number if available
-      // BUG FIX: Use numeric equality here too
       const linkedBill = bills.find(b => Number(b.id) === Number(p.billId));
 
       return {
         id: p.id + '_credit',
         date: p.date,
-        description: `Payment Received`,
+        description: p.note ? `Payment: ${p.note}` : `Payment Received`,
         debit: 0,
-        credit: p.amount,
+        credit: Number(p.amount) + (Number(p.adjustment) || 0),
         balance: 0,
         companyId: p.companyId,
         companyName: p.companyName,
@@ -340,7 +364,6 @@ export function DataProvider({ children }: { children: ReactNode }) {
         timestamp: new Date(p.date).getTime(),
         method: p.method,
         paymentRef: p.reference,
-        // Inherit Job/Bill info if linked
         billNo: linkedBill?.billNo,
         jobNumber: linkedBill?.jobNumber
       };
