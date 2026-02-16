@@ -7,6 +7,7 @@ import { Bill } from '@/context/data-context';
 interface InvoiceTemplateProps {
     bill: Bill | null;
     hideAttachments?: boolean;
+    attachmentDataUrl?: string | null;
 }
 
 const statusStyles: Record<string, string> = {
@@ -15,7 +16,7 @@ const statusStyles: Record<string, string> = {
     Unpaid: 'bg-red-100 text-red-800 border-red-200 shadow-sm',
 };
 
-export const InvoiceTemplate = forwardRef<HTMLDivElement, InvoiceTemplateProps>(({ bill, hideAttachments = false }, ref) => {
+export const InvoiceTemplate = forwardRef<HTMLDivElement, InvoiceTemplateProps>(({ bill, hideAttachments = false, attachmentDataUrl = null }, ref) => {
     if (!bill) return null;
 
     const isPaid = bill.calculatedStatus === 'Paid' || bill.status === 'Paid';
@@ -162,7 +163,7 @@ export const InvoiceTemplate = forwardRef<HTMLDivElement, InvoiceTemplateProps>(
                                     <div className="flex items-start gap-2">
                                         <span className="w-1.5 h-1.5 rounded-full bg-red-600 mt-1 flex-shrink-0" />
                                         <p className="text-xs font-black text-red-600 leading-tight uppercase tracking-tight">
-                                            All Necessary documents enclosed.
+                                            A high-resolution scanned copy of the document is enclosed.
                                         </p>
                                     </div>
                                 )}
@@ -263,15 +264,18 @@ export const InvoiceTemplate = forwardRef<HTMLDivElement, InvoiceTemplateProps>(
                         </div>
 
                         <div className="bg-slate-50 rounded-[3rem] p-10 border border-slate-200 shadow-inner group">
-                            {bill.attachment.toLowerCase().endsWith('.pdf') ? (
-                                <div className="w-full h-[900px] border-4 border-white rounded-[2rem] overflow-hidden bg-slate-200 shadow-2xl relative">
-                                    <iframe
-                                        src={`${bill.attachment}${bill.attachment.includes('?') ? '&' : '?'}t=${Date.now()}#toolbar=0&navpanes=0&view=FitH`}
-                                        className="w-full h-full border-none"
-                                        title="Bill PDF Attachment"
+                            <div className="flex justify-center flex-col items-center">
+                                <div className="relative inline-block border-[12px] border-white rounded-[3rem] shadow-2xl overflow-hidden bg-white max-w-full">
+                                    <img
+                                        src={attachmentDataUrl || `${bill.attachment}${bill.attachment.includes('?') ? '&' : '?'}t=${Date.now()}`}
+                                        alt="Bill Attachment"
+                                        crossOrigin="anonymous"
+                                        className="max-w-full h-auto max-h-[1200px] object-contain transition-transform group-hover:scale-[1.02] duration-700"
                                     />
-                                    {/* Fallback Link - Always visible as a backup */}
-                                    <div className="absolute bottom-6 right-6 z-20">
+                                    <div className="absolute inset-0 ring-1 ring-inset ring-black/5 rounded-[2rem]" />
+
+                                    {/* External View Link - Repositioned for standard image view */}
+                                    <div className="absolute bottom-6 right-6 opacity-0 group-hover:opacity-100 transition-opacity duration-300">
                                         <a
                                             href={bill.attachment}
                                             target="_blank"
@@ -283,23 +287,11 @@ export const InvoiceTemplate = forwardRef<HTMLDivElement, InvoiceTemplateProps>(
                                         </a>
                                     </div>
                                 </div>
-                            ) : (
-                                <div className="flex justify-center flex-col items-center">
-                                    <div className="relative inline-block border-[12px] border-white rounded-[3rem] shadow-2xl overflow-hidden bg-white max-w-full">
-                                        <img
-                                            src={`${bill.attachment}${bill.attachment.includes('?') ? '&' : '?'}t=${Date.now()}`}
-                                            alt="Bill Attachment"
-                                            crossOrigin="anonymous"
-                                            className="max-w-full h-auto max-h-[1000px] object-contain transition-transform group-hover:scale-[1.02] duration-700"
-                                        />
-                                        <div className="absolute inset-0 ring-1 ring-inset ring-black/5 rounded-[2rem]" />
-                                    </div>
-                                    <div className="mt-8 flex items-center gap-2 px-6 py-2 bg-white/50 backdrop-blur-sm rounded-full border border-white shadow-sm font-black text-[10px] text-slate-400 uppercase tracking-[0.3em]">
-                                        <span className="w-2 h-2 rounded-full bg-primary" />
-                                        End of Document
-                                    </div>
+                                <div className="mt-8 flex items-center gap-2 px-6 py-2 bg-white/50 backdrop-blur-sm rounded-full border border-white shadow-sm font-black text-[10px] text-slate-400 uppercase tracking-[0.3em]">
+                                    <span className="w-2 h-2 rounded-full bg-primary" />
+                                    End of Document
                                 </div>
-                            )}
+                            </div>
                         </div>
                     </div>
                 )}

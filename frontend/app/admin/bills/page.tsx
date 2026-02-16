@@ -36,6 +36,7 @@ import {
   Ship,
   Truck,
   Plane,
+  FileImage,
   FileText,
   User,
   Calendar,
@@ -64,6 +65,8 @@ const statusStyles = {
   Unpaid: 'bg-red-100 text-red-800 border-red-200',
 };
 
+import { PDFDocument } from 'pdf-lib';
+
 export default function BillsPage() {
   const { bills, companies, addBill } = useData();
   const [isDialogOpen, setIsDialogOpen] = useState(false);
@@ -72,22 +75,113 @@ export default function BillsPage() {
   const [loading, setLoading] = useState(false);
   const tableRef = useRef<HTMLDivElement>(null);
   const invoiceRef = useRef<HTMLDivElement>(null);
-  const [pdfBill, setPdfBill] = useState<Bill | null>(null);
+  // Consolidated PDF generation state
+  const [downloadState, setDownloadState] = useState<{
+    bill: Bill | null;
+    dataUrl: string | null;
+  }>({
+    bill: null,
+    dataUrl: null,
+  });
+
+  const [viewDataUrl, setViewDataUrl] = useState<string | null>(null);
 
   const handleDownloadInvoice = async (bill: Bill) => {
-    setPdfBill(bill);
+    setLoading(true);
+    try {
+      let attachmentDataUrl: string | null = null;
+
+      if (bill.attachment) {
+        const filename = bill.attachment.split('/').pop();
+        const token = localStorage.getItem('auth_token');
+        console.log('[handleDownloadInvoice] Fetching attachment:', filename);
+        const response = await fetch(`http://localhost:8000/api/v1/bills/attachment/${filename}`, {
+          headers: {
+            'Authorization': `Bearer ${token}`
+          }
+        });
+        if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
+        const blob = await response.blob();
+        console.log('[handleDownloadInvoice] Blob received:', blob.size, 'bytes');
+
+        const reader = new FileReader();
+        attachmentDataUrl = await new Promise<string>((resolve, reject) => {
+          reader.onloadend = () => resolve(reader.result as string);
+          reader.onerror = reject;
+          reader.readAsDataURL(blob);
+        });
+      }
+
+      setDownloadState({
+        bill,
+        dataUrl: attachmentDataUrl,
+      });
+      console.log('[handleDownloadInvoice] Download state updated with dataUrl length:', attachmentDataUrl?.length || 0);
+
+    } catch (err) {
+      console.error('Pre-load failed', err);
+      // Fallback: Continue without attachment preview
+      setDownloadState({ bill, dataUrl: null });
+    }
+  };
+
+  const handleViewBill = async (bill: Bill) => {
+    setSelectedBill(bill);
+    setIsViewOpen(true);
+    setViewDataUrl(null); // Reset while loading
+
+    if (bill.attachment) {
+      try {
+        const filename = bill.attachment.split('/').pop();
+        const token = localStorage.getItem('auth_token');
+        console.log('[handleViewBill] Fetching attachment:', filename);
+        const response = await fetch(`http://localhost:8000/api/v1/bills/attachment/${filename}`, {
+          headers: {
+            'Authorization': `Bearer ${token}`
+          }
+        });
+        if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
+        const blob = await response.blob();
+        console.log('[handleViewBill] Blob received:', blob.size, 'bytes');
+
+        const reader = new FileReader();
+        const dataUrl = await new Promise<string>((resolve, reject) => {
+          reader.onloadend = () => resolve(reader.result as string);
+          reader.onerror = reject;
+          reader.readAsDataURL(blob);
+        });
+
+        // Ensure the modal is still open for the SAME bill before updating state
+        setSelectedBill(current => {
+          if (current?.id === bill.id) {
+            setViewDataUrl(dataUrl);
+            console.log('[handleViewBill] View dataUrl updated, length:', dataUrl.length);
+          }
+          return current;
+        });
+      } catch (err) {
+        console.error('Failed to pre-load image for view', err);
+      }
+    }
   };
 
   useEffect(() => {
-    if (pdfBill && invoiceRef.current) {
+    if (downloadState.bill && invoiceRef.current) {
       const generatePDF = async () => {
         try {
-          // Small delay to ensure render
-          await new Promise(resolve => setTimeout(resolve, 500));
+          // ensure DOM is fully painted with image Data URL, 3.5s for high-res images
+          await new Promise(resolve => setTimeout(resolve, 3500));
 
-          const dataUrl = await toPng(invoiceRef.current!, { cacheBust: true, pixelRatio: 2 });
+          const toPngOptions = {
+            cacheBust: true,
+            pixelRatio: 2,
+            backgroundColor: '#ffffff',
+            filter: (node: any) => node.tagName !== 'IFRAME'
+          };
+
+          const captureDataUrl = await toPng(invoiceRef.current!, toPngOptions);
           const pdf = new jsPDF('p', 'mm', 'a4');
-          const imgProps = pdf.getImageProperties(dataUrl);
+          const imgProps = pdf.getImageProperties(captureDataUrl);
           const pdfWidth = pdf.internal.pageSize.getWidth();
           const pageHeight = pdf.internal.pageSize.getHeight();
           const imgHeight = (imgProps.height * pdfWidth) / imgProps.width;
@@ -95,57 +189,33 @@ export default function BillsPage() {
           let heightLeft = imgHeight;
           let position = 0;
 
-          // Add first page
-          pdf.addImage(dataUrl, 'PNG', 0, position, pdfWidth, imgHeight);
+          pdf.addImage(captureDataUrl, 'PNG', 0, position, pdfWidth, imgHeight);
           heightLeft -= pageHeight;
 
-          // Add subsequent pages if content is longer than one page
           while (heightLeft > 0) {
             position = heightLeft - imgHeight;
             pdf.addPage();
-            pdf.addImage(dataUrl, 'PNG', 0, position, pdfWidth, imgHeight);
+            pdf.addImage(captureDataUrl, 'PNG', 0, position, pdfWidth, imgHeight);
             heightLeft -= pageHeight;
           }
 
-          const invoiceBlob = pdf.output('blob');
-
-          if (pdfBill.attachment) {
-            const zip = new JSZip();
-            const fileName = `Invoice_${pdfBill.billNo}`;
-
-            // Add Invoice PDF
-            zip.file(`${fileName}.pdf`, invoiceBlob);
-
-            // Add Attachment
-            try {
-              const response = await fetch(pdfBill.attachment);
-              const attachmentBlob = await response.blob();
-              const ext = pdfBill.attachment.split('.').pop()?.split('?')[0] || 'file';
-              zip.file(`Attachment_of_Bill_${pdfBill.billNo}.${ext}`, attachmentBlob);
-            } catch (err) {
-              console.error('Failed to fetch attachment for ZIP', err);
-            }
-
-            const zipBlob = await zip.generateAsync({ type: 'blob' });
-            const url = URL.createObjectURL(zipBlob);
-            const link = document.createElement('a');
-            link.href = url;
-            link.download = `${fileName}.zip`;
-            link.click();
-            URL.revokeObjectURL(url);
-          } else {
-            pdf.save(`Invoice_${pdfBill.billNo}.pdf`);
-          }
-        } catch (err) {
-          console.error('Failed to generate PDF', err);
+          const fileName = `Invoice_${downloadState.bill.billNo}`;
+          pdf.save(`${fileName}.pdf`);
+        } catch (err: any) {
+          console.error('PDF creation error details:', {
+            message: err.message,
+            stack: err.stack,
+            error: err
+          });
+          alert(`Could not generate PDF: ${err.message || 'Unknown capture error'}. Please try again.`);
         } finally {
-          setPdfBill(null);
+          setDownloadState({ bill: null, dataUrl: null });
+          setLoading(false);
         }
       };
-
       generatePDF();
     }
-  }, [pdfBill]);
+  }, [downloadState]);
 
   const BILL_ITEMS = [
     "DUTY TAXES & ETO",
@@ -806,13 +876,13 @@ export default function BillsPage() {
                           </div>
                           <div className="text-center">
                             <p className="text-sm font-semibold text-foreground">Attach Shipment Documents</p>
-                            <p className="text-xs text-muted-foreground mt-1">Upload PDF or high-resolution images</p>
+                            <p className="text-xs text-muted-foreground mt-1">Upload high-resolution images (JPG, PNG)</p>
                           </div>
                           <div className="relative w-full max-w-xs mt-2">
                             <Input
                               type="file"
                               className="opacity-0 absolute inset-0 w-full h-full cursor-pointer z-10"
-                              accept=".pdf,image/*"
+                              accept="image/*"
                               onChange={(e) => {
                                 const file = e.target.files?.[0];
                                 if (file) setAttachment(file);
@@ -821,11 +891,11 @@ export default function BillsPage() {
                             <div className="flex items-center justify-center gap-2 px-6 py-2.5 border-2 rounded-xl bg-white dark:bg-slate-950 text-sm font-medium text-foreground/80 shadow-sm border-border/50">
                               {attachment ? (
                                 <span className="truncate flex items-center gap-2">
-                                  <FileText className="w-4 h-4 text-primary" />
+                                  <FileImage className="w-4 h-4 text-primary" />
                                   {attachment.name}
                                 </span>
                               ) : (
-                                "Select Files"
+                                "Select Image"
                               )}
                             </div>
                           </div>
@@ -960,10 +1030,7 @@ export default function BillsPage() {
                                 variant="ghost"
                                 size="icon"
                                 className="hover:text-primary hover:bg-primary/5 transition-colors"
-                                onClick={() => {
-                                  setSelectedBill(item);
-                                  setIsViewOpen(true);
-                                }}
+                                onClick={() => handleViewBill(item)}
                               >
                                 <Eye className="w-4 h-4" />
                               </Button>
@@ -1031,7 +1098,7 @@ export default function BillsPage() {
 
               {selectedBill && (
                 <div className="space-y-8 py-4">
-                  <InvoiceTemplate bill={selectedBill} />
+                  <InvoiceTemplate bill={selectedBill} attachmentDataUrl={viewDataUrl} />
                   <div className="flex gap-4 pt-6 border-t">
                     <Button className="flex-1 gap-2 rounded-xl" onClick={() => handleDownloadInvoice(selectedBill)}>
                       <Download className="w-4 h-4" />
@@ -1050,9 +1117,9 @@ export default function BillsPage() {
       </DashboardLayout >
       {/* Hidden Capture Area for PDF Generation  */}
       <div style={{ position: 'fixed', top: '200vh', left: 0 }} suppressHydrationWarning>
-        {pdfBill && (
+        {downloadState.bill && (
           <div ref={invoiceRef} className="w-[210mm] bg-white p-8">
-            <InvoiceTemplate bill={pdfBill} hideAttachments={true} />
+            <InvoiceTemplate bill={downloadState.bill} attachmentDataUrl={downloadState.dataUrl} />
           </div>
         )}
       </div>

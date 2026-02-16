@@ -91,24 +91,23 @@ class BillController extends Controller
                     $finfo = new \finfo(FILEINFO_MIME_TYPE);
                     $actualMimeType = $finfo->buffer($decodedData);
                     
-                    // SECURITY: Only allow safe file types
+                    // SECURITY: Only allow safe image file types
                     $allowedMimes = [
                         'image/jpeg' => 'jpg',
                         'image/png' => 'png',
-                        'application/pdf' => 'pdf',
                     ];
                     
                     if (!isset($allowedMimes[$actualMimeType])) {
                         return response()->json([
-                            'message' => 'Invalid file type. Only JPEG, PNG, and PDF files are allowed.',
-                            'errors' => ['attachment' => ['File type not allowed']]
+                            'message' => 'Invalid file type. Only JPEG and PNG images are allowed.',
+                            'errors' => ['attachment' => ['Only image files (JPG, PNG) are supported']]
                         ], 422);
                     }
                     
-                    // SECURITY: Check file size (5MB max to prevent DoS)
-                    if (strlen($decodedData) > 5 * 1024 * 1024) {
+                    // SECURITY: Check file size (50MB max to accommodate high-res scans)
+                    if (strlen($decodedData) > 50 * 1024 * 1024) {
                         return response()->json([
-                            'message' => 'File too large. Maximum size is 5MB.',
+                            'message' => 'File too large. Maximum size is 50MB.',
                             'errors' => ['attachment' => ['File exceeds size limit']]
                         ], 422);
                     }
@@ -190,5 +189,21 @@ class BillController extends Controller
 
         $bill->delete();
         return response()->json(null, 204);
+    }
+    public function getAttachment($filename)
+    {
+        $path = 'attachments/' . $filename;
+        if (!\Illuminate\Support\Facades\Storage::disk('public')->exists($path)) {
+            abort(404);
+        }
+
+        $file = \Illuminate\Support\Facades\Storage::disk('public')->get($path);
+        $type = \Illuminate\Support\Facades\Storage::disk('public')->mimeType($path);
+
+        return response($file, 200)
+            ->header('Content-Type', $type)
+            ->header('Access-Control-Allow-Origin', '*')
+            ->header('Access-Control-Allow-Methods', 'GET')
+            ->header('Access-Control-Allow-Headers', 'Content-Type, X-Requested-With');
     }
 }

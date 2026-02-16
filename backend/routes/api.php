@@ -18,6 +18,7 @@ Route::prefix('v1')->middleware('auth.token')->group(function () {
     Route::get('/me', [AuthController::class, 'me']);
 
     Route::apiResource('companies', CompanyController::class);
+    Route::get('/bills/attachment/{filename}', [BillController::class, 'getAttachment']);
     Route::apiResource('bills', BillController::class);
     Route::apiResource('payments', PaymentController::class);
     Route::apiResource('securities', SecurityController::class);
