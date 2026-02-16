@@ -1,13 +1,10 @@
 /**
  * Centralized API service for handling all requests to the Laravel backend.
- * Provides unified error handling, token management, and property naming conversion.
+ * Supports automatic JSON ↔ FormData switching for file uploads.
  */
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000/api/v1';
 
-/**
- * TYPE SAFETY: Properly typed API response interface
- */
 export interface ApiResponse<T = any> {
     ok: boolean;
     status?: number;
@@ -15,22 +12,24 @@ export interface ApiResponse<T = any> {
     data?: T;
 }
 
-
 class ApiService {
-    private static getHeaders(token?: string | null) {
+    // ─────────────────────────────────────────────────────────────────────
+    // Private helpers
+    // ─────────────────────────────────────────────────────────────────────
+    private static getHeaders(token?: string | null): HeadersInit {
         const headers: HeadersInit = {
-            'Content-Type': 'application/json',
             'Accept': 'application/json',
         };
+        // Content-Type is NOT set here – it will be added automatically
+        // for JSON requests, and omitted for FormData (browser sets boundary).
 
         if (token) {
             headers['Authorization'] = `Bearer ${token}`;
         }
-
         return headers;
     }
 
-    private static async handleResponse(response: Response) {
+    private static async handleResponse(response: Response): Promise<ApiResponse> {
         if (response.status === 204) {
             return { ok: true, status: 204 };
         }
@@ -54,7 +53,10 @@ class ApiService {
         };
     }
 
-    static async get(endpoint: string, token?: string | null) {
+    // ─────────────────────────────────────────────────────────────────────
+    // HTTP methods
+    // ─────────────────────────────────────────────────────────────────────
+    static async get(endpoint: string, token?: string | null): Promise<ApiResponse> {
         try {
             const response = await fetch(`${API_BASE_URL}${endpoint}`, {
                 method: 'GET',
@@ -67,20 +69,29 @@ class ApiService {
         }
     }
 
-    static async post(endpoint: string, body: any, token?: string | null) {
+    static async post(endpoint: string, body: any, token?: string | null): Promise<ApiResponse> {
         try {
+            const hasFiles = this.containsFiles(body);
             const snakeBody = this.camelToSnake(body);
-            const bodyString = JSON.stringify(snakeBody);
 
-            // SECURITY: Prevent DoS attacks with large payloads (10MB limit)
-            if (bodyString.length > 10 * 1024 * 1024) {
-                return { ok: false, message: 'Request payload too large (max 10MB)' };
+            let requestBody: BodyInit;
+            const headers = this.getHeaders(token);
+
+            if (hasFiles) {
+                const formData = new FormData();
+                this.buildFormData(formData, snakeBody);
+                requestBody = formData;
+                // Remove Content-Type so the browser sets it with the correct boundary
+                delete headers['Content-Type'];
+            } else {
+                headers['Content-Type'] = 'application/json';
+                requestBody = JSON.stringify(snakeBody);
             }
 
             const response = await fetch(`${API_BASE_URL}${endpoint}`, {
                 method: 'POST',
-                headers: this.getHeaders(token),
-                body: bodyString,
+                headers,
+                body: requestBody,
             });
             return await this.handleResponse(response);
         } catch (error) {
@@ -89,22 +100,45 @@ class ApiService {
         }
     }
 
-    static async put(endpoint: string, body: any, token?: string | null) {
+    static async put(endpoint: string, body: any, token?: string | null): Promise<ApiResponse> {
         try {
+            const hasFiles = this.containsFiles(body);
             const snakeBody = this.camelToSnake(body);
-            const response = await fetch(`${API_BASE_URL}${endpoint}`, {
-                method: 'PUT',
-                headers: this.getHeaders(token),
-                body: JSON.stringify(snakeBody),
-            });
-            return await this.handleResponse(response);
+
+            let requestBody: BodyInit;
+            const headers = this.getHeaders(token);
+
+            if (hasFiles) {
+                const formData = new FormData();
+                this.buildFormData(formData, snakeBody);
+                // Laravel needs this workaround for PUT/PATCH with files
+                formData.append('_method', 'PUT');
+                requestBody = formData;
+                delete headers['Content-Type'];
+                // Use POST method because browser can't send multipart PUT
+                const response = await fetch(`${API_BASE_URL}${endpoint}`, {
+                    method: 'POST',
+                    headers,
+                    body: requestBody,
+                });
+                return await this.handleResponse(response);
+            } else {
+                headers['Content-Type'] = 'application/json';
+                requestBody = JSON.stringify(snakeBody);
+                const response = await fetch(`${API_BASE_URL}${endpoint}`, {
+                    method: 'PUT',
+                    headers,
+                    body: requestBody,
+                });
+                return await this.handleResponse(response);
+            }
         } catch (error) {
             console.error('Fetch error:', error);
             return { ok: false, message: 'Connection failed. Please check your network or server.' };
         }
     }
 
-    static async delete(endpoint: string, token?: string | null) {
+    static async delete(endpoint: string, token?: string | null): Promise<ApiResponse> {
         try {
             const response = await fetch(`${API_BASE_URL}${endpoint}`, {
                 method: 'DELETE',
@@ -117,7 +151,42 @@ class ApiService {
         }
     }
 
-    // Naming conversion helpers
+    // ─────────────────────────────────────────────────────────────────────
+    // File detection and FormData building
+    // ─────────────────────────────────────────────────────────────────────
+    private static containsFiles(obj: any): boolean {
+        if (obj === null || typeof obj !== 'object') return false;
+        if (obj instanceof File || obj instanceof Blob) return true;
+        if (Array.isArray(obj)) {
+            return obj.some(item => this.containsFiles(item));
+        }
+        return Object.values(obj).some(value => this.containsFiles(value));
+    }
+
+    private static buildFormData(formData: FormData, data: any, parentKey?: string): void {
+        if (data === null || data === undefined) return;
+
+        if (data instanceof File || data instanceof Blob) {
+            formData.append(parentKey!, data);
+        } else if (Array.isArray(data)) {
+            data.forEach((item, index) => {
+                const key = parentKey ? `${parentKey}[${index}]` : `${index}`;
+                this.buildFormData(formData, item, key);
+            });
+        } else if (typeof data === 'object') {
+            Object.entries(data).forEach(([key, value]) => {
+                const formKey = parentKey ? `${parentKey}[${key}]` : key;
+                this.buildFormData(formData, value, formKey);
+            });
+        } else {
+            // primitive (string, number, boolean)
+            formData.append(parentKey!, String(data));
+        }
+    }
+
+    // ─────────────────────────────────────────────────────────────────────
+    // Naming conversion helpers (camel ↔ snake)
+    // ─────────────────────────────────────────────────────────────────────
     private static camelToSnake(obj: any): any {
         if (obj === null || typeof obj !== 'object' || obj instanceof File || obj instanceof Blob) {
             return obj;

@@ -91,28 +91,22 @@ class BillController extends Controller
                     $finfo = new \finfo(FILEINFO_MIME_TYPE);
                     $actualMimeType = $finfo->buffer($decodedData);
                     
-                    // SECURITY: Only allow safe image file types
+                    // SECURITY: Only allow PDF files
                     $allowedMimes = [
-                        'image/jpeg' => 'jpg',
-                        'image/png' => 'png',
+                        'application/pdf' => 'pdf',
                     ];
                     
                     if (!isset($allowedMimes[$actualMimeType])) {
                         return response()->json([
-                            'message' => 'Invalid file type. Only JPEG and PNG images are allowed.',
-                            'errors' => ['attachment' => ['Only image files (JPG, PNG) are supported']]
+                            'message' => 'Invalid file type. Only PDF files are allowed.',
+                            'errors' => ['attachment' => ['Only PDF files are supported']]
                         ], 422);
                     }
                     
-                    // SECURITY: Check file size (50MB max to accommodate high-res scans)
-                    if (strlen($decodedData) > 50 * 1024 * 1024) {
-                        return response()->json([
-                            'message' => 'File too large. Maximum size is 50MB.',
-                            'errors' => ['attachment' => ['File exceeds size limit']]
-                        ], 422);
-                    }
+                    // SECURITY: Check file size (no limit as requested)
+                    // if (strlen($decodedData) > 50 * 1024 * 1024) { ... }
                     
-                    $extension = $allowedMimes[$actualMimeType];
+                    $extension = 'pdf';
                     
                     // SECURITY: Use UUID for unpredictable filenames
                     $fileName = 'bill_' . \Illuminate\Support\Str::uuid() . '.' . $extension;
@@ -192,8 +186,14 @@ class BillController extends Controller
     }
     public function getAttachment($filename)
     {
+        $filename = urldecode($filename);
         $path = 'attachments/' . $filename;
+        
+        // Debugging
+        \Illuminate\Support\Facades\Log::info("Checking attachment path: " . $path);
+        
         if (!\Illuminate\Support\Facades\Storage::disk('public')->exists($path)) {
+             \Illuminate\Support\Facades\Log::error("Attachment not found: " . $path);
             abort(404);
         }
 

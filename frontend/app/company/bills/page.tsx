@@ -1,6 +1,7 @@
 'use client';
 
 import { jsPDF } from 'jspdf';
+import html2canvas from 'html2canvas';
 import { toPng } from 'html-to-image';
 import JSZip from 'jszip';
 import { useRef, useMemo, useState, useEffect } from 'react';
@@ -46,96 +47,72 @@ export default function CompanyBillsPage() {
   };
 
   const handleDownloadInvoice = async (bill: Bill) => {
-    setPdfBill(bill);
-  };
+    try {
+      // 1. Set the bill to be viewed (renders the hidden template)
+      setPdfBill(bill);
 
-  useEffect(() => {
-    if (pdfBill && invoiceRef.current) {
-      const generatePDF = async () => {
-        try {
-          // Wait for images to load in the capture area
-          const images = invoiceRef.current?.querySelectorAll('img');
-          if (images) {
-            await Promise.all(
-              Array.from(images).map(img => {
-                if (img.complete) return Promise.resolve();
-                return new Promise(resolve => {
-                  img.onload = resolve;
-                  img.onerror = resolve; // Continue even if one image fails
-                });
-              })
-            );
-          }
+      // 2. Wait for render
+      await new Promise((resolve) => setTimeout(resolve, 500));
 
-          // Small delay to ensure paint
-          await new Promise(resolve => setTimeout(resolve, 500));
+      // 2. Wait for render
+      await new Promise((resolve) => setTimeout(resolve, 500));
 
-          const dataUrl = await toPng(invoiceRef.current!, {
-            cacheBust: true,
-            pixelRatio: 2,
-            skipFonts: true, // Speeds up generation
-          });
-          const pdf = new jsPDF('p', 'mm', 'a4');
-          const imgProps = pdf.getImageProperties(dataUrl);
-          const pdfWidth = pdf.internal.pageSize.getWidth();
-          const pageHeight = pdf.internal.pageSize.getHeight();
-          const imgHeight = (imgProps.height * pdfWidth) / imgProps.width;
+      if (!invoiceRef.current) {
+        console.error('Invoice template ref not found');
+        return;
+      }
 
-          let heightLeft = imgHeight;
-          let position = 0;
+      // 3. Capture with html2canvas (high scale for quality)
+      const canvas = await html2canvas(invoiceRef.current, {
+        scale: 2,
+        useCORS: true,
+        logging: false,
+        backgroundColor: '#ffffff'
+      });
 
-          // Add first page
-          pdf.addImage(dataUrl, 'PNG', 0, position, pdfWidth, imgHeight);
-          heightLeft -= pageHeight;
+      const imgData = canvas.toDataURL('image/jpeg', 1.0);
 
-          // Add subsequent pages if content is longer than one page
-          while (heightLeft > 0) {
-            position = heightLeft - imgHeight;
-            pdf.addPage();
-            pdf.addImage(dataUrl, 'PNG', 0, position, pdfWidth, imgHeight);
-            heightLeft -= pageHeight;
-          }
+      // 4. Create A4 PDF (210mm x 297mm)
+      const pdf = new jsPDF('p', 'mm', 'a4');
+      const pdfWidth = 210;
+      const pdfHeight = 297;
 
-          const invoiceBlob = pdf.output('blob');
+      // 5. Calculate Scale to FIT Single Page
+      const imgWidth = pdfWidth;
+      const imgHeight = (canvas.height * pdfWidth) / canvas.width;
 
-          if (pdfBill.attachment) {
-            const zip = new JSZip();
-            const fileName = `Invoice_${pdfBill.billNo}`;
+      // If content is taller than A4, scale it down to fit
+      let finalWidth = imgWidth;
+      let finalHeight = imgHeight;
 
-            // Add Invoice PDF
-            zip.file(`${fileName}.pdf`, invoiceBlob);
+      if (imgHeight > pdfHeight) {
+        const scaleFactor = pdfHeight / imgHeight;
+        finalWidth = imgWidth * scaleFactor;
+        finalHeight = pdfHeight; // Fits exactly vertically
+      }
 
-            // Add Attachment
-            try {
-              const response = await fetch(pdfBill.attachment);
-              const attachmentBlob = await response.blob();
-              const ext = pdfBill.attachment.split('.').pop()?.split('?')[0] || 'file';
-              zip.file(`Attachment_of_Bill_${pdfBill.billNo}.${ext}`, attachmentBlob);
-            } catch (err) {
-              console.error('Failed to fetch attachment for ZIP', err);
-            }
+      // Center horizontally if scaled down (though usually we just match width)
+      const xOffset = (pdfWidth - finalWidth) / 2;
+      const yOffset = 0; // Top align
 
-            const zipBlob = await zip.generateAsync({ type: 'blob' });
-            const url = URL.createObjectURL(zipBlob);
-            const link = document.createElement('a');
-            link.href = url;
-            link.download = `${fileName}.zip`;
-            link.click();
-            URL.revokeObjectURL(url);
-          } else {
-            pdf.save(`Invoice_${pdfBill.billNo}.pdf`);
-          }
-        } catch (err) {
-          console.error('Failed to generate PDF', err);
-          alert("Failed to generate PDF. Please try again or check if images are loading.");
-        } finally {
-          setPdfBill(null);
-        }
-      };
+      pdf.addImage(imgData, 'JPEG', xOffset, yOffset, finalWidth, finalHeight);
 
-      generatePDF();
+      // 6. Download the Generated PDF
+      const filename = bill.jobNumber ? `Invoice_${bill.jobNumber}.pdf` : `Invoice_${bill.billNo}.pdf`;
+      pdf.save(filename);
+
+      // Cleanup
+      setPdfBill(null);
+
+    } catch (error) {
+      console.error('Error generating PDF:', error);
+      toast({
+        title: 'Error',
+        description: 'Failed to generate PDF. Please try again.',
+        variant: 'destructive',
+      });
     }
-  }, [pdfBill]);
+  };
 
   const currentCompany = useMemo(() => {
     if (user?.role === 'company' && user.id) {

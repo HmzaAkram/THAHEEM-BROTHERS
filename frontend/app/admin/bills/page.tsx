@@ -36,7 +36,6 @@ import {
   Ship,
   Truck,
   Plane,
-  FileImage,
   FileText,
   User,
   Calendar,
@@ -87,41 +86,70 @@ export default function BillsPage() {
   const [viewDataUrl, setViewDataUrl] = useState<string | null>(null);
 
   const handleDownloadInvoice = async (bill: Bill) => {
-    setLoading(true);
     try {
-      let attachmentDataUrl: string | null = null;
+      setLoading(true);
+      // 1. Set the bill to be viewed (renders the hidden template)
+      setDownloadState({ bill, dataUrl: null });
 
-      if (bill.attachment) {
-        const filename = bill.attachment.split('/').pop();
-        const token = localStorage.getItem('auth_token');
-        console.log('[handleDownloadInvoice] Fetching attachment:', filename);
-        const response = await fetch(`http://localhost:8000/api/v1/bills/attachment/${filename}`, {
-          headers: {
-            'Authorization': `Bearer ${token}`
-          }
-        });
-        if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
-        const blob = await response.blob();
-        console.log('[handleDownloadInvoice] Blob received:', blob.size, 'bytes');
+      // 2. Wait for render
+      await new Promise((resolve) => setTimeout(resolve, 500));
 
-        const reader = new FileReader();
-        attachmentDataUrl = await new Promise<string>((resolve, reject) => {
-          reader.onloadend = () => resolve(reader.result as string);
-          reader.onerror = reject;
-          reader.readAsDataURL(blob);
-        });
+      if (!invoiceRef.current) {
+        console.error('Invoice template ref not found');
+        setLoading(false);
+        return;
       }
 
-      setDownloadState({
-        bill,
-        dataUrl: attachmentDataUrl,
+      // 3. Capture with html2canvas (high scale for quality)
+      const canvas = await html2canvas(invoiceRef.current, {
+        scale: 2,
+        useCORS: true,
+        logging: false,
+        backgroundColor: '#ffffff'
       });
-      console.log('[handleDownloadInvoice] Download state updated with dataUrl length:', attachmentDataUrl?.length || 0);
 
-    } catch (err) {
-      console.error('Pre-load failed', err);
-      // Fallback: Continue without attachment preview
-      setDownloadState({ bill, dataUrl: null });
+      const imgData = canvas.toDataURL('image/jpeg', 1.0);
+
+      // 4. Create A4 PDF (210mm x 297mm)
+      const pdf = new jsPDF('p', 'mm', 'a4');
+      const pdfWidth = 210;
+      const pdfHeight = 297;
+
+      // 5. Calculate Scale to FIT Single Page
+      const imgWidth = pdfWidth;
+      const imgHeight = (canvas.height * pdfWidth) / canvas.width;
+
+      // If content is taller than A4, scale it down to fit
+      let finalWidth = imgWidth;
+      let finalHeight = imgHeight;
+
+      if (imgHeight > pdfHeight) {
+        const scaleFactor = pdfHeight / imgHeight;
+        finalWidth = imgWidth * scaleFactor;
+        finalHeight = pdfHeight; // Fits exactly vertically
+      }
+
+      // Center horizontally if scaled down (though usually we just match width)
+      const xOffset = (pdfWidth - finalWidth) / 2;
+      const yOffset = 0; // Top align
+
+      pdf.addImage(imgData, 'JPEG', xOffset, yOffset, finalWidth, finalHeight);
+
+      // 6. Download the Generated PDF
+      const filename = bill.jobNumber ? `Invoice_${bill.jobNumber}.pdf` : `Invoice_${bill.billNo}.pdf`;
+      pdf.save(filename);
+
+      // Cleanup
+      setDownloadState({ bill: null, dataUrl: null });
+    } catch (error) {
+      console.error('Error generating PDF:', error);
+      toast({
+        title: 'Error',
+        description: 'Failed to generate PDF. Please try again.',
+        variant: 'destructive',
+      });
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -132,38 +160,41 @@ export default function BillsPage() {
 
     if (bill.attachment) {
       try {
+        // Extract filename safely
         const filename = bill.attachment.split('/').pop();
+        if (!filename) throw new Error("Invalid attachment path");
+
         const token = localStorage.getItem('auth_token');
         console.log('[handleViewBill] Fetching attachment:', filename);
+
         const response = await fetch(`http://localhost:8000/api/v1/bills/attachment/${filename}`, {
           headers: {
             'Authorization': `Bearer ${token}`
           }
         });
-        if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
+
+        if (!response.ok) {
+          console.warn(`[handleViewBill] Fetch failed with status: ${response.status}`);
+          // If direct API fetch fails, it might be a public URL or different format
+          // We'll leave viewDataUrl as null, and let the template try its fallback
+          return;
+        }
+
         const blob = await response.blob();
         console.log('[handleViewBill] Blob received:', blob.size, 'bytes');
 
-        const reader = new FileReader();
-        const dataUrl = await new Promise<string>((resolve, reject) => {
-          reader.onloadend = () => resolve(reader.result as string);
-          reader.onerror = reject;
-          reader.readAsDataURL(blob);
-        });
+        // Use Blob URL - more efficient and reliable for PDFs
+        const objectUrl = window.URL.createObjectURL(blob);
+        setViewDataUrl(objectUrl);
 
-        // Ensure the modal is still open for the SAME bill before updating state
-        setSelectedBill(current => {
-          if (current?.id === bill.id) {
-            setViewDataUrl(dataUrl);
-            console.log('[handleViewBill] View dataUrl updated, length:', dataUrl.length);
-          }
-          return current;
-        });
-      } catch (err) {
-        console.error('Failed to pre-load image for view', err);
+      } catch (error) {
+        console.error('Error fetching attachment for view:', error);
+        // Toast optional here, as the modal will still open
       }
     }
   };
+
+
 
   useEffect(() => {
     if (downloadState.bill && invoiceRef.current) {
@@ -465,6 +496,7 @@ export default function BillsPage() {
       console.error('Failed to export PDF', err);
     }
   };
+
 
   return (
     <>
@@ -876,13 +908,13 @@ export default function BillsPage() {
                           </div>
                           <div className="text-center">
                             <p className="text-sm font-semibold text-foreground">Attach Shipment Documents</p>
-                            <p className="text-xs text-muted-foreground mt-1">Upload high-resolution images (JPG, PNG)</p>
+                            <p className="text-xs text-muted-foreground mt-1">Upload PDF Document</p>
                           </div>
                           <div className="relative w-full max-w-xs mt-2">
                             <Input
                               type="file"
                               className="opacity-0 absolute inset-0 w-full h-full cursor-pointer z-10"
-                              accept="image/*"
+                              accept="application/pdf"
                               onChange={(e) => {
                                 const file = e.target.files?.[0];
                                 if (file) setAttachment(file);
@@ -891,11 +923,11 @@ export default function BillsPage() {
                             <div className="flex items-center justify-center gap-2 px-6 py-2.5 border-2 rounded-xl bg-white dark:bg-slate-950 text-sm font-medium text-foreground/80 shadow-sm border-border/50">
                               {attachment ? (
                                 <span className="truncate flex items-center gap-2">
-                                  <FileImage className="w-4 h-4 text-primary" />
+                                  <FileText className="w-4 h-4 text-primary" />
                                   {attachment.name}
                                 </span>
                               ) : (
-                                "Select Image"
+                                "Select PDF"
                               )}
                             </div>
                           </div>
