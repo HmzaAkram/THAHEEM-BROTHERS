@@ -76,30 +76,58 @@ export const InvoiceTemplate = forwardRef<HTMLDivElement, InvoiceTemplateProps>(
                 </div>
                 <div>
                     <h3 className="text-xs font-black uppercase tracking-widest text-slate-400 mb-2 border-b border-slate-200 pb-1">Shipment Details</h3>
-                    <div className="grid grid-cols-2 gap-x-4 gap-y-2 text-sm">
+                    <div className="grid grid-cols-3 gap-x-2 gap-y-2 text-[10px]">
                         <div>
-                            <p className="text-xs text-slate-500 font-semibold">Date</p>
+                            <p className="text-[9px] text-slate-500 font-semibold uppercase">Job No</p>
+                            <p className="font-bold break-words">{bill.jobNumber || bill.billNo}</p>
+                        </div>
+                        <div className="col-span-2">
+                            <p className="text-[9px] text-slate-500 font-semibold uppercase">Exporter</p>
+                            <p className="font-bold break-words">{bill.exporter || '-'}</p>
+                        </div>
+                        <div>
+                            <p className="text-[9px] text-slate-500 font-semibold uppercase">Date</p>
                             <p className="font-bold">{formatDate(bill.date)}</p>
                         </div>
                         <div>
-                            <p className="text-xs text-slate-500 font-semibold">GD Ref</p>
+                            <p className="text-[9px] text-slate-500 font-semibold uppercase">Arrival Date</p>
+                            <p className="font-bold">{bill.invoiceDate ? formatDate(bill.invoiceDate) : '-'}</p>
+                        </div>
+                        <div>
+                            <p className="text-[9px] text-slate-500 font-semibold uppercase">GD Ref</p>
                             <p className="font-bold break-words">{bill.gdNumber || '-'}</p>
                         </div>
                         <div>
-                            <p className="text-xs text-slate-500 font-semibold">Weight</p>
+                            <p className="text-[9px] text-slate-500 font-semibold uppercase">Weight</p>
                             <p className="font-bold break-words">{bill.weight ? `${bill.weight} KG` : '-'}</p>
                         </div>
                         <div>
-                            <p className="text-xs text-slate-500 font-semibold">Packages</p>
+                            <p className="text-[9px] text-slate-500 font-semibold uppercase">Packages</p>
                             <p className="font-bold break-words">{bill.packages || '-'}</p>
                         </div>
                         <div>
-                            <p className="text-xs text-slate-500 font-semibold">Carrier / VIA</p>
+                            <p className="text-[9px] text-slate-500 font-semibold uppercase">VIA</p>
                             <p className="font-bold break-words">{bill.via || '-'}</p>
                         </div>
                         <div>
-                            <p className="text-xs text-slate-500 font-semibold">BE / ED No.</p>
-                            <p className="font-bold break-words">{bill.beNumber || '-'}</p>
+                            <p className="text-[9px] text-slate-500 font-semibold uppercase">IGM No</p>
+                            <p className="font-bold break-words">{bill.igm || '-'}</p>
+                        </div>
+                        <div>
+                            <p className="text-[9px] text-slate-500 font-semibold uppercase">Index No</p>
+                            <p className="font-bold break-words">{bill.indexNo || '-'}</p>
+                        </div>
+                        <div>
+                            <p className="text-[9px] text-slate-500 font-semibold uppercase">HAWB No</p>
+                            <p className="font-bold break-words">{bill.hawb || '-'}</p>
+                        </div>
+                        <div className="col-span-3">
+                            <p className="text-[9px] text-slate-500 font-semibold uppercase">Container Info</p>
+                            <p className="font-bold break-words">
+                                {bill.noOfContainers ? `${bill.noOfContainers}x Containers` : ''}
+                                {bill.containerNo ? ` (${bill.containerNo})` : ''}
+                                {!bill.noOfContainers && !bill.containerNo && '-'}
+                            </p>
                         </div>
                     </div>
                 </div>
@@ -111,8 +139,9 @@ export const InvoiceTemplate = forwardRef<HTMLDivElement, InvoiceTemplateProps>(
                     <thead>
                         <tr className="border-b-2 border-slate-900">
                             <th className="text-left py-2 text-xs font-black uppercase tracking-widest text-slate-600 w-[5%]">#</th>
-                            <th className="text-left py-2 text-xs font-black uppercase tracking-widest text-slate-600 w-[45%]">Description</th>
-                            <th className="text-left py-2 text-xs font-black uppercase tracking-widest text-slate-600 w-[30%]">Notes</th>
+                            <th className="text-left py-2 text-xs font-black uppercase tracking-widest text-slate-600 w-[35%]">Description</th>
+                            <th className="text-left py-2 text-xs font-black uppercase tracking-widest text-slate-600 w-[15%]">Inv. No</th>
+                            <th className="text-left py-2 text-xs font-black uppercase tracking-widest text-slate-600 w-[25%]">Notes</th>
                             <th className="text-right py-2 text-xs font-black uppercase tracking-widest text-slate-600 w-[20%]">Amount</th>
                         </tr>
                     </thead>
@@ -122,6 +151,9 @@ export const InvoiceTemplate = forwardRef<HTMLDivElement, InvoiceTemplateProps>(
                                 <td className="py-2 align-top text-slate-500 font-mono">{index + 1}</td>
                                 <td className="py-2 align-top font-bold text-slate-800 pr-2">
                                     <div className="break-words whitespace-pre-wrap">{item.description}</div>
+                                </td>
+                                <td className="py-2 align-top text-slate-500 font-mono text-xs pr-2">
+                                    <div className="break-words">{item.invoiceNo || '-'}</div>
                                 </td>
                                 <td className="py-2 align-top text-slate-500 text-xs italic pr-2">
                                     <div className="break-words whitespace-pre-wrap">{item.notes || '-'}</div>
