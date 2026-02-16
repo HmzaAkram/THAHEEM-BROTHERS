@@ -9,7 +9,7 @@ class SecurityController extends Controller
 {
     public function index()
     {
-        $user = auth()->user();
+        $user = auth('sanctum')->user();
         if ($user instanceof \App\Models\Company) {
             return response()->json(SecurityTracking::where('company_id', $user->id)->get());
         }
@@ -43,7 +43,7 @@ class SecurityController extends Controller
 
     public function update(Request $request, SecurityTracking $security)
     {
-        $user = auth()->user();
+        $user = auth('sanctum')->user();
         if ($user instanceof \App\Models\Company && $security->company_id !== $user->id) {
             return response()->json(['message' => 'Unauthorized'], 403);
         }
@@ -61,7 +61,7 @@ class SecurityController extends Controller
 
     public function destroy(SecurityTracking $security)
     {
-        $user = auth()->user();
+        $user = auth('sanctum')->user();
         if ($user instanceof \App\Models\Company && $security->company_id !== $user->id) {
             return response()->json(['message' => 'Unauthorized'], 403);
         }

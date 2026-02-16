@@ -155,21 +155,50 @@ export function DataProvider({ children }: { children: ReactNode }) {
 
     try {
       const token = localStorage.getItem('auth_token');
-      const [companiesRes, billsRes, paymentsRes, securitiesRes] = await Promise.all([
+
+      // BUG FIX: Use Promise.allSettled instead of Promise.all
+      // This prevents one API failure from breaking all data fetching
+      const results = await Promise.allSettled([
         ApiService.get('/companies', token),
         ApiService.get('/bills', token),
         ApiService.get('/payments', token),
         ApiService.get('/securities', token),
       ]);
 
-      if (companiesRes.ok) setCompanies((companiesRes as any).data);
-      if (billsRes.ok) setBills((billsRes as any).data);
-      if (paymentsRes.ok) setPayments((paymentsRes as any).data);
-      if (securitiesRes.ok) setSecurities((securitiesRes as any).data);
+      // Handle each result independently
+      const [companiesRes, billsRes, paymentsRes, securitiesRes] = results;
+
+      // SECURITY FIX: Remove unsafe 'as any' casts, use proper type checking
+      if (companiesRes.status === 'fulfilled' && companiesRes.value.ok) {
+        setCompanies(companiesRes.value.data || []);
+      } else {
+        console.error('Failed to load companies:', companiesRes);
+      }
+
+      if (billsRes.status === 'fulfilled' && billsRes.value.ok) {
+        // Handle paginated response from backend
+        const billData = billsRes.value.data;
+        setBills(Array.isArray(billData) ? billData : (billData?.data || []));
+      } else {
+        console.error('Failed to load bills:', billsRes);
+      }
+
+      if (paymentsRes.status === 'fulfilled' && paymentsRes.value.ok) {
+        setPayments(paymentsRes.value.data || []);
+      } else {
+        console.error('Failed to load payments:', paymentsRes);
+      }
+
+      if (securitiesRes.status === 'fulfilled' && securitiesRes.value.ok) {
+        setSecurities(securitiesRes.value.data || []);
+      } else {
+        console.error('Failed to load securities:', securitiesRes);
+      }
 
       setIsLoaded(true);
     } catch (error) {
-      console.error('Error fetching data:', error);
+      console.error('Critical error fetching data:', error);
+      // Don't throw - let app continue with existing data
     }
   }, [isAuthenticated]);
 
@@ -219,21 +248,47 @@ export function DataProvider({ children }: { children: ReactNode }) {
 
   const addPayment = async (paymentData: Omit<Payment, 'id' | 'createdAt'>) => {
     const token = localStorage.getItem('auth_token');
-    const result = await ApiService.post('/payments', paymentData, token);
-    if (result.ok) {
-      setPayments(prev => [...prev, (result as any).data]);
-      // Refresh bills to update their status from the backend calculation
-      const billsRes = await ApiService.get('/bills', token);
-      if (billsRes.ok) setBills((billsRes as any).data);
+
+    // BUG FIX: Optimistic update with rollback to prevent race conditions
+    const tempId = `temp_${Date.now()}_${Math.random()}`;
+    const tempPayment = { ...paymentData, id: tempId, createdAt: new Date().toISOString() } as Payment;
+
+    // Optimistically add payment
+    setPayments(prev => [...prev, tempPayment]);
+
+    try {
+      const result = await ApiService.post('/payments', paymentData, token);
+
+      if (result.ok && result.data) {
+        // Replace temp payment with real one
+        setPayments(prev => prev.map(p => p.id === tempId ? result.data : p));
+
+        // Refresh bills to update their status
+        const billsRes = await ApiService.get('/bills', token);
+        if (billsRes.ok) {
+          const billData = billsRes.data;
+          setBills(Array.isArray(billData) ? billData : (billData?.data || []));
+        }
+
+        return result;
+      } else {
+        // Rollback on failure
+        setPayments(prev => prev.filter(p => p.id !== tempId));
+        return result;
+      }
+    } catch (error) {
+      // Rollback on exception
+      setPayments(prev => prev.filter(p => p.id !== tempId));
+      console.error('Payment creation failed:', error);
+      throw error;
     }
-    return result;
   };
 
   const addSecurity = async (securityData: Omit<SecurityTracking, 'id' | 'createdAt' | 'status'>) => {
     const token = localStorage.getItem('auth_token');
     const result = await ApiService.post('/securities', securityData, token);
-    if (result.ok) {
-      setSecurities(prev => [...prev, (result as any).data]);
+    if (result.ok && result.data) {
+      setSecurities(prev => [...prev, result.data]);
     }
     return result;
   };
@@ -241,13 +296,14 @@ export function DataProvider({ children }: { children: ReactNode }) {
   const updateSecurity = async (id: string, data: Partial<SecurityTracking>) => {
     const token = localStorage.getItem('auth_token');
     const result = await ApiService.put(`/securities/${id}`, data, token);
-    if (result.ok) {
-      setSecurities(prev => prev.map(s => s.id === id ? (result as any).data : s));
+    if (result.ok && result.data) {
+      setSecurities(prev => prev.map(s => s.id === id ? result.data : s));
     }
   };
 
   const getCompanyLedger = (companyId: string): LedgerEntry[] => {
-    const companyBills = bills.filter(b => b.companyId == companyId).map(b => ({
+    // BUG FIX: Use strict equality (===) to prevent type confusion auth bypass
+    const companyBills = bills.filter(b => String(b.companyId) === String(companyId)).map(b => ({
       id: b.id + '_debit',
       date: b.date,
       description: `Invoice #${b.billNo}`,
@@ -263,9 +319,10 @@ export function DataProvider({ children }: { children: ReactNode }) {
       jobNumber: b.jobNumber
     }));
 
-    const companyPayments = payments.filter(p => p.companyId == companyId).map(p => {
+    const companyPayments = payments.filter(p => String(p.companyId) === String(companyId)).map(p => {
       // Find linked bill to get Job Number if available
-      const linkedBill = bills.find(b => b.id == p.billId);
+      // BUG FIX: Use strict equality here too
+      const linkedBill = bills.find(b => String(b.id) === String(p.billId));
 
       return {
         id: p.id + '_credit',

@@ -9,7 +9,7 @@ class PaymentController extends Controller
 {
     public function index()
     {
-        $user = auth()->user();
+        $user = auth('sanctum')->user();
         if ($user instanceof \App\Models\Company) {
             return response()->json(Payment::where('company_id', $user->id)->get());
         }
@@ -39,7 +39,7 @@ class PaymentController extends Controller
 
     public function destroy(Payment $payment)
     {
-        $user = auth()->user();
+        $user = auth('sanctum')->user();
         if ($user instanceof \App\Models\Company && $payment->company_id !== $user->id) {
             return response()->json(['message' => 'Unauthorized'], 403);
         }

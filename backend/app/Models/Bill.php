@@ -51,6 +51,12 @@ class Bill extends Model
 
     public function getPaidAmountAttribute()
     {
+        // PERFORMANCE FIX: Use eager-loaded sum if available (prevents N+1 queries)
+        if (isset($this->payments_sum_amount)) {
+            return (float) ($this->payments_sum_amount + ($this->payments_sum_adjustment ?? 0));
+        }
+        
+        // Fallback to relationship query (when not eager loaded)
         return (float) ($this->payments()->sum('amount') + $this->payments()->sum('adjustment'));
     }
 

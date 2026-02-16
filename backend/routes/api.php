@@ -8,7 +8,9 @@ use App\Http\Controllers\PaymentController;
 use App\Http\Controllers\SecurityController;
 use App\Http\Controllers\BackupController;
 
-Route::post('/login', [AuthController::class, 'login']);
+// Public routes
+Route::post('/login', [AuthController::class, 'login'])
+    ->middleware('throttle:5,1');  // SECURITY: Rate limiting - 5 attempts per minute
 
 Route::middleware('auth.token')->group(function () {
     Route::post('/logout', [AuthController::class, 'logout']);

@@ -5,6 +5,17 @@
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000/api';
 
+/**
+ * TYPE SAFETY: Properly typed API response interface
+ */
+export interface ApiResponse<T = any> {
+    ok: boolean;
+    status?: number;
+    message?: string;
+    data?: T;
+}
+
+
 class ApiService {
     private static getHeaders(token?: string | null) {
         const headers: HeadersInit = {

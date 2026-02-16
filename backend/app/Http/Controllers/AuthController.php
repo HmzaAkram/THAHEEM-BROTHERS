@@ -35,8 +35,8 @@ class AuthController extends Controller
             ->orWhere('email', $login)
             ->first();
 
-        // Plain text comparison for companies to allow admin visibility
-        if ($company && $password === $company->password) {
+        // SECURITY FIX: Use Hash::check for secure password comparison
+        if ($company && \Illuminate\Support\Facades\Hash::check($password, $company->password)) {
             $token = $company->createToken('auth_token')->plainTextToken;
             return response()->json([
                 'access_token' => $token,
@@ -54,7 +54,7 @@ class AuthController extends Controller
 
     public function logout(Request $request)
     {
-        $request->user()->currentAccessToken()->delete();
+        auth('sanctum')->user()->currentAccessToken()->delete();
 
         return response()->json([
             'message' => 'Logged out successfully'
@@ -63,6 +63,6 @@ class AuthController extends Controller
 
     public function me(Request $request)
     {
-        return response()->json($request->user());
+        return response()->json(auth('sanctum')->user());
     }
 }

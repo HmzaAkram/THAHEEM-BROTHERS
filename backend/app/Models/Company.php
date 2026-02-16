@@ -4,24 +4,44 @@ namespace App\Models;
 
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Database\Eloquent\Relations\HasMany;
-use App\Traits\HasApiTokens;
+use Laravel\Sanctum\HasApiTokens;
 
 class Company extends Authenticatable
 {
     use HasApiTokens;
 
     protected $fillable = [
-
         'name',
-        'identifier',
         'email',
         'phone',
         'address',
         'city',
         'ntn',
         'username',
-        'password',
         'status',
+        'password',
+    ];
+
+    /**
+     * The attributes that are not mass assignable.
+     * Protects critical fields from mass assignment vulnerabilities.
+     *
+     * @var list<string>
+     */
+    protected $guarded = [
+        'id',
+        'identifier',  // Auto-generated, should not be manually set
+        'created_at',
+        'updated_at',
+    ];
+
+    /**
+     * The attributes that should be hidden for serialization.
+     *
+     * @var list<string>
+     */
+    protected $hidden = [
+        'password',  // Never expose password in API responses
     ];
 
     protected $appends = ['role', 'identifier', 'balance'];
@@ -58,5 +78,17 @@ class Company extends Authenticatable
     public function securities(): HasMany
     {
         return $this->hasMany(SecurityTracking::class);
+    }
+
+    /**
+     * Get the attributes that should be cast.
+     *
+     * @return array<string, string>
+     */
+    protected function casts(): array
+    {
+        return [
+            'password' => 'hashed',  // Automatically hash passwords
+        ];
     }
 }

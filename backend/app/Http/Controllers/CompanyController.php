@@ -10,7 +10,7 @@ class CompanyController extends Controller
 {
     public function index()
     {
-        $user = auth()->user();
+        $user = auth('sanctum')->user();
         if ($user instanceof \App\Models\Company) {
             return response()->json([$user]);
         }
@@ -19,7 +19,7 @@ class CompanyController extends Controller
 
     public function store(Request $request)
     {
-        $user = auth()->user();
+        $user = auth('sanctum')->user();
         if (!$user instanceof \App\Models\User || $user->role !== 'admin') {
             return response()->json(['message' => 'Unauthorized. Admin access required.'], 403);
         }
@@ -45,10 +45,8 @@ class CompanyController extends Controller
                 $validated['identifier'] = 'C' . $nextId;
             }
 
-            // Passwords stored in plain text for admin visibility as requested
-            // if (isset($validated['password'])) {
-            //     $validated['password'] = Hash::make($validated['password']);
-            // }
+            // Password is automatically hashed via Company model's 'hashed' cast
+            // No manual hashing needed - Laravel handles it securely
 
             $company = Company::create($validated);
 
@@ -72,12 +70,14 @@ class CompanyController extends Controller
         return response()->json($company->load(['bills', 'payments', 'securities']));
     }
 
-    public function update(Request $request, Company $company)
+    public function update(Request $request, $id)
     {
-        $user = auth()->user();
+        $user = auth('sanctum')->user();
         if (!$user instanceof \App\Models\User || $user->role !== 'admin') {
             return response()->json(['message' => 'Unauthorized. Admin access required.'], 403);
         }
+
+        $company = Company::findOrFail($id);
 
         $validated = $request->validate([
             'name' => 'required|string|max:255',
@@ -91,24 +91,22 @@ class CompanyController extends Controller
             'status' => 'nullable|string',
         ]);
 
-        // Passwords stored in plain text for admin visibility as requested
-        // if (isset($validated['password'])) {
-        //     $validated['password'] = Hash::make($validated['password']);
-        // }
-
+        // Password is automatically hashed via Company model's 'hashed' cast
+        // No manual hashing needed - Laravel handles it securely
         $company->update($validated);
 
 
         return response()->json($company);
     }
 
-    public function destroy(Company $company)
+    public function destroy($id)
     {
-        $user = auth()->user();
+        $user = auth('sanctum')->user();
         if (!$user instanceof \App\Models\User || $user->role !== 'admin') {
             return response()->json(['message' => 'Unauthorized. Admin access required.'], 403);
         }
 
+        $company = Company::findOrFail($id);
         $company->delete();
         return response()->json(null, 204);
     }

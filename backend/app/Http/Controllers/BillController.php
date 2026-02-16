@@ -11,14 +11,26 @@ class BillController extends Controller
 {
     public function index()
     {
-        $user = auth()->user();
+        $user = auth('sanctum')->user();
+        
+        // PERFORMANCE FIX: Eager load relationships to prevent N+1 queries
+        // Also added pagination to prevent memory exhaustion with large datasets
         if ($user instanceof \App\Models\Company) {
-            $bills = Bill::with(['items', 'company'])->where('company_id', $user->id)->orderBy('id', 'desc')->get();
+            $bills = Bill::with(['items', 'company', 'payments'])
+                ->where('company_id', $user->id)
+                ->orderBy('id', 'desc')
+                ->paginate(50);  // 50 bills per page
         } else {
-            $bills = Bill::with(['items', 'company'])->orderBy('id', 'desc')->get();
+            $bills = Bill::with(['items', 'company', 'payments'])
+                ->orderBy('id', 'desc')
+                ->paginate(50);  // 50 bills per page
         }
 
-        $bills->each(function ($bill) {
+        // Load payment sums to optimize appended attributes
+        $bills->getCollection()->loadSum('payments', 'amount');
+        $bills->getCollection()->loadSum('payments', 'adjustment');
+
+        $bills->getCollection()->each(function ($bill) {
             if ($bill->attachment) {
                 $bill->attachment = $this->ensureAbsoluteUrl($bill->attachment);
             }
@@ -65,16 +77,47 @@ class BillController extends Controller
         return DB::transaction(function () use ($validated, $request) {
             $billData = collect($validated)->except(['items', 'attachment'])->toArray();
             
-            // Handle Attachment Storage
+            // SECURITY FIX: Proper file upload validation
             if ($request->filled('attachment')) {
                 $attachmentData = $request->input('attachment');
                 if (str_starts_with($attachmentData, 'data:')) {
-                    // It's a base64 string
-                    $format = explode('/', explode(':', substr($attachmentData, 0, strpos($attachmentData, ';')))[1])[1];
+                    // Parse MIME type from base64 string
+                    $mimeTypePart = explode(':', substr($attachmentData, 0, strpos($attachmentData, ';')))[1];
+                    $format = explode('/', $mimeTypePart)[1];
                     $image = str_replace(' ', '+', explode(',', $attachmentData)[1]);
-                    $fileName = 'bill_' . time() . '_' . uniqid() . '.' . $format;
                     
-                    \Illuminate\Support\Facades\Storage::disk('public')->put('attachments/' . $fileName, base64_decode($image));
+                    // Decode and validate MIME type
+                    $decodedData = base64_decode($image);
+                    $finfo = new \finfo(FILEINFO_MIME_TYPE);
+                    $actualMimeType = $finfo->buffer($decodedData);
+                    
+                    // SECURITY: Only allow safe file types
+                    $allowedMimes = [
+                        'image/jpeg' => 'jpg',
+                        'image/png' => 'png',
+                        'application/pdf' => 'pdf',
+                    ];
+                    
+                    if (!isset($allowedMimes[$actualMimeType])) {
+                        return response()->json([
+                            'message' => 'Invalid file type. Only JPEG, PNG, and PDF files are allowed.',
+                            'errors' => ['attachment' => ['File type not allowed']]
+                        ], 422);
+                    }
+                    
+                    // Check file size (10MB max)
+                    if (strlen($decodedData) > 10 * 1024 * 1024) {
+                        return response()->json([
+                            'message' => 'File too large. Maximum size is 10MB.',
+                            'errors' => ['attachment' => ['File exceeds size limit']]
+                        ], 422);
+                    }
+                    
+                    $extension = $allowedMimes[$actualMimeType];
+                    $fileName = 'bill_' . time() . '_' . uniqid() . '.' . $extension;
+                    
+                    // Store in public storage (accessible via URL)
+                    \Illuminate\Support\Facades\Storage::disk('public')->put('attachments/' . $fileName, $decodedData);
                     $url = \Illuminate\Support\Facades\Storage::url('attachments/' . $fileName);
                     $billData['attachment'] = str_starts_with($url, 'http') ? $url : config('app.url') . $url;
                 } else {
@@ -101,7 +144,7 @@ class BillController extends Controller
 
     public function show(Bill $bill)
     {
-        $user = auth()->user();
+        $user = auth('sanctum')->user();
         if ($user instanceof \App\Models\Company && $bill->company_id !== $user->id) {
             return response()->json(['message' => 'Unauthorized'], 403);
         }
@@ -123,7 +166,7 @@ class BillController extends Controller
 
     public function update(Request $request, Bill $bill)
     {
-        $user = auth()->user();
+        $user = auth('sanctum')->user();
         if ($user instanceof \App\Models\Company && $bill->company_id !== $user->id) {
             return response()->json(['message' => 'Unauthorized'], 403);
         }
@@ -138,7 +181,7 @@ class BillController extends Controller
 
     public function destroy(Bill $bill)
     {
-        $user = auth()->user();
+        $user = auth('sanctum')->user();
         if ($user instanceof \App\Models\Company && $bill->company_id !== $user->id) {
             return response()->json(['message' => 'Unauthorized'], 403);
         }
