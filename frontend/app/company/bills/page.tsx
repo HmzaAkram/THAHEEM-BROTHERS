@@ -52,10 +52,28 @@ export default function CompanyBillsPage() {
     if (pdfBill && invoiceRef.current) {
       const generatePDF = async () => {
         try {
-          // Small delay to ensure render
-          await new Promise(resolve => setTimeout(resolve, 100));
+          // Wait for images to load in the capture area
+          const images = invoiceRef.current?.querySelectorAll('img');
+          if (images) {
+            await Promise.all(
+              Array.from(images).map(img => {
+                if (img.complete) return Promise.resolve();
+                return new Promise(resolve => {
+                  img.onload = resolve;
+                  img.onerror = resolve; // Continue even if one image fails
+                });
+              })
+            );
+          }
 
-          const dataUrl = await toPng(invoiceRef.current!, { cacheBust: true, pixelRatio: 2 });
+          // Small delay to ensure paint
+          await new Promise(resolve => setTimeout(resolve, 300));
+
+          const dataUrl = await toPng(invoiceRef.current!, {
+            cacheBust: true,
+            pixelRatio: 2,
+            skipFonts: true, // Speeds up generation
+          });
           const pdf = new jsPDF('p', 'mm', 'a4');
           const imgProps = pdf.getImageProperties(dataUrl);
           const pdfWidth = pdf.internal.pageSize.getWidth();
@@ -65,6 +83,7 @@ export default function CompanyBillsPage() {
           pdf.save(`Invoice_${pdfBill.billNo}.pdf`);
         } catch (err) {
           console.error('Failed to generate PDF', err);
+          alert("Failed to generate PDF. Please try again or check if images are loading.");
         } finally {
           setPdfBill(null);
         }
@@ -101,6 +120,16 @@ export default function CompanyBillsPage() {
     if (!tableRef.current) return;
 
     try {
+      // Wait for images
+      const images = tableRef.current.querySelectorAll('img');
+      await Promise.all(
+        Array.from(images).map(img => {
+          if (img.complete) return Promise.resolve();
+          return new Promise(resolve => { img.onload = resolve; img.onerror = resolve; });
+        })
+      );
+      await new Promise(resolve => setTimeout(resolve, 300));
+
       const dataUrl = await toPng(tableRef.current, { cacheBust: true, style: { background: 'white', padding: '20px' } });
       const pdf = new jsPDF('p', 'mm', 'a4');
       const imgProps = pdf.getImageProperties(dataUrl);
