@@ -26,15 +26,15 @@ class BackupController extends Controller
             $filename = 'thaheem_backup_' . date('Y-m-d_His') . '.sql';
             $path = storage_path('app/' . $filename);
 
-            // Try to find mysqldump path on Windows
+            // Try to find mysqldump path on Windows or use from PATH
             $mysqldump = 'mysqldump';
             if (strtoupper(substr(PHP_OS, 0, 3)) === 'WIN') {
                 $possiblePaths = [
                     'C:\\xampp\\mysql\\bin\\mysqldump.exe',
+                    'D:\\xampp\\mysql\\bin\\mysqldump.exe',
                     'C:\\wamp64\\bin\\mysql\\mysql' . config('database.connections.mysql.version', '8.0') . '\\bin\\mysqldump.exe',
                     'C:\\Program Files\\MySQL\\MySQL Server 8.0\\bin\\mysqldump.exe',
                     'C:\\Program Files\\MySQL\\MySQL Server 5.7\\bin\\mysqldump.exe',
-                    'D:\\xampp\\mysql\\bin\\mysqldump.exe',
                 ];
 
                 foreach ($possiblePaths as $p) {
@@ -46,8 +46,9 @@ class BackupController extends Controller
             }
 
             // Command for mysqldump
+            // Note: We use --no-tablespaces to avoid permission issues when not running as root/admin
             $command = sprintf(
-                '%s --user=%s --password=%s --host=%s %s > %s',
+                '%s --user=%s --password=%s --host=%s --no-tablespaces %s > %s',
                 $mysqldump,
                 escapeshellarg($username),
                 escapeshellarg($password),
@@ -61,17 +62,17 @@ class BackupController extends Controller
             exec($command . ' 2>&1', $output, $returnVar);
 
             if ($returnVar === 0 && file_exists($path)) {
-                // Ensure the response clearly identifies the file as .sql
                 return response()->download($path, $filename)->deleteFileAfterSend(true);
             }
 
             return response()->json([
                 'error' => 'MySQL dump failed. ' . implode("\n", $output),
-                'debug' => [
-                    'command' => str_replace($password, '********', $command),
-                    'mysqldump' => $mysqldump,
-                    'return_var' => $returnVar,
-                    'connection_found' => $connection
+                'diagnostics' => [
+                    'mysqldump_command' => $mysqldump,
+                    'return_code' => $returnVar,
+                    'output' => $output,
+                    'database' => $database,
+                    'host' => $host
                 ]
             ], 500);
         }
@@ -110,9 +111,9 @@ class BackupController extends Controller
             if (strtoupper(substr(PHP_OS, 0, 3)) === 'WIN') {
                 $possiblePaths = [
                     'C:\\xampp\\mysql\\bin\\mysql.exe',
+                    'D:\\xampp\\mysql\\bin\\mysql.exe',
                     'C:\\wamp64\\bin\\mysql\\mysql' . config('database.connections.mysql.version', '8.0') . '\\bin\\mysql.exe',
                     'C:\\Program Files\\MySQL\\MySQL Server 8.0\\bin\\mysql.exe',
-                    'D:\\xampp\\mysql\\bin\\mysql.exe',
                 ];
 
                 foreach ($possiblePaths as $p) {
@@ -145,7 +146,13 @@ class BackupController extends Controller
 
             return response()->json([
                 'error' => 'MySQL restore failed. ' . implode("\n", $output),
-                'debug' => str_replace($password, '********', $command)
+                'diagnostics' => [
+                    'mysql_command' => $mysql,
+                    'return_code' => $returnVar,
+                    'output' => $output,
+                    'database' => $database,
+                    'host' => $host
+                ]
             ], 500);
         }
 

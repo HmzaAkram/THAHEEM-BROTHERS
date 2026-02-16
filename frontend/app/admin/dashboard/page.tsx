@@ -480,7 +480,7 @@ export default function AdminDashboard() {
                       </div>
                     ) : (
                       recentActions.map((action) => (
-                        <div key={action.id} className="flex items-start justify-between group p-3 rounded-lg hover:bg-white dark:hover:bg-slate-800 transition-all duration-200 border border-transparent hover:border-border/50 shadow-sm hover:shadow-md">
+                        <div key={`${action.type}-${action.id}`} className="flex items-start justify-between group p-3 rounded-lg hover:bg-white dark:hover:bg-slate-800 transition-all duration-200 border border-transparent hover:border-border/50 shadow-sm hover:shadow-md">
                           <div className="flex gap-4 items-center">
                             <div className={`p-2 rounded-full ring-2 ring-opacity-20 ${action.type === 'BILL' ? 'bg-blue-100 text-blue-600 ring-blue-500' :
                               action.type === 'PAYMENT' ? 'bg-green-100 text-green-600 ring-green-500' :
@@ -513,18 +513,18 @@ export default function AdminDashboard() {
                         <p>No recent bills.</p>
                       </div>
                     ) : (
-                      recentBills.map((action) => (
-                        <div key={action.id} className="flex items-start justify-between group p-3 rounded-lg hover:bg-white dark:hover:bg-slate-800 transition-all duration-200 border border-transparent hover:border-border/50 shadow-sm hover:shadow-md">
+                      recentBills.map((bill) => (
+                        <div key={`bill-${bill.id}`} className="flex items-center justify-between p-3 rounded-lg hover:bg-white dark:hover:bg-slate-800 transition-all duration-200 border border-transparent hover:border-border/50 shadow-sm hover:shadow-md py-4">
                           <div className="flex gap-4 items-center">
                             <div className="p-2 rounded-full ring-2 ring-opacity-20 bg-blue-100 text-blue-600 ring-blue-500">
                               <FileText className="w-4 h-4" />
                             </div>
                             <div>
                               <p className="font-semibold text-sm text-foreground group-hover:text-primary transition-colors">
-                                {action.title}
+                                {bill.title}
                               </p>
                               <p className="text-xs text-muted-foreground">
-                                {action.subtitle}
+                                {bill.subtitle}
                               </p>
                             </div>
                           </div>
@@ -542,18 +542,18 @@ export default function AdminDashboard() {
                         <p>No recent payments.</p>
                       </div>
                     ) : (
-                      recentPayments.map((action) => (
-                        <div key={action.id} className="flex items-start justify-between group p-3 rounded-lg hover:bg-white dark:hover:bg-slate-800 transition-all duration-200 border border-transparent hover:border-border/50 shadow-sm hover:shadow-md">
+                      recentPayments.map((payment) => (
+                        <div key={`payment-${payment.id}`} className="flex items-center justify-between p-3 rounded-lg hover:bg-white dark:hover:bg-slate-800 transition-all duration-200 border border-transparent hover:border-border/50 shadow-sm hover:shadow-md py-4">
                           <div className="flex gap-4 items-center">
                             <div className="p-2 rounded-full ring-2 ring-opacity-20 bg-green-100 text-green-600 ring-green-500">
                               <DollarSign className="w-4 h-4" />
                             </div>
                             <div>
                               <p className="font-semibold text-sm text-foreground group-hover:text-primary transition-colors">
-                                {action.title}
+                                {payment.title}
                               </p>
                               <p className="text-xs text-muted-foreground">
-                                {action.subtitle}
+                                {payment.subtitle}
                               </p>
                             </div>
                           </div>
