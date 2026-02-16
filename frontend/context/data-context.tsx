@@ -184,7 +184,9 @@ export function DataProvider({ children }: { children: ReactNode }) {
       }
 
       if (paymentsRes.status === 'fulfilled' && paymentsRes.value.ok) {
-        setPayments(paymentsRes.value.data || []);
+        // PAGINATION FIX: Handle paginated response from backend
+        const paymentData = paymentsRes.value.data;
+        setPayments(Array.isArray(paymentData) ? paymentData : (paymentData?.data || []));
       } else {
         console.error('Failed to load payments:', paymentsRes);
       }
@@ -224,8 +226,8 @@ export function DataProvider({ children }: { children: ReactNode }) {
   const updateCompany = async (id: string, data: Partial<Company>) => {
     const token = localStorage.getItem('auth_token');
     const result = await ApiService.put(`/companies/${id}`, data, token);
-    if (result.ok) {
-      setCompanies(prev => prev.map(c => c.id === id ? (result as any).data : c));
+    if (result.ok && result.data) {
+      setCompanies(prev => prev.map(c => c.id === id ? result.data : c));
     }
   };
 
@@ -240,8 +242,8 @@ export function DataProvider({ children }: { children: ReactNode }) {
   const addBill = async (billData: Omit<Bill, 'id' | 'createdAt' | 'paidAmount' | 'status' | 'calculatedStatus'>) => {
     const token = localStorage.getItem('auth_token');
     const result = await ApiService.post('/bills', billData, token);
-    if (result.ok) {
-      setBills(prev => [...prev, (result as any).data]);
+    if (result.ok && result.data) {
+      setBills(prev => [...prev, result.data]);
     }
     return result;
   };
@@ -302,8 +304,8 @@ export function DataProvider({ children }: { children: ReactNode }) {
   };
 
   const getCompanyLedger = (companyId: string): LedgerEntry[] => {
-    // BUG FIX: Use strict equality (===) to prevent type confusion auth bypass
-    const companyBills = bills.filter(b => String(b.companyId) === String(companyId)).map(b => ({
+    // BUG FIX: Use numeric equality to prevent type confusion
+    const companyBills = bills.filter(b => Number(b.companyId) === Number(companyId)).map(b => ({
       id: b.id + '_debit',
       date: b.date,
       description: `Invoice #${b.billNo}`,
@@ -319,10 +321,10 @@ export function DataProvider({ children }: { children: ReactNode }) {
       jobNumber: b.jobNumber
     }));
 
-    const companyPayments = payments.filter(p => String(p.companyId) === String(companyId)).map(p => {
+    const companyPayments = payments.filter(p => Number(p.companyId) === Number(companyId)).map(p => {
       // Find linked bill to get Job Number if available
-      // BUG FIX: Use strict equality here too
-      const linkedBill = bills.find(b => String(b.id) === String(p.billId));
+      // BUG FIX: Use numeric equality here too
+      const linkedBill = bills.find(b => Number(b.id) === Number(p.billId));
 
       return {
         id: p.id + '_credit',

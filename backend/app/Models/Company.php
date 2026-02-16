@@ -58,6 +58,12 @@ class Company extends Authenticatable
 
     public function getBalanceAttribute()
     {
+        // PERFORMANCE FIX: Use eager-loaded sum if available to prevent N+1 queries
+        if (isset($this->bills_sum_grand_total) && isset($this->payments_sum_amount)) {
+            return ($this->bills_sum_grand_total ?? 0) - ($this->payments_sum_amount ?? 0);
+        }
+        
+        // Fallback for single company loads (when not eager-loaded)
         $billed = (float) $this->bills()->sum('grand_total');
         $paid = (float) $this->payments()->sum('amount');
         return $billed - $paid;

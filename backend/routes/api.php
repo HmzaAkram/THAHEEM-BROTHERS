@@ -9,10 +9,11 @@ use App\Http\Controllers\SecurityController;
 use App\Http\Controllers\BackupController;
 
 // Public routes
-Route::post('/login', [AuthController::class, 'login'])
+Route::post('/v1/login', [AuthController::class, 'login'])
     ->middleware('throttle:5,1');  // SECURITY: Rate limiting - 5 attempts per minute
 
-Route::middleware('auth.token')->group(function () {
+// Protected v1 API routes
+Route::prefix('v1')->middleware('auth.token')->group(function () {
     Route::post('/logout', [AuthController::class, 'logout']);
     Route::get('/me', [AuthController::class, 'me']);
 

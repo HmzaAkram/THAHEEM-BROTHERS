@@ -3,7 +3,7 @@
  * Provides unified error handling, token management, and property naming conversion.
  */
 
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000/api';
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000/api/v1';
 
 /**
  * TYPE SAFETY: Properly typed API response interface
@@ -70,10 +70,17 @@ class ApiService {
     static async post(endpoint: string, body: any, token?: string | null) {
         try {
             const snakeBody = this.camelToSnake(body);
+            const bodyString = JSON.stringify(snakeBody);
+
+            // SECURITY: Prevent DoS attacks with large payloads (10MB limit)
+            if (bodyString.length > 10 * 1024 * 1024) {
+                return { ok: false, message: 'Request payload too large (max 10MB)' };
+            }
+
             const response = await fetch(`${API_BASE_URL}${endpoint}`, {
                 method: 'POST',
                 headers: this.getHeaders(token),
-                body: JSON.stringify(snakeBody),
+                body: bodyString,
             });
             return await this.handleResponse(response);
         } catch (error) {

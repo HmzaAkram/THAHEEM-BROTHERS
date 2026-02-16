@@ -14,7 +14,14 @@ class CompanyController extends Controller
         if ($user instanceof \App\Models\Company) {
             return response()->json([$user]);
         }
-        return response()->json(Company::all());
+        
+        // PERFORMANCE FIX: Prevent N+1 query in balance calculation
+        // Load aggregated sums for bills and payments to avoid multiple queries
+        return response()->json(
+            Company::withSum('bills', 'grand_total')
+                ->withSum('payments', 'amount')
+                ->get()
+        );
     }
 
     public function store(Request $request)
@@ -27,14 +34,14 @@ class CompanyController extends Controller
         try {
             $validated = $request->validate([
                 'name' => 'required|string|max:255',
-                'email' => 'nullable|email',
-                'phone' => 'nullable|string',
-                'address' => 'nullable|string',
-                'city' => 'nullable|string',
-                'ntn' => 'nullable|string',
-                'username' => 'nullable|string',
-                'password' => 'nullable|string',
-                'status' => 'nullable|string',
+                'email' => 'nullable|email|unique:companies,email',
+                'phone' => 'nullable|string|max:20',
+                'address' => 'nullable|string|max:500',
+                'city' => 'nullable|string|max:100',
+                'ntn' => 'nullable|string|max:50',
+                'username' => 'nullable|string|max:50|unique:companies,username|regex:/^[a-zA-Z0-9_]+$/',
+                'password' => 'nullable|string|min:8|regex:/^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)/',
+                'status' => 'nullable|string|in:Active,Inactive',
             ]);
 
             // Generate C-ID identifier (e.g., C1, C2, C3)
@@ -81,14 +88,14 @@ class CompanyController extends Controller
 
         $validated = $request->validate([
             'name' => 'required|string|max:255',
-            'email' => 'nullable|email',
-            'phone' => 'nullable|string',
-            'address' => 'nullable|string',
-            'city' => 'nullable|string',
-            'ntn' => 'nullable|string',
-            'username' => 'nullable|string',
-            'password' => 'nullable|string',
-            'status' => 'nullable|string',
+            'email' => 'nullable|email|unique:companies,email,' . $id,
+            'phone' => 'nullable|string|max:20',
+            'address' => 'nullable|string|max:500',
+            'city' => 'nullable|string|max:100',
+            'ntn' => 'nullable|string|max:50',
+            'username' => 'nullable|string|max:50|unique:companies,username,' . $id . '|regex:/^[a-zA-Z0-9_]+$/',
+            'password' => 'nullable|string|min:8|regex:/^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)/',
+            'status' => 'nullable|string|in:Active,Inactive',
         ]);
 
         // Password is automatically hashed via Company model's 'hashed' cast

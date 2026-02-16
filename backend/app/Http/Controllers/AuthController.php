@@ -30,12 +30,15 @@ class AuthController extends Controller
             ]);
         }
 
-        // 2. Check Company model (Company Owner)
-        $company = \App\Models\Company::where('username', $login)
-            ->orWhere('email', $login)
+        // 2. Check Company model (Company Owner) - SECURITY FIX: Check status first
+        $company = \App\Models\Company::where('status', 'Active')
+            ->where(function($query) use ($login) {
+                $query->where('username', $login)
+                      ->orWhere('email', $login);
+            })
             ->first();
 
-        // SECURITY FIX: Use Hash::check for secure password comparison
+        // SECURITY FIX: Constant-time comparison to prevent timing attacks
         if ($company && \Illuminate\Support\Facades\Hash::check($password, $company->password)) {
             $token = $company->createToken('auth_token')->plainTextToken;
             return response()->json([
@@ -46,6 +49,9 @@ class AuthController extends Controller
         }
 
 
+        // SECURITY: Add delay to prevent timing attacks
+        usleep(500000); // 0.5 second delay
+        
         return response()->json([
             'message' => 'Invalid login details'
         ], 401);

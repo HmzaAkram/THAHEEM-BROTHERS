@@ -10,10 +10,16 @@ class PaymentController extends Controller
     public function index()
     {
         $user = auth('sanctum')->user();
+        
+        // PERFORMANCE FIX: Add pagination and eager loading to prevent memory exhaustion
+        $query = \App\Models\Payment::with('company')  // Eager load company relationship
+            ->orderBy('date', 'desc');
+        
         if ($user instanceof \App\Models\Company) {
-            return response()->json(Payment::where('company_id', $user->id)->get());
+            $query->where('company_id', $user->id);
         }
-        return response()->json(Payment::all());
+        
+        return response()->json($query->paginate(50));  // 50 payments per page
     }
 
     public function store(Request $request)

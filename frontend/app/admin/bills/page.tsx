@@ -204,7 +204,7 @@ export default function BillsPage() {
 
   const totalAmount = items.reduce((sum, item) => sum + (Number(item.amount) || 0), 0);
   const calculatedSalesTax = (Number(salesTax) * 0.15) || 0;
-  const grandTotal = totalAmount + (Number(serviceCharges) || 0) + calculatedSalesTax - (Number(advancePayment) || 0);
+  const grandTotal = totalAmount + (Number(serviceCharges) || 0) + calculatedSalesTax; // Gross Total (Advance not deducted)
 
   const handleAddItem = () => {
     setItems([...items, { description: 'DUTY TAXES & ETO', notes: '', amount: 0, invoiceNo: '' }]);

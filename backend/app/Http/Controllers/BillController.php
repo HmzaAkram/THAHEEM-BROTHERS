@@ -105,16 +105,18 @@ class BillController extends Controller
                         ], 422);
                     }
                     
-                    // Check file size (10MB max)
-                    if (strlen($decodedData) > 10 * 1024 * 1024) {
+                    // SECURITY: Check file size (5MB max to prevent DoS)
+                    if (strlen($decodedData) > 5 * 1024 * 1024) {
                         return response()->json([
-                            'message' => 'File too large. Maximum size is 10MB.',
+                            'message' => 'File too large. Maximum size is 5MB.',
                             'errors' => ['attachment' => ['File exceeds size limit']]
                         ], 422);
                     }
                     
                     $extension = $allowedMimes[$actualMimeType];
-                    $fileName = 'bill_' . time() . '_' . uniqid() . '.' . $extension;
+                    
+                    // SECURITY: Use UUID for unpredictable filenames
+                    $fileName = 'bill_' . \Illuminate\Support\Str::uuid() . '.' . $extension;
                     
                     // Store in public storage (accessible via URL)
                     \Illuminate\Support\Facades\Storage::disk('public')->put('attachments/' . $fileName, $decodedData);

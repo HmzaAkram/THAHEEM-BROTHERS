@@ -15,6 +15,11 @@ return Application::configure(basePath: dirname(__DIR__))
         $middleware->alias([
             'auth.token' => \App\Http\Middleware\CheckToken::class,
         ]);
+        
+        // SECURITY: Add audit logging for all API requests
+        $middleware->appendToGroup('api', [
+            \App\Http\Middleware\AuditLog::class,
+        ]);
     })
     ->withExceptions(function (Exceptions $exceptions): void {
         //
