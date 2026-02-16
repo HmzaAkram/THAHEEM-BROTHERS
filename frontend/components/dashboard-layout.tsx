@@ -22,7 +22,7 @@ export function DashboardLayout({ children, role }: DashboardLayoutProps) {
 
   if (!isHydrated || !isAuthenticated) {
     return (
-      <div className="h-screen w-screen flex items-center justify-center bg-slate-50 dark:bg-slate-950">
+      <div className="h-screen w-screen flex items-center justify-center bg-slate-50 dark:bg-slate-950" suppressHydrationWarning>
         <div className="w-8 h-8 border-4 border-primary border-t-transparent rounded-full animate-spin" />
       </div>
     );
@@ -34,7 +34,7 @@ export function DashboardLayout({ children, role }: DashboardLayoutProps) {
   };
 
   return (
-    <div className="flex h-screen bg-background">
+    <div className="flex h-screen bg-background" suppressHydrationWarning>
       <Sidebar user={user} onLogout={handleLogout} />
       <div className="flex-1 flex flex-col overflow-hidden">
         <main className="flex-1 overflow-auto">

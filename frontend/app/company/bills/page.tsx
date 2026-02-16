@@ -318,7 +318,7 @@ export default function CompanyBillsPage() {
         </div>
       </DashboardLayout>
       {/* Hidden Capture Area for PDF Generation */}
-      <div style={{ position: 'fixed', top: '200vh', left: 0 }}>
+      <div style={{ position: 'fixed', top: '200vh', left: 0 }} suppressHydrationWarning>
         {pdfBill && (
           <div ref={invoiceRef} className="w-[210mm] bg-white p-8">
             <InvoiceTemplate bill={pdfBill} />

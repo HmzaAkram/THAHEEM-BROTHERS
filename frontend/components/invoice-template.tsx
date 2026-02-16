@@ -9,132 +9,141 @@ interface InvoiceTemplateProps {
 }
 
 const statusStyles: Record<string, string> = {
-    Paid: 'bg-green-100 text-green-800 border-green-200',
-    Partial: 'bg-yellow-100 text-yellow-800 border-yellow-200',
-    Unpaid: 'bg-red-100 text-red-800 border-red-200',
+    Paid: 'bg-green-100 text-green-800 border-green-200 shadow-sm',
+    Partial: 'bg-yellow-100 text-yellow-800 border-yellow-200 shadow-sm',
+    Unpaid: 'bg-red-100 text-red-800 border-red-200 shadow-sm',
 };
 
 export const InvoiceTemplate = forwardRef<HTMLDivElement, InvoiceTemplateProps>(({ bill }, ref) => {
     if (!bill) return null;
 
+    const isPaid = bill.calculatedStatus === 'Paid' || bill.status === 'Paid';
+
     return (
-        <div ref={ref} className="bg-white p-8 max-w-4xl mx-auto">
-            <div className="space-y-8 py-4">
-                {/* Brand Header */}
-                <div className="flex justify-between items-center border-b pb-6">
+        <div ref={ref} className="bg-white p-8 max-w-4xl mx-auto relative overflow-hidden ring-1 ring-slate-200 shadow-xl rounded-2xl" suppressHydrationWarning>
+            {/* PAID Stamp Effect - More Subtle */}
+            {isPaid && (
+                <div className="absolute top-16 right-8 rotate-[20deg] opacity-[0.08] pointer-events-none select-none z-0">
+                    <div className="border-[8px] border-green-600 rounded-2xl p-4 flex flex-col items-center justify-center">
+                        <span className="text-6xl font-black text-green-600 tracking-tighter leading-none">PAID</span>
+                        <span className="text-lg font-bold text-green-600 uppercase tracking-[0.2em] mt-1">Processed</span>
+                    </div>
+                </div>
+            )}
+
+            <div className="relative z-10 space-y-6">
+                {/* Brand Header - More Compact */}
+                <div className="flex justify-between items-start border-b border-slate-100 pb-6">
                     <div className="flex items-center gap-4">
-                        <img
-                            src="/logo.PNG"
-                            alt="Thaheem Brothers"
-                            className="h-16 w-auto object-contain"
-                        />
+                        <div className="w-16 h-16 bg-slate-50 rounded-xl flex items-center justify-center p-2 shadow-inner border border-slate-100">
+                            <img
+                                src="/logo.PNG"
+                                alt="Thaheem Brothers"
+                                className="w-full h-full object-contain"
+                            />
+                        </div>
                         <div>
-                            <h1 className="text-2xl font-black text-slate-900 uppercase tracking-tighter leading-none">THAHEEM BROTHERS</h1>
-                            <p className="text-xs font-bold text-muted-foreground tracking-widest uppercase mt-1">Logistics & Supply Chain</p>
+                            <h1 className="text-2xl font-black text-slate-900 uppercase tracking-tighter leading-none mb-1">THAHEEM BROTHERS</h1>
+                            <div className="flex items-center gap-2">
+                                <span className="w-1.5 h-1.5 rounded-full bg-primary" />
+                                <p className="text-[10px] font-black text-primary tracking-widest uppercase">Logistics & Supply Chain Solutions</p>
+                            </div>
                         </div>
                     </div>
-                    <div className="text-right">
-                        <span className="bg-slate-900 text-white px-4 py-1 rounded-full text-xs font-bold uppercase tracking-widest">
-                            Official Invoice
-                        </span>
+                    <div className="text-right space-y-2">
+                        <div className="inline-block transform skew-x-[-12deg] bg-slate-900 text-white px-4 py-1.5 rounded-md shadow-lg">
+                            <span className="inline-block skew-x-[12deg] text-[10px] font-black uppercase tracking-[0.2em]">Official Invoice</span>
+                        </div>
+                        <p className="text-[9px] font-bold text-muted-foreground uppercase tracking-widest">Original Document</p>
                     </div>
                 </div>
 
-                {/* Details Grid */}
-                <div className="grid grid-cols-2 lg:grid-cols-4 gap-6 p-6 bg-muted/30 rounded-2xl border">
-                    <div>
-                        <Label className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Invoice No</Label>
-                        <p className="font-mono font-bold text-lg">{bill.billNo}</p>
+                {/* Main Details Grid - More Balanced */}
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                    <div className="col-span-2 grid grid-cols-2 gap-6 p-6 bg-slate-50/50 rounded-3xl border border-slate-100 shadow-sm relative overflow-hidden">
+
+                        <div className="space-y-1 relative z-10">
+                            <Label className="text-[9px] font-black uppercase tracking-[0.2em] text-muted-foreground">Invoice Reference</Label>
+                            <p className="font-mono font-black text-xl text-slate-900 tracking-tighter">{bill.billNo}</p>
+                        </div>
+
+                        <div className="space-y-1 relative z-10">
+                            <Label className="text-[9px] font-black uppercase tracking-[0.2em] text-muted-foreground">Billing Date</Label>
+                            <p className="font-bold text-base text-slate-800">{formatDate(bill.date)}</p>
+                        </div>
+
+                        <div className="space-y-1 relative z-10">
+                            <Label className="text-[9px] font-black uppercase tracking-[0.2em] text-muted-foreground">Billed To</Label>
+                            <div className="space-y-0.5">
+                                <p className="font-black text-lg text-primary leading-tight">{(bill as any).company?.name || bill.companyName}</p>
+                                {(bill as any).company?.address && (
+                                    <p className="text-[10px] font-medium text-muted-foreground max-w-[200px] leading-relaxed">{(bill as any).company.address}</p>
+                                )}
+                            </div>
+                        </div>
+
+                        <div className="space-y-1 relative z-10">
+                            <Label className="text-[9px] font-black uppercase tracking-[0.2em] text-muted-foreground">Job Number</Label>
+                            <p className="font-mono font-black text-lg text-slate-700 bg-white px-2 py-1 rounded-md border border-slate-100 shadow-sm inline-block">{bill.jobNumber}</p>
+                        </div>
                     </div>
-                    <div>
-                        <Label className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Bill To</Label>
+
+                    <div className="flex flex-col justify-between p-6 bg-slate-900 rounded-3xl text-white shadow-xl border-4 border-white">
                         <div className="space-y-1">
-                            <p className="font-bold text-lg text-primary">{(bill as any).company?.name || bill.companyName}</p>
-                            {(bill as any).company?.address && (
-                                <p className="text-xs text-muted-foreground max-w-[200px] leading-tight">{(bill as any).company.address}</p>
-                            )}
-                            {(bill as any).company?.phone && (
-                                <p className="text-xs text-muted-foreground">{(bill as any).company.phone}</p>
-                            )}
+                            <Label className="text-[9px] font-black uppercase tracking-[0.2em] text-muted-foreground text-slate-400">Weight</Label>
+                            <p className="text-xl font-black">{bill.weight ? `${bill.weight} KG` : 'N/A'}</p>
                         </div>
-                    </div>
-                    <div>
-                        <Label className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Date</Label>
-                        <p className="font-semibold">{formatDate(bill.date)}</p>
-                    </div>
-                    <div>
-                        <Label className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Job No</Label>
-                        <p className="font-mono font-semibold">{bill.jobNumber}</p>
-                    </div>
-                    <div>
-                        <Label className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Status</Label>
-                        <div className="mt-1">
-                            <span className={`px-3 py-1 rounded-full text-xs font-bold border ${statusStyles[bill.calculatedStatus || 'Unpaid']}`}>
-                                {bill.calculatedStatus || 'Unpaid'}
-                            </span>
-                        </div>
-                    </div>
-                </div>
-
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-                    <div className="space-y-4">
-                        <h3 className="font-bold text-sm uppercase tracking-widest text-primary">Shipment Details</h3>
-                        <div className="space-y-2 grid grid-cols-2 gap-4">
-                            <div>
-                                <Label className="text-[10px] font-bold text-muted-foreground">VIA</Label>
-                                <p className="text-sm font-medium">{bill.via || 'N/A'}</p>
-                            </div>
-                            <div>
-                                <Label className="text-[10px] font-bold text-muted-foreground">Weight</Label>
-                                <p className="text-sm font-medium">{bill.weight ? `${bill.weight} KG` : 'N/A'}</p>
-                            </div>
-                            <div>
-                                <Label className="text-[10px] font-bold text-muted-foreground">Packages</Label>
-                                <p className="text-sm font-medium">{bill.packages || 'N/A'}</p>
-                            </div>
-                            <div>
-                                <Label className="text-[10px] font-bold text-muted-foreground">GD No</Label>
-                                <p className="text-sm font-medium">{bill.gdNumber || 'N/A'}</p>
-                            </div>
-                        </div>
-                    </div>
-
-                    <div className="space-y-4">
-                        <h3 className="font-bold text-sm uppercase tracking-widest text-primary">Customs Info</h3>
-                        <div className="space-y-2 grid grid-cols-2 gap-4">
-                            <div className="col-span-2">
-                                <Label className="text-[10px] font-bold text-muted-foreground">Exporter</Label>
-                                <p className="text-sm font-medium">{bill.exporter || 'N/A'}</p>
-                            </div>
-                            <div>
-                                <Label className="text-[10px] font-bold text-muted-foreground">BE Number</Label>
-                                <p className="text-sm font-mono text-xs">{bill.beNumber || 'N/A'}</p>
-                            </div>
-                            <div>
-                                <Label className="text-[10px] font-bold text-muted-foreground">HAWB</Label>
-                                <p className="text-sm font-medium">{bill.hawb || 'N/A'}</p>
+                        <div className="mt-2 pt-2 border-t border-white/10">
+                            <Label className="text-[9px] font-black uppercase tracking-[0.2em] text-muted-foreground text-slate-400">Status</Label>
+                            <div className="mt-1">
+                                <span className={`px-3 py-1 rounded-lg text-[9px] font-black uppercase tracking-widest border border-white/20 inline-block ${isPaid ? 'bg-green-500 text-white' : 'bg-amber-500 text-white'
+                                    }`}>
+                                    {bill.calculatedStatus || 'Unpaid'}
+                                </span>
                             </div>
                         </div>
                     </div>
                 </div>
 
-                <div className="space-y-4">
-                    <h3 className="font-bold text-sm uppercase tracking-widest text-primary">Itemized Charges</h3>
-                    <div className="border rounded-2xl overflow-hidden">
+                {/* Shipping Metadata - More Compact */}
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-4 px-2">
+                    <div className="space-y-1">
+                        <Label className="text-[8px] font-black text-muted-foreground uppercase tracking-widest">Carrier / VIA</Label>
+                        <p className="text-[10px] font-black text-slate-800 uppercase">{bill.via || 'N/A'}</p>
+                    </div>
+                    <div className="space-y-1">
+                        <Label className="text-[8px] font-black text-muted-foreground uppercase tracking-widest">Packages</Label>
+                        <p className="text-[10px] font-black text-slate-800 uppercase">{bill.packages || 'N/A'}</p>
+                    </div>
+                    <div className="space-y-1">
+                        <Label className="text-[8px] font-black text-muted-foreground uppercase tracking-widest">GD Ref</Label>
+                        <p className="text-[10px] font-black text-slate-800 uppercase">{bill.gdNumber || 'N/A'}</p>
+                    </div>
+                    <div className="space-y-1">
+                        <Label className="text-[8px] font-black text-muted-foreground uppercase tracking-widest">BE/ED Number</Label>
+                        <p className="text-[10px] font-mono font-bold text-slate-800 tracking-tighter">{bill.beNumber || 'N/A'}</p>
+                    </div>
+                </div>
+
+                {/* Itemized Table - More Compact Padding */}
+                <div className="space-y-2">
+                    <div className="overflow-hidden rounded-2xl border border-slate-100 shadow-sm">
                         <Table>
-                            <TableHeader className="bg-muted/50">
-                                <TableRow>
-                                    <TableHead className="text-[10px] font-bold">DESCRIPTION</TableHead>
-                                    <TableHead className="text-[10px] font-bold">NOTES</TableHead>
-                                    <TableHead className="text-right text-[10px] font-bold">AMOUNT</TableHead>
+                            <TableHeader className="bg-slate-900 border-none">
+                                <TableRow className="hover:bg-slate-900 border-none">
+                                    <TableHead className="text-[9px] font-black text-slate-300 uppercase tracking-widest py-3">Service Description</TableHead>
+                                    <TableHead className="text-[9px] font-black text-slate-300 uppercase tracking-widest py-3">Internal Notes</TableHead>
+                                    <TableHead className="text-right text-[9px] font-black text-slate-300 uppercase tracking-widest py-3 px-6">Subtotal</TableHead>
                                 </TableRow>
                             </TableHeader>
                             <TableBody>
                                 {bill.items.map((item, i) => (
-                                    <TableRow key={i}>
-                                        <TableCell className="font-medium text-sm">{item.description}</TableCell>
-                                        <TableCell className="text-xs text-muted-foreground italic">{item.notes}</TableCell>
-                                        <TableCell className="text-right font-mono text-sm">{item.amount.toLocaleString()}</TableCell>
+                                    <TableRow key={i} className="group border-b border-slate-50 last:border-none">
+                                        <TableCell className="font-black text-sm text-slate-800 py-3">{item.description}</TableCell>
+                                        <TableCell className="text-[10px] font-bold text-muted-foreground italic group-hover:text-primary transition-colors">{item.notes || '-'}</TableCell>
+                                        <TableCell className="text-right font-mono font-black text-sm text-slate-900 px-6">
+                                            {item.amount.toLocaleString()}
+                                        </TableCell>
                                     </TableRow>
                                 ))}
                             </TableBody>
@@ -142,102 +151,159 @@ export const InvoiceTemplate = forwardRef<HTMLDivElement, InvoiceTemplateProps>(
                     </div>
                 </div>
 
-                <div className="flex justify-end pt-4">
-                    <div className="w-full max-w-sm space-y-3 bg-slate-50 dark:bg-slate-900 p-6 rounded-2xl border">
-                        <div className="flex justify-between text-sm">
-                            <span className="text-muted-foreground">Total Items</span>
-                            <span className="font-mono">PKR {bill.totalAmount.toLocaleString()}</span>
+                {/* Calculations & Notes */}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-10 items-end">
+                    <div className="space-y-6 self-start pt-4">
+                        <div className="space-y-3 p-6 bg-red-50/50 rounded-3xl border border-red-100/50">
+                            <h3 className="text-[10px] font-black uppercase tracking-[0.2em] text-red-800 mb-2">Important Notices</h3>
+                            <div className="space-y-2">
+                                {bill.attachment && (
+                                    <div className="flex items-start gap-2">
+                                        <span className="w-1.5 h-1.5 rounded-full bg-red-600 mt-1 flex-shrink-0" />
+                                        <p className="text-xs font-black text-red-600 leading-tight uppercase tracking-tight">
+                                            All Necessary documents enclosed.
+                                        </p>
+                                    </div>
+                                )}
+                                {(!bill.advancePayment || bill.advancePayment <= 0) && (
+                                    <div className="flex items-start gap-2">
+                                        <span className="w-1.5 h-1.5 rounded-full bg-red-600 mt-1 flex-shrink-0" />
+                                        <p className="text-xs font-black text-red-600 leading-tight uppercase tracking-tight">
+                                            The consignee has not made any advance payment.
+                                        </p>
+                                    </div>
+                                )}
+                            </div>
                         </div>
-                        <div className="flex justify-between text-sm">
-                            <span className="text-muted-foreground">Service Charges</span>
-                            <span className="font-mono">PKR {(bill.serviceCharges || 0).toLocaleString()}</span>
+
+                        {/* Bank Card - Updated Terminology */}
+                        <div className="p-6 bg-slate-50 rounded-3xl border border-slate-100 space-y-4 shadow-sm">
+                            <div className="flex items-center justify-between border-b border-slate-200 pb-2">
+                                <h3 className="font-black text-[10px] uppercase tracking-widest text-primary">Bank Account Details</h3>
+                                <div className="flex gap-1">
+                                    <div className="w-0.5 h-3 bg-primary/20 rounded-full" />
+                                    <div className="w-0.5 h-3 bg-primary/40 rounded-full" />
+                                    <div className="w-0.5 h-3 bg-primary/60 rounded-full" />
+                                </div>
+                            </div>
+                            <div className="grid grid-cols-1 gap-4">
+                                <div className="space-y-1">
+                                    <div className="flex justify-between items-end">
+                                        <Label className="text-[8px] font-black text-muted-foreground uppercase text-slate-500">Dubai Islamic Bank</Label>
+                                        <span className="text-[8px] font-black text-slate-400">Account #</span>
+                                    </div>
+                                    <p className="font-mono font-black text-xs text-slate-900 bg-white p-2 rounded-lg border border-slate-100 shadow-sm uppercase tracking-tight">PK92DUIB000000571507001</p>
+                                </div>
+                                <div className="space-y-1">
+                                    <div className="flex justify-between items-end">
+                                        <Label className="text-[8px] font-black text-muted-foreground uppercase text-slate-500">Bank Al-Habib</Label>
+                                        <span className="text-[8px] font-black text-slate-400">Account #</span>
+                                    </div>
+                                    <p className="font-mono font-black text-xs text-slate-900 bg-white p-2 rounded-lg border border-slate-100 shadow-sm uppercase tracking-tight">PK14BAHL5028008100103201</p>
+                                </div>
+                            </div>
                         </div>
-                        <div className="flex justify-between text-sm text-primary font-semibold">
-                            <span>SBR Sales Tax (15%)</span>
-                            <span className="font-mono">PKR {(bill.salesTax || 0).toLocaleString()}</span>
-                        </div>
-                        <div className="flex justify-between text-sm text-green-600 font-semibold border-b pb-2">
-                            <span>Advance Received</span>
-                            <span className="font-mono">- PKR {(bill.advancePayment || 0).toLocaleString()}</span>
-                        </div>
-                        <div className="flex justify-between items-end pt-2">
-                            <span className="text-xs font-bold uppercase tracking-widest text-muted-foreground">Grand Total</span>
-                            <span className="text-2xl font-black text-primary font-mono tracking-tighter">
-                                PKR {bill.grandTotal.toLocaleString()}
-                            </span>
+                    </div>
+
+                    <div className="space-y-4">
+                        <div className="p-8 bg-slate-900 rounded-[2.5rem] text-white shadow-xl relative overflow-hidden ring-8 ring-slate-50">
+                            <div className="space-y-4">
+                                <div className="flex justify-between items-center text-xs border-b border-white/5 pb-3">
+                                    <span className="font-bold text-slate-400 uppercase tracking-widest text-[9px]">Total Items</span>
+                                    <span className="font-mono font-black text-base">{bill.totalAmount.toLocaleString()}</span>
+                                </div>
+                                <div className="flex justify-between items-center text-xs border-b border-white/5 pb-3">
+                                    <span className="font-bold text-slate-400 uppercase tracking-widest text-[9px]">Service Charges</span>
+                                    <span className="font-mono font-black text-base">{(bill.serviceCharges || 0).toLocaleString()}</span>
+                                </div>
+                                <div className="flex justify-between items-center text-xs border-b border-white/5 pb-3">
+                                    <span className="font-bold text-primary-foreground/80 uppercase tracking-widest text-[9px]">Sales Tax (15%)</span>
+                                    <span className="font-mono font-black text-base text-primary-foreground">{(bill.salesTax || 0).toLocaleString()}</span>
+                                </div>
+                                <div className="flex justify-between items-center text-xs border-b border-white/5 pb-3 bg-green-500/10 px-4 -mx-4 py-2">
+                                    <span className="font-black text-green-400 uppercase tracking-widest text-[9px]">Advance Credit</span>
+                                    <span className="font-mono font-black text-base text-green-400">- {(bill.advancePayment || 0).toLocaleString()}</span>
+                                </div>
+                                <div className="pt-2 space-y-1">
+                                    <p className="text-[9px] font-black uppercase tracking-[0.2em] text-slate-500 text-center mb-1">Total Payable Amount</p>
+                                    <div className="text-center p-4 bg-white/5 rounded-2xl border border-white/10">
+                                        <p className="text-3xl font-black text-white font-mono tracking-tighter">
+                                            {bill.grandTotal.toLocaleString()}
+                                        </p>
+                                        <span className="text-[8px] font-black text-slate-500 tracking-widest uppercase">PKR Currency</span>
+                                    </div>
+                                </div>
+                            </div>
                         </div>
                     </div>
                 </div>
 
-                {/* Conditional Notes */}
-                <div className="space-y-1 px-2 border-l-2 border-primary/20 italic">
-                    {bill.attachment && (
-                        <p className="text-xs font-bold text-slate-700">
-                            • All Necessary documents enclosed.
-                        </p>
-                    )}
-                    {(!bill.advancePayment || bill.advancePayment <= 0) && (
-                        <p className="text-xs font-bold text-slate-700">
-                            • The consignee has not made any advance payment.
-                        </p>
-                    )}
+                {/* Footer Brand */}
+                <div className="pt-10 border-t border-slate-100 flex justify-between items-center">
+                    <div className="flex items-center gap-2">
+                        <div className="w-1 h-6 bg-primary rounded-full" />
+                        <p className="text-[10px] font-black text-slate-400 uppercase tracking-[0.4em]">Powered by TB Logistics</p>
+                    </div>
+                    <p className="text-[10px] font-bold text-slate-300">Certified Transaction Document # {String(bill.id).slice(0, 8).toUpperCase()}</p>
                 </div>
 
-                {/* Bank Details */}
-                <div className="pt-8 border-t-2 border-dashed">
-                    <h3 className="font-bold text-sm uppercase tracking-widest text-primary mb-4">Bank Account Details</h3>
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6 bg-slate-50 border border-slate-200 p-6 rounded-2xl">
-                        <div>
-                            <Label className="text-[10px] font-bold text-muted-foreground uppercase">Account Title</Label>
-                            <p className="font-bold font-mono text-lg text-slate-800">TAHEEM BROTHERS</p>
-                            <Label className="text-[10px] font-bold text-muted-foreground uppercase mt-3 block">Branch</Label>
-                            <p className="font-bold font-mono text-slate-800">NEW CHALLI</p>
-                        </div>
-                        <div className="space-y-4">
-                            <div>
-                                <Label className="text-[10px] font-bold text-muted-foreground uppercase">DUBAI ISLAMIC BANK</Label>
-                                <p className="font-mono font-medium text-sm select-all text-slate-800">PK92DUIB000000571507001</p>
+                {/* Attachments Section - High Fidelity */}
+                {bill.attachment && (
+                    <div className="pt-20 mt-20 border-t-4 border-dashed border-slate-100">
+                        <div className="flex items-center gap-4 mb-8">
+                            <div className="p-3 bg-primary/10 rounded-2xl">
+                                <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="text-primary"><path d="m21.44 11.05-9.19 9.19a6 6 0 0 1-8.49-8.49l8.57-8.57A4 4 0 1 1 18 8.84l-8.59 8.51a2 2 0 0 1-2.83-2.83l8.49-8.48" /></svg>
                             </div>
                             <div>
-                                <Label className="text-[10px] font-bold text-muted-foreground uppercase">AL-HABIB BANK</Label>
-                                <p className="font-mono font-medium text-sm select-all text-slate-800">PK14BAHL5028008100103201</p>
+                                <h3 className="font-black text-xl uppercase tracking-tighter text-slate-900">Digital Enclosures</h3>
+                                <p className="text-xs font-bold text-muted-foreground uppercase tracking-widest">Linked supporting documentation</p>
                             </div>
                         </div>
-                    </div>
-                    {/* Attachments Section */}
-                    {bill.attachment && (
-                        <div className="pt-8 break-before-page no-print-break-inside avoid-page-break">
-                            <h3 className="font-bold text-sm uppercase tracking-widest text-primary mb-4 border-b pb-2">Attached Documents</h3>
-                            <div className="flex justify-center flex-col items-center gap-2">
-                                {bill.attachment.toLowerCase().endsWith('.pdf') ? (
-                                    <div className="w-full h-[800px] border rounded-lg overflow-hidden bg-slate-100 flex items-center justify-center print:hidden">
-                                        <object data={bill.attachment} type="application/pdf" className="w-full h-full">
-                                            <div className="flex flex-col items-center justify-center p-10 text-center space-y-4">
-                                                <p className="text-muted-foreground">PDF Preview not available.</p>
-                                                <a href={bill.attachment} target="_blank" rel="noopener noreferrer" className="text-primary hover:underline font-bold">
-                                                    Click here to view/download PDF
-                                                </a>
+
+                        <div className="bg-slate-50 rounded-[3rem] p-10 border border-slate-200 shadow-inner group">
+                            {bill.attachment.toLowerCase().endsWith('.pdf') ? (
+                                <div className="w-full h-[900px] border-4 border-white rounded-[2rem] overflow-hidden bg-slate-200 shadow-2xl relative">
+                                    <object
+                                        data={bill.attachment}
+                                        type="application/pdf"
+                                        className="w-full h-full"
+                                    >
+                                        <div className="flex flex-col items-center justify-center h-full p-20 text-center space-y-6">
+                                            <div className="w-20 h-20 bg-white rounded-3xl flex items-center justify-center shadow-xl">
+                                                <svg xmlns="http://www.w3.org/2000/svg" width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="red" strokeWidth="2"><path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z" /><polyline points="14 2 14 8 20 8" /></svg>
                                             </div>
-                                        </object>
+                                            <p className="text-slate-600 font-black uppercase tracking-widest italic">PDF stream requires external viewer</p>
+                                            <a
+                                                href={bill.attachment}
+                                                target="_blank"
+                                                rel="noopener noreferrer"
+                                                className="bg-primary text-white px-10 py-4 rounded-2xl font-black uppercase tracking-[0.2em] shadow-2xl shadow-primary/40 hover:scale-105 transition-transform"
+                                            >
+                                                Open Documentation
+                                            </a>
+                                        </div>
+                                    </object>
+                                </div>
+                            ) : (
+                                <div className="flex justify-center flex-col items-center">
+                                    <div className="relative inline-block border-[12px] border-white rounded-[3rem] shadow-2xl overflow-hidden bg-white max-w-full">
+                                        <img
+                                            src={bill.attachment}
+                                            alt="Bill Attachment"
+                                            crossOrigin="anonymous"
+                                            className="max-w-full h-auto max-h-[1000px] object-contain transition-transform group-hover:scale-[1.02] duration-700"
+                                        />
+                                        <div className="absolute inset-0 ring-1 ring-inset ring-black/5 rounded-[2rem]" />
                                     </div>
-                                ) : (
-                                    <img
-                                        src={bill.attachment}
-                                        alt="Bill Attachment"
-                                        className="max-w-full h-auto max-h-[800px] border rounded-lg shadow-sm"
-                                    />
-                                )}
-                                {/* Always show a download link for print versions if it's a PDF */}
-                                {bill.attachment.toLowerCase().endsWith('.pdf') && (
-                                    <div className="hidden print:block text-center p-4 border rounded-lg">
-                                        <p className="font-bold">Attached Document: PDF</p>
-                                        <p className="text-sm text-muted-foreground">This document has a PDF attachment. Please refer to the digital version or attached file.</p>
+                                    <div className="mt-8 flex items-center gap-2 px-6 py-2 bg-white/50 backdrop-blur-sm rounded-full border border-white shadow-sm font-black text-[10px] text-slate-400 uppercase tracking-[0.3em]">
+                                        <span className="w-2 h-2 rounded-full bg-primary" />
+                                        End of Document
                                     </div>
-                                )}
-                            </div>
+                                </div>
+                            )}
                         </div>
-                    )}
-                </div>
+                    </div>
+                )}
             </div>
         </div>
     );
