@@ -52,6 +52,7 @@ import {
 import { useState, useMemo, useRef, useEffect } from 'react';
 import { useData, BillItem, Bill } from '@/context/data-context';
 import { formatDate, formatCurrency } from '@/lib/utils';
+import JSZip from 'jszip';
 import { jsPDF } from 'jspdf';
 import { toPng } from 'html-to-image';
 import { InvoiceTemplate } from '@/components/invoice-template';
@@ -82,16 +83,59 @@ export default function BillsPage() {
       const generatePDF = async () => {
         try {
           // Small delay to ensure render
-          await new Promise(resolve => setTimeout(resolve, 100));
+          await new Promise(resolve => setTimeout(resolve, 500));
 
           const dataUrl = await toPng(invoiceRef.current!, { cacheBust: true, pixelRatio: 2 });
           const pdf = new jsPDF('p', 'mm', 'a4');
           const imgProps = pdf.getImageProperties(dataUrl);
           const pdfWidth = pdf.internal.pageSize.getWidth();
-          const pdfHeight = (imgProps.height * pdfWidth) / imgProps.width;
+          const pageHeight = pdf.internal.pageSize.getHeight();
+          const imgHeight = (imgProps.height * pdfWidth) / imgProps.width;
 
-          pdf.addImage(dataUrl, 'PNG', 0, 0, pdfWidth, pdfHeight);
-          pdf.save(`Invoice_${pdfBill.billNo}.pdf`);
+          let heightLeft = imgHeight;
+          let position = 0;
+
+          // Add first page
+          pdf.addImage(dataUrl, 'PNG', 0, position, pdfWidth, imgHeight);
+          heightLeft -= pageHeight;
+
+          // Add subsequent pages if content is longer than one page
+          while (heightLeft > 0) {
+            position = heightLeft - imgHeight;
+            pdf.addPage();
+            pdf.addImage(dataUrl, 'PNG', 0, position, pdfWidth, imgHeight);
+            heightLeft -= pageHeight;
+          }
+
+          const invoiceBlob = pdf.output('blob');
+
+          if (pdfBill.attachment) {
+            const zip = new JSZip();
+            const fileName = `Invoice_${pdfBill.billNo}`;
+
+            // Add Invoice PDF
+            zip.file(`${fileName}.pdf`, invoiceBlob);
+
+            // Add Attachment
+            try {
+              const response = await fetch(pdfBill.attachment);
+              const attachmentBlob = await response.blob();
+              const ext = pdfBill.attachment.split('.').pop()?.split('?')[0] || 'file';
+              zip.file(`Attachment_of_Bill_${pdfBill.billNo}.${ext}`, attachmentBlob);
+            } catch (err) {
+              console.error('Failed to fetch attachment for ZIP', err);
+            }
+
+            const zipBlob = await zip.generateAsync({ type: 'blob' });
+            const url = URL.createObjectURL(zipBlob);
+            const link = document.createElement('a');
+            link.href = url;
+            link.download = `${fileName}.zip`;
+            link.click();
+            URL.revokeObjectURL(url);
+          } else {
+            pdf.save(`Invoice_${pdfBill.billNo}.pdf`);
+          }
         } catch (err) {
           console.error('Failed to generate PDF', err);
         } finally {
@@ -159,7 +203,8 @@ export default function BillsPage() {
   const [advancePayment, setAdvancePayment] = useState<string>('');
 
   const totalAmount = items.reduce((sum, item) => sum + (Number(item.amount) || 0), 0);
-  const grandTotal = totalAmount + (Number(serviceCharges) || 0) + (Number(salesTax) || 0) - (Number(advancePayment) || 0);
+  const calculatedSalesTax = (Number(salesTax) * 0.15) || 0;
+  const grandTotal = totalAmount + (Number(serviceCharges) || 0) + calculatedSalesTax - (Number(advancePayment) || 0);
 
   const handleAddItem = () => {
     setItems([...items, { description: 'DUTY TAXES & ETO', notes: '', amount: 0, invoiceNo: '' }]);
@@ -240,7 +285,7 @@ export default function BillsPage() {
         items: finalItems,
         totalAmount: totalAmount,
         serviceCharges: Number(serviceCharges) || 0,
-        salesTax: Number(salesTax) || 0,
+        salesTax: calculatedSalesTax,
         advancePayment: Number(advancePayment) || 0,
         grandTotal: grandTotal,
       });
@@ -730,8 +775,8 @@ export default function BillsPage() {
                               <span className="font-mono">{formatCurrency(Number(serviceCharges) || 0)}</span>
                             </div>
                             <div className="flex justify-between items-center text-xs font-semibold text-primary uppercase tracking-widest">
-                              <span>SBR Sales Tax (15%)</span>
-                              <span className="font-mono">{formatCurrency(Number(salesTax) || 0)}</span>
+                              <span>SBR Sales Tax (15% of Input)</span>
+                              <span className="font-mono">{formatCurrency(calculatedSalesTax)}</span>
                             </div>
                             {Number(advancePayment) > 0 && (
                               <div className="flex justify-between items-center text-xs font-semibold text-green-600 dark:text-green-400 uppercase tracking-widest">
@@ -1004,10 +1049,10 @@ export default function BillsPage() {
         </div>
       </DashboardLayout >
       {/* Hidden Capture Area for PDF Generation  */}
-      <div style={{ position: 'fixed', top: '200vh', left: 0 }}>
+      <div style={{ position: 'fixed', top: '200vh', left: 0 }} suppressHydrationWarning>
         {pdfBill && (
           <div ref={invoiceRef} className="w-[210mm] bg-white p-8">
-            <InvoiceTemplate bill={pdfBill} />
+            <InvoiceTemplate bill={pdfBill} hideAttachments={true} />
           </div>
         )}
       </div>

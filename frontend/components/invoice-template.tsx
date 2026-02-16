@@ -6,6 +6,7 @@ import { Bill } from '@/context/data-context';
 
 interface InvoiceTemplateProps {
     bill: Bill | null;
+    hideAttachments?: boolean;
 }
 
 const statusStyles: Record<string, string> = {
@@ -14,13 +15,13 @@ const statusStyles: Record<string, string> = {
     Unpaid: 'bg-red-100 text-red-800 border-red-200 shadow-sm',
 };
 
-export const InvoiceTemplate = forwardRef<HTMLDivElement, InvoiceTemplateProps>(({ bill }, ref) => {
+export const InvoiceTemplate = forwardRef<HTMLDivElement, InvoiceTemplateProps>(({ bill, hideAttachments = false }, ref) => {
     if (!bill) return null;
 
     const isPaid = bill.calculatedStatus === 'Paid' || bill.status === 'Paid';
 
     return (
-        <div ref={ref} className="bg-white p-8 max-w-4xl mx-auto relative overflow-hidden ring-1 ring-slate-200 shadow-xl rounded-2xl" suppressHydrationWarning>
+        <div ref={ref} className="bg-white p-4 max-w-4xl mx-auto relative overflow-hidden ring-1 ring-slate-200 shadow-lg rounded-2xl" suppressHydrationWarning>
             {/* PAID Stamp Effect - More Subtle */}
             {isPaid && (
                 <div className="absolute top-16 right-8 rotate-[20deg] opacity-[0.08] pointer-events-none select-none z-0">
@@ -31,11 +32,11 @@ export const InvoiceTemplate = forwardRef<HTMLDivElement, InvoiceTemplateProps>(
                 </div>
             )}
 
-            <div className="relative z-10 space-y-6">
-                {/* Brand Header - More Compact */}
-                <div className="flex justify-between items-start border-b border-slate-100 pb-6">
+            <div className="relative z-10 space-y-2">
+                {/* Brand Header - Ultra Compact */}
+                <div className="flex justify-between items-start border-b border-slate-100 pb-2">
                     <div className="flex items-center gap-4">
-                        <div className="w-16 h-16 bg-slate-50 rounded-xl flex items-center justify-center p-2 shadow-inner border border-slate-100">
+                        <div className="w-10 h-10 bg-slate-50 rounded-lg flex items-center justify-center p-1 shadow-inner border border-slate-100">
                             <img
                                 src="/logo.PNG"
                                 alt="Thaheem Brothers"
@@ -58,9 +59,9 @@ export const InvoiceTemplate = forwardRef<HTMLDivElement, InvoiceTemplateProps>(
                     </div>
                 </div>
 
-                {/* Main Details Grid - More Balanced */}
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                    <div className="col-span-2 grid grid-cols-2 gap-6 p-6 bg-slate-50/50 rounded-3xl border border-slate-100 shadow-sm relative overflow-hidden">
+                {/* Main Details Grid - Ultra Compact */}
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                    <div className="col-span-2 grid grid-cols-2 gap-3 p-3 bg-slate-50/50 rounded-xl border border-slate-100 shadow-sm relative overflow-hidden">
 
                         <div className="space-y-1 relative z-10">
                             <Label className="text-[9px] font-black uppercase tracking-[0.2em] text-muted-foreground">Invoice Reference</Label>
@@ -88,7 +89,7 @@ export const InvoiceTemplate = forwardRef<HTMLDivElement, InvoiceTemplateProps>(
                         </div>
                     </div>
 
-                    <div className="flex flex-col justify-between p-6 bg-slate-900 rounded-3xl text-white shadow-xl border-4 border-white">
+                    <div className="flex flex-col justify-between p-4 bg-slate-900 rounded-2xl text-white shadow-xl border-4 border-white">
                         <div className="space-y-1">
                             <Label className="text-[9px] font-black uppercase tracking-[0.2em] text-muted-foreground text-slate-400">Weight</Label>
                             <p className="text-xl font-black">{bill.weight ? `${bill.weight} KG` : 'N/A'}</p>
@@ -105,8 +106,8 @@ export const InvoiceTemplate = forwardRef<HTMLDivElement, InvoiceTemplateProps>(
                     </div>
                 </div>
 
-                {/* Shipping Metadata - More Compact */}
-                <div className="grid grid-cols-2 md:grid-cols-4 gap-4 px-2">
+                {/* Shipping Metadata - Ultra Compact */}
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-2 px-1">
                     <div className="space-y-1">
                         <Label className="text-[8px] font-black text-muted-foreground uppercase tracking-widest">Carrier / VIA</Label>
                         <p className="text-[10px] font-black text-slate-800 uppercase">{bill.via || 'N/A'}</p>
@@ -152,9 +153,9 @@ export const InvoiceTemplate = forwardRef<HTMLDivElement, InvoiceTemplateProps>(
                 </div>
 
                 {/* Calculations & Notes */}
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-10 items-end">
-                    <div className="space-y-6 self-start pt-4">
-                        <div className="space-y-3 p-6 bg-red-50/50 rounded-3xl border border-red-100/50">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6 items-end">
+                    <div className="space-y-4 self-start pt-2">
+                        <div className="space-y-2 p-4 bg-red-50/50 rounded-2xl border border-red-100/50">
                             <h3 className="text-[10px] font-black uppercase tracking-[0.2em] text-red-800 mb-2">Important Notices</h3>
                             <div className="space-y-2">
                                 {bill.attachment && (
@@ -177,7 +178,7 @@ export const InvoiceTemplate = forwardRef<HTMLDivElement, InvoiceTemplateProps>(
                         </div>
 
                         {/* Bank Card - Updated Terminology */}
-                        <div className="p-6 bg-slate-50 rounded-3xl border border-slate-100 space-y-4 shadow-sm">
+                        <div className="p-4 bg-slate-50 rounded-2xl border border-slate-100 space-y-3 shadow-sm">
                             <div className="flex items-center justify-between border-b border-slate-200 pb-2">
                                 <h3 className="font-black text-[10px] uppercase tracking-widest text-primary">Bank Account Details</h3>
                                 <div className="flex gap-1">
@@ -205,8 +206,8 @@ export const InvoiceTemplate = forwardRef<HTMLDivElement, InvoiceTemplateProps>(
                         </div>
                     </div>
 
-                    <div className="space-y-4">
-                        <div className="p-8 bg-slate-900 rounded-[2.5rem] text-white shadow-xl relative overflow-hidden ring-8 ring-slate-50">
+                    <div className="space-y-2">
+                        <div className="p-4 bg-slate-900 rounded-2xl text-white shadow-xl relative overflow-hidden ring-2 ring-slate-50">
                             <div className="space-y-4">
                                 <div className="flex justify-between items-center text-xs border-b border-white/5 pb-3">
                                     <span className="font-bold text-slate-400 uppercase tracking-widest text-[9px]">Total Items</span>
@@ -239,16 +240,17 @@ export const InvoiceTemplate = forwardRef<HTMLDivElement, InvoiceTemplateProps>(
                 </div>
 
                 {/* Footer Brand */}
-                <div className="pt-10 border-t border-slate-100 flex justify-between items-center">
+                <div className="pt-2 border-t border-slate-100 flex justify-between items-center">
                     <div className="flex items-center gap-2">
-                        <div className="w-1 h-6 bg-primary rounded-full" />
-                        <p className="text-[10px] font-black text-slate-400 uppercase tracking-[0.4em]">Powered by TB Logistics</p>
+                        <div className="w-1 h-4 bg-primary rounded-full" />
+                        <p className="text-[8px] font-black text-slate-400 uppercase tracking-[0.4em]">Powered by TB Logistics</p>
                     </div>
-                    <p className="text-[10px] font-bold text-slate-300">Certified Transaction Document # {String(bill.id).slice(0, 8).toUpperCase()}</p>
+                    <div className="text-[8px] font-bold text-slate-300 uppercase tracking-widest">
+                        Certified Document #{bill.id?.toString().slice(-6).toUpperCase() || 'OFFICIAL'}
+                    </div>
                 </div>
-
                 {/* Attachments Section - High Fidelity */}
-                {bill.attachment && (
+                {bill.attachment && !hideAttachments && (
                     <div className="pt-20 mt-20 border-t-4 border-dashed border-slate-100">
                         <div className="flex items-center gap-4 mb-8">
                             <div className="p-3 bg-primary/10 rounded-2xl">
@@ -263,32 +265,29 @@ export const InvoiceTemplate = forwardRef<HTMLDivElement, InvoiceTemplateProps>(
                         <div className="bg-slate-50 rounded-[3rem] p-10 border border-slate-200 shadow-inner group">
                             {bill.attachment.toLowerCase().endsWith('.pdf') ? (
                                 <div className="w-full h-[900px] border-4 border-white rounded-[2rem] overflow-hidden bg-slate-200 shadow-2xl relative">
-                                    <object
-                                        data={bill.attachment}
-                                        type="application/pdf"
-                                        className="w-full h-full"
-                                    >
-                                        <div className="flex flex-col items-center justify-center h-full p-20 text-center space-y-6">
-                                            <div className="w-20 h-20 bg-white rounded-3xl flex items-center justify-center shadow-xl">
-                                                <svg xmlns="http://www.w3.org/2000/svg" width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="red" strokeWidth="2"><path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z" /><polyline points="14 2 14 8 20 8" /></svg>
-                                            </div>
-                                            <p className="text-slate-600 font-black uppercase tracking-widest italic">PDF stream requires external viewer</p>
-                                            <a
-                                                href={bill.attachment}
-                                                target="_blank"
-                                                rel="noopener noreferrer"
-                                                className="bg-primary text-white px-10 py-4 rounded-2xl font-black uppercase tracking-[0.2em] shadow-2xl shadow-primary/40 hover:scale-105 transition-transform"
-                                            >
-                                                Open Documentation
-                                            </a>
-                                        </div>
-                                    </object>
+                                    <iframe
+                                        src={`${bill.attachment}${bill.attachment.includes('?') ? '&' : '?'}t=${Date.now()}#toolbar=0&navpanes=0&view=FitH`}
+                                        className="w-full h-full border-none"
+                                        title="Bill PDF Attachment"
+                                    />
+                                    {/* Fallback Link - Always visible as a backup */}
+                                    <div className="absolute bottom-6 right-6 z-20">
+                                        <a
+                                            href={bill.attachment}
+                                            target="_blank"
+                                            rel="noopener noreferrer"
+                                            className="bg-primary/90 backdrop-blur-sm text-white px-6 py-3 rounded-xl font-black text-[10px] uppercase tracking-widest shadow-xl hover:scale-105 transition-all flex items-center gap-2"
+                                        >
+                                            <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><path d="M15 3h6v6" /><path d="M10 14 21 3" /><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6" /></svg>
+                                            External View
+                                        </a>
+                                    </div>
                                 </div>
                             ) : (
                                 <div className="flex justify-center flex-col items-center">
                                     <div className="relative inline-block border-[12px] border-white rounded-[3rem] shadow-2xl overflow-hidden bg-white max-w-full">
                                         <img
-                                            src={bill.attachment}
+                                            src={`${bill.attachment}${bill.attachment.includes('?') ? '&' : '?'}t=${Date.now()}`}
                                             alt="Bill Attachment"
                                             crossOrigin="anonymous"
                                             className="max-w-full h-auto max-h-[1000px] object-contain transition-transform group-hover:scale-[1.02] duration-700"

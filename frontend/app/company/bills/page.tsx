@@ -2,6 +2,7 @@
 
 import { jsPDF } from 'jspdf';
 import { toPng } from 'html-to-image';
+import JSZip from 'jszip';
 import { useRef, useMemo, useState, useEffect } from 'react';
 import { InvoiceTemplate } from '@/components/invoice-template';
 import { Bill } from '@/context/data-context';
@@ -67,7 +68,7 @@ export default function CompanyBillsPage() {
           }
 
           // Small delay to ensure paint
-          await new Promise(resolve => setTimeout(resolve, 300));
+          await new Promise(resolve => setTimeout(resolve, 500));
 
           const dataUrl = await toPng(invoiceRef.current!, {
             cacheBust: true,
@@ -77,10 +78,53 @@ export default function CompanyBillsPage() {
           const pdf = new jsPDF('p', 'mm', 'a4');
           const imgProps = pdf.getImageProperties(dataUrl);
           const pdfWidth = pdf.internal.pageSize.getWidth();
-          const pdfHeight = (imgProps.height * pdfWidth) / imgProps.width;
+          const pageHeight = pdf.internal.pageSize.getHeight();
+          const imgHeight = (imgProps.height * pdfWidth) / imgProps.width;
 
-          pdf.addImage(dataUrl, 'PNG', 0, 0, pdfWidth, pdfHeight);
-          pdf.save(`Invoice_${pdfBill.billNo}.pdf`);
+          let heightLeft = imgHeight;
+          let position = 0;
+
+          // Add first page
+          pdf.addImage(dataUrl, 'PNG', 0, position, pdfWidth, imgHeight);
+          heightLeft -= pageHeight;
+
+          // Add subsequent pages if content is longer than one page
+          while (heightLeft > 0) {
+            position = heightLeft - imgHeight;
+            pdf.addPage();
+            pdf.addImage(dataUrl, 'PNG', 0, position, pdfWidth, imgHeight);
+            heightLeft -= pageHeight;
+          }
+
+          const invoiceBlob = pdf.output('blob');
+
+          if (pdfBill.attachment) {
+            const zip = new JSZip();
+            const fileName = `Invoice_${pdfBill.billNo}`;
+
+            // Add Invoice PDF
+            zip.file(`${fileName}.pdf`, invoiceBlob);
+
+            // Add Attachment
+            try {
+              const response = await fetch(pdfBill.attachment);
+              const attachmentBlob = await response.blob();
+              const ext = pdfBill.attachment.split('.').pop()?.split('?')[0] || 'file';
+              zip.file(`Attachment_of_Bill_${pdfBill.billNo}.${ext}`, attachmentBlob);
+            } catch (err) {
+              console.error('Failed to fetch attachment for ZIP', err);
+            }
+
+            const zipBlob = await zip.generateAsync({ type: 'blob' });
+            const url = URL.createObjectURL(zipBlob);
+            const link = document.createElement('a');
+            link.href = url;
+            link.download = `${fileName}.zip`;
+            link.click();
+            URL.revokeObjectURL(url);
+          } else {
+            pdf.save(`Invoice_${pdfBill.billNo}.pdf`);
+          }
         } catch (err) {
           console.error('Failed to generate PDF', err);
           alert("Failed to generate PDF. Please try again or check if images are loading.");
@@ -321,7 +365,7 @@ export default function CompanyBillsPage() {
       <div style={{ position: 'fixed', top: '200vh', left: 0 }} suppressHydrationWarning>
         {pdfBill && (
           <div ref={invoiceRef} className="w-[210mm] bg-white p-8">
-            <InvoiceTemplate bill={pdfBill} />
+            <InvoiceTemplate bill={pdfBill} hideAttachments={true} />
           </div>
         )}
       </div>
