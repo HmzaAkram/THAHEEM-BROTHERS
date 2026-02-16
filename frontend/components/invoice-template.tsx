@@ -169,6 +169,20 @@ export const InvoiceTemplate = forwardRef<HTMLDivElement, InvoiceTemplateProps>(
                     </div>
                 </div>
 
+                {/* Conditional Notes */}
+                <div className="space-y-1 px-2 border-l-2 border-primary/20 italic">
+                    {bill.attachment && (
+                        <p className="text-xs font-bold text-slate-700">
+                            • All Necessary documents enclosed.
+                        </p>
+                    )}
+                    {(!bill.advancePayment || bill.advancePayment <= 0) && (
+                        <p className="text-xs font-bold text-slate-700">
+                            • The consignee has not made any advance payment.
+                        </p>
+                    )}
+                </div>
+
                 {/* Bank Details */}
                 <div className="pt-8 border-t-2 border-dashed">
                     <h3 className="font-bold text-sm uppercase tracking-widest text-primary mb-4">Bank Account Details</h3>
