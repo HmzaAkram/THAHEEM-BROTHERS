@@ -107,12 +107,11 @@ export default function AdminDashboard() {
       ? companies.filter(c => new Date(c.createdAt) >= startDate!)
       : companies;
 
-    const totalBilled = filteredBills.reduce((sum, bill) => sum + (Number(bill.totalAmount) || 0), 0);
-    const totalCollected = filteredPayments.reduce((sum, payment) => sum + (Number(payment.amount) || 0), 0);
-    // Outstanding logic: 
-    // If we want "Outstanding created in this period", it is (BilledInPeriod - CollectedInPeriod).
-    // If we want "Total Outstanding", it stays same.
-    // User context implies "Monthly Stats" -> Performance of this month. So flow metric is better.
+    const totalBilled = filteredBills.reduce((sum, bill) => sum + (Number(bill.grandTotal) || 0), 0);
+    const totalCollected =
+      filteredBills.reduce((sum, bill) => sum + (Number(bill.advancePayment) || 0), 0) +
+      filteredPayments.reduce((sum, payment) => sum + (Number(payment.amount) || 0) + (Number(payment.adjustment) || 0), 0);
+
     const outstanding = totalBilled - totalCollected;
 
     // For "Total Companies", if filtered, we show "New Companies". If overall, "Total".
@@ -141,7 +140,9 @@ export default function AdminDashboard() {
       const billDate = new Date(bill.date);
       const monthData = months.find(m => m.monthIndex === billDate.getMonth() && m.year === billDate.getFullYear());
       if (monthData) {
-        monthData.bills += (Number(bill.totalAmount) || 0);
+        monthData.bills += (Number(bill.grandTotal) || 0);
+        // Include advance in payments for the month the bill was generated
+        monthData.payments += (Number(bill.advancePayment) || 0);
       }
     });
 
@@ -149,7 +150,7 @@ export default function AdminDashboard() {
       const paymentDate = new Date(payment.date);
       const monthData = months.find(m => m.monthIndex === paymentDate.getMonth() && m.year === paymentDate.getFullYear());
       if (monthData) {
-        monthData.payments += (Number(payment.amount) || 0);
+        monthData.payments += (Number(payment.amount) || 0) + (Number(payment.adjustment) || 0);
       }
     });
 
@@ -206,8 +207,10 @@ export default function AdminDashboard() {
       const companyBills = bills.filter(b => String(b.companyId) === String(company.id));
       const companyPayments = payments.filter(p => String(p.companyId) === String(company.id));
 
-      const debit = companyBills.reduce((sum, b) => sum + (Number(b.totalAmount) || 0), 0);
-      const credit = companyPayments.reduce((sum, p) => sum + (Number(p.amount) || 0), 0);
+      const debit = companyBills.reduce((sum, b) => sum + (Number(b.grandTotal) || 0), 0);
+      const credit =
+        companyBills.reduce((sum, b) => sum + (Number(b.advancePayment) || 0), 0) +
+        companyPayments.reduce((sum, p) => sum + (Number(p.amount) || 0) + (Number(p.adjustment) || 0), 0);
       const balance = debit - credit;
 
       return {
