@@ -75,8 +75,10 @@ export default function ReportsPage() {
       const companyBills = bills.filter(b => b.companyId === c.id);
       const companyPayments = payments.filter(p => p.companyId === c.id);
 
-      const billed = companyBills.reduce((sum, b) => sum + b.totalAmount, 0);
-      const paid = companyPayments.reduce((sum, p) => sum + p.amount, 0);
+      const billed = companyBills.reduce((sum, b) => sum + (Number(b.grandTotal) || 0), 0);
+      const paid =
+        companyBills.reduce((sum, b) => sum + (Number(b.advancePayment) || 0), 0) +
+        companyPayments.reduce((sum, p) => sum + (Number(p.amount) || 0) + (Number(p.adjustment) || 0), 0);
       const outstanding = billed - paid;
 
       // Unpaid bills within range for report clarity
@@ -124,7 +126,7 @@ export default function ReportsPage() {
     bills.forEach(b => {
       const d = new Date(b.date);
       const m = monthsData.find(mo => mo.monthIdx === d.getMonth() && mo.year === d.getFullYear());
-      if (m) m.outstanding += b.totalAmount;
+      if (m) m.outstanding += (Number(b.grandTotal) || 0);
     });
 
     return {
@@ -356,10 +358,10 @@ export default function ReportsPage() {
                             <TableCell className="font-mono font-bold">{bill.billNo}</TableCell>
                             <TableCell>{bill.companyName}</TableCell>
                             <TableCell className="font-mono text-xs">{bill.jobNumber}</TableCell>
-                            <TableCell className="text-right font-bold">{formatCurrency(bill.totalAmount)}</TableCell>
+                            <TableCell className="text-right font-bold">{formatCurrency(bill.grandTotal)}</TableCell>
                             <TableCell className="text-right">
-                              <span className={`px-2 py-0.5 rounded-full text-[10px] uppercase font-black border ${bill.status === 'Paid' ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}>
-                                {bill.status}
+                              <span className={`px-2 py-0.5 rounded-full text-[10px] uppercase font-black border ${bill.calculatedStatus === 'Paid' ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}>
+                                {bill.calculatedStatus}
                               </span>
                             </TableCell>
                           </TableRow>
@@ -390,7 +392,7 @@ export default function ReportsPage() {
                             <TableCell className="font-mono font-bold text-xs">{payment.reference || 'N/A'}</TableCell>
                             <TableCell>{payment.companyName}</TableCell>
                             <TableCell className="text-xs uppercase font-bold">{payment.method}</TableCell>
-                            <TableCell className="text-right font-bold text-green-600">{formatCurrency(payment.amount)}</TableCell>
+                            <TableCell className="text-right font-bold text-green-600">{formatCurrency(Number(payment.amount) + (Number(payment.adjustment) || 0))}</TableCell>
                           </TableRow>
                         ))
                       )}
@@ -418,10 +420,10 @@ export default function ReportsPage() {
                             <TableCell className="text-[10px] uppercase font-black">{entry.type}</TableCell>
                             <TableCell className="font-mono text-xs">{entry.billNo || entry.reference || '-'}</TableCell>
                             <TableCell className="text-right font-bold text-red-600">
-                              {entry.type === 'BILL' ? formatCurrency(entry.totalAmount) : '-'}
+                              {entry.type === 'BILL' ? formatCurrency(entry.grandTotal) : '-'}
                             </TableCell>
                             <TableCell className="text-right font-bold text-green-600">
-                              {entry.type === 'PAYMENT' ? formatCurrency(entry.amount) : '-'}
+                              {entry.type === 'PAYMENT' ? formatCurrency(Number(entry.amount) + (Number(entry.adjustment) || 0)) : '-'}
                             </TableCell>
                           </TableRow>
                         ))
@@ -494,8 +496,8 @@ export default function ReportsPage() {
                     </p>
                     <p className={`text-2xl font-bold mt-1 ${reportType === 'payments' ? 'text-green-600' : 'text-primary'}`}>
                       {reportType === 'bills'
-                        ? formatCurrency(filteredBills.reduce((s: number, b: any) => s + b.totalAmount, 0))
-                        : formatCurrency(filteredPayments.reduce((s: number, p: any) => s + p.amount, 0))}
+                        ? formatCurrency(filteredBills.reduce((s: number, b: any) => s + (Number(b.grandTotal) || 0), 0))
+                        : formatCurrency(filteredPayments.reduce((s: number, p: any) => s + (Number(p.amount) || 0) + (Number(p.adjustment) || 0), 0))}
                     </p>
                   </div>
                   <div>

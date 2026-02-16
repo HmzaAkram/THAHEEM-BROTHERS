@@ -53,18 +53,20 @@ export default function CompanyDashboard() {
 
   const stats = useMemo(() => {
     if (!currentCompany) return { billed: 0, paid: 0, outstanding: 0 };
-    const billed = companyBills.reduce((sum, b) => sum + b.totalAmount, 0);
-    const paid = companyPayments.reduce((sum, p) => sum + p.amount, 0);
+    const billed = companyBills.reduce((sum, b) => sum + (Number(b.grandTotal) || 0), 0);
+    const paid =
+      companyBills.reduce((sum, b) => sum + (Number(b.advancePayment) || 0), 0) +
+      companyPayments.reduce((sum, p) => sum + (Number(p.amount) || 0) + (Number(p.adjustment) || 0), 0);
     return { billed, paid, outstanding: billed - paid };
   }, [companyBills, companyPayments, currentCompany]);
 
   const last6Months = useMemo(() => {
     if (!currentCompany) return [];
-    const months: { month: string; amount: number; year: number; monthIndex: number }[] = [];
+    const monthsData: { month: string; amount: number; year: number; monthIndex: number }[] = [];
     for (let i = 5; i >= 0; i--) {
       const d = new Date();
       d.setMonth(d.getMonth() - i);
-      months.push({
+      monthsData.push({
         month: d.toLocaleString('default', { month: 'short' }),
         amount: 0,
         year: d.getFullYear(),
@@ -74,11 +76,13 @@ export default function CompanyDashboard() {
 
     companyBills.forEach(bill => {
       const d = new Date(bill.date);
-      const m = months.find(mo => mo.monthIndex === d.getMonth() && mo.year === d.getFullYear());
-      if (m) m.amount += bill.totalAmount;
+      const m = monthsData.find(mo => mo.monthIndex === d.getMonth() && mo.year === d.getFullYear());
+      if (m) {
+        m.amount += (Number(bill.grandTotal) || 0);
+      }
     });
 
-    return months;
+    return monthsData;
   }, [companyBills, currentCompany]);
 
   const recentActivity = useMemo(() => {
@@ -89,7 +93,7 @@ export default function CompanyDashboard() {
         title: `Invoice #${b.billNo} Created`,
         subtitle: `Invoice Date: ${formatDate(b.date)}`,
         date: b.createdAt,
-        amount: b.totalAmount,
+        amount: b.grandTotal,
         status: b.calculatedStatus,
         isNew: (new Date().getTime() - new Date(b.createdAt).getTime()) < 48 * 60 * 60 * 1000
       })),
@@ -99,7 +103,7 @@ export default function CompanyDashboard() {
         title: `Payment Confirmed`,
         subtitle: `Received: ${formatDate(p.date)}`,
         date: p.createdAt,
-        amount: p.amount,
+        amount: Number(p.amount) + (Number(p.adjustment) || 0),
         status: 'Paid' as const,
         isNew: false
       }))
