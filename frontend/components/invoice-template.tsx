@@ -7,9 +7,10 @@ interface InvoiceTemplateProps {
     bill: Bill | null;
     hideAttachments?: boolean;
     attachmentDataUrl?: string | null;
+    paidDate?: string;
 }
 
-export const InvoiceTemplate = forwardRef<HTMLDivElement, InvoiceTemplateProps>(({ bill, hideAttachments = false }, ref) => {
+export const InvoiceTemplate = forwardRef<HTMLDivElement, InvoiceTemplateProps>(({ bill, hideAttachments = false, paidDate }, ref) => {
     if (!bill) return null;
 
     // Calculate totals - Ensure numerical addition
@@ -199,6 +200,18 @@ export const InvoiceTemplate = forwardRef<HTMLDivElement, InvoiceTemplateProps>(
                             </button>
                         </div>
                     )}
+
+                    {/* Conditional Notes */}
+                    <div className="mt-4 space-y-1">
+                        {/* Default Note if attachment exists */}
+                        {bill.attachment && (
+                            <p className="text-[10px] text-slate-600 italic font-medium">Note: All Necessary documents enclosed.</p>
+                        )}
+                        {/* Note if NO advance payment was made */}
+                        {advance === 0 && (
+                            <p className="text-[10px] text-slate-600 italic font-medium">Note: The consignee has not made any advance payment.</p>
+                        )}
+                    </div>
                 </div>
 
                 {/* Calculation */}
@@ -230,6 +243,14 @@ export const InvoiceTemplate = forwardRef<HTMLDivElement, InvoiceTemplateProps>(
                                 {netPayable.toLocaleString()}
                             </span>
                         </div>
+                        {/* Paid Date Message */}
+                        {bill.calculatedStatus === 'Paid' && paidDate && (
+                            <div className="pt-2 text-right">
+                                <p className="text-[10px] font-bold text-green-600 uppercase tracking-tight">
+                                    Total Bill is Paid at {formatDate(paidDate)}
+                                </p>
+                            </div>
+                        )}
                     </div>
                 </div>
             </div>

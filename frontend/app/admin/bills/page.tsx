@@ -69,7 +69,7 @@ const statusStyles = {
 import { PDFDocument } from 'pdf-lib';
 
 export default function BillsPage() {
-  const { bills, companies, addBill } = useData();
+  const { bills, companies, addBill, payments } = useData();
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [isViewOpen, setIsViewOpen] = useState(false);
   const [selectedBill, setSelectedBill] = useState<Bill | null>(null);
@@ -142,6 +142,20 @@ export default function BillsPage() {
       setLoading(false);
     }
   };
+
+  const getPaidDate = (billId: string) => {
+    // Find all payments for this bill
+    const billPayments = payments.filter(p =>
+      String(p.billId) === String(billId) ||
+      (p.reference && p.reference === billId) // Legacy check
+    );
+
+    if (billPayments.length === 0) return undefined;
+
+    // Sort by date descending to get the latest payment
+    const sortedPayments = billPayments.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+    return sortedPayments[0].date;
+  }
 
   const handleViewBill = async (bill: Bill) => {
     setSelectedBill(bill);
@@ -1071,7 +1085,11 @@ export default function BillsPage() {
 
               {selectedBill && (
                 <div className="space-y-8 py-4">
-                  <InvoiceTemplate bill={selectedBill} attachmentDataUrl={viewDataUrl} />
+                  <InvoiceTemplate
+                    bill={selectedBill}
+                    attachmentDataUrl={viewDataUrl}
+                    paidDate={getPaidDate(selectedBill.id)}
+                  />
                   <div className="flex gap-4 pt-6 border-t">
                     <Button className="flex-1 gap-2 rounded-xl" onClick={() => handleDownloadInvoice(selectedBill)}>
                       <Download className="w-4 h-4" />
@@ -1092,7 +1110,11 @@ export default function BillsPage() {
       <div style={{ position: 'fixed', top: '200vh', left: 0 }} suppressHydrationWarning>
         {downloadState.bill && (
           <div ref={invoiceRef} className="w-[210mm] bg-white">
-            <InvoiceTemplate bill={downloadState.bill} attachmentDataUrl={downloadState.dataUrl} />
+            <InvoiceTemplate
+              bill={downloadState.bill}
+              attachmentDataUrl={downloadState.dataUrl}
+              paidDate={getPaidDate(downloadState.bill.id)}
+            />
           </div>
         )}
       </div>

@@ -33,12 +33,26 @@ import { formatDate } from '@/lib/utils';
 
 export default function CompanyBillsPage() {
   const { user, isHydrated: authHydrated } = useAuth();
-  const { bills, companies } = useData();
+  const { bills, companies, payments } = useData();
   const [selectedBill, setSelectedBill] = useState<Bill | null>(null);
   const [isViewOpen, setIsViewOpen] = useState(false);
   const tableRef = useRef<HTMLDivElement>(null);
   const invoiceRef = useRef<HTMLDivElement>(null);
   const [pdfBill, setPdfBill] = useState<Bill | null>(null);
+
+  const getPaidDate = (billId: string) => {
+    // Find all payments for this bill
+    const billPayments = payments.filter(p =>
+      String(p.billId) === String(billId) ||
+      (p.reference && p.reference === billId)
+    );
+
+    if (billPayments.length === 0) return undefined;
+
+    // Sort by date descending to get the latest payment
+    const sortedPayments = billPayments.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+    return sortedPayments[0].date;
+  }
 
   const statusStyles: Record<string, string> = {
     Paid: 'bg-green-100 text-green-800 border-green-200',
@@ -314,7 +328,10 @@ export default function CompanyBillsPage() {
 
               {selectedBill && (
                 <div className="space-y-8 py-4">
-                  <InvoiceTemplate bill={selectedBill} />
+                  <InvoiceTemplate
+                    bill={selectedBill}
+                    paidDate={getPaidDate(selectedBill.id)}
+                  />
                   <div className="flex gap-4 pt-6 border-t">
                     <Button className="flex-1 gap-2 rounded-xl h-12 font-bold shadow-lg" onClick={() => handleDownloadInvoice(selectedBill)}>
                       <Download className="w-4 h-4" />
@@ -334,7 +351,11 @@ export default function CompanyBillsPage() {
       <div style={{ position: 'fixed', top: '200vh', left: 0 }} suppressHydrationWarning>
         {pdfBill && (
           <div ref={invoiceRef} className="w-[210mm] bg-white">
-            <InvoiceTemplate bill={pdfBill} hideAttachments={true} />
+            <InvoiceTemplate
+              bill={pdfBill}
+              hideAttachments={true}
+              paidDate={getPaidDate(pdfBill.id)}
+            />
           </div>
         )}
       </div>
