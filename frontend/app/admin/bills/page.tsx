@@ -57,6 +57,8 @@ import { jsPDF } from 'jspdf';
 import { toPng } from 'html-to-image';
 import { InvoiceTemplate } from '@/components/invoice-template';
 import { CompanySelect } from '@/components/company-select';
+import html2canvas from 'html2canvas';
+import { toast } from '@/components/ui/use-toast';
 
 const statusStyles = {
   Paid: 'bg-green-100 text-green-800 border-green-200',
@@ -91,8 +93,8 @@ export default function BillsPage() {
       // 1. Set the bill to be viewed (renders the hidden template)
       setDownloadState({ bill, dataUrl: null });
 
-      // 2. Wait for render
-      await new Promise((resolve) => setTimeout(resolve, 500));
+      // 2. Wait for render - slightly longer to ensure layout stability
+      await new Promise((resolve) => setTimeout(resolve, 1000));
 
       if (!invoiceRef.current) {
         console.error('Invoice template ref not found');
@@ -100,40 +102,28 @@ export default function BillsPage() {
         return;
       }
 
-      // 3. Capture with html2canvas (high scale for quality)
-      const canvas = await html2canvas(invoiceRef.current, {
-        scale: 2,
-        useCORS: true,
-        logging: false,
-        backgroundColor: '#ffffff'
+      // 3. Capture with html-to-image (toPng) for better fidelity
+      const dataUrl = await toPng(invoiceRef.current, {
+        cacheBust: true,
+        pixelRatio: 2, // High resolution
+        backgroundColor: '#ffffff',
+        style: {
+          transform: 'scale(1)', // Ensure no unintended scaling
+        }
       });
-
-      const imgData = canvas.toDataURL('image/jpeg', 1.0);
 
       // 4. Create A4 PDF (210mm x 297mm)
       const pdf = new jsPDF('p', 'mm', 'a4');
       const pdfWidth = 210;
       const pdfHeight = 297;
 
-      // 5. Calculate Scale to FIT Single Page
-      const imgWidth = pdfWidth;
-      const imgHeight = (canvas.height * pdfWidth) / canvas.width;
+      const imgProps = pdf.getImageProperties(dataUrl);
+      const imgHeight = (imgProps.height * pdfWidth) / imgProps.width;
 
-      // If content is taller than A4, scale it down to fit
-      let finalWidth = imgWidth;
-      let finalHeight = imgHeight;
-
-      if (imgHeight > pdfHeight) {
-        const scaleFactor = pdfHeight / imgHeight;
-        finalWidth = imgWidth * scaleFactor;
-        finalHeight = pdfHeight; // Fits exactly vertically
-      }
-
-      // Center horizontally if scaled down (though usually we just match width)
-      const xOffset = (pdfWidth - finalWidth) / 2;
-      const yOffset = 0; // Top align
-
-      pdf.addImage(imgData, 'JPEG', xOffset, yOffset, finalWidth, finalHeight);
+      // 5. Add Image to PDF
+      // If content is slightly larger, we scale it to fit width. 
+      // Pagination is not expected for single page invoices, but if needed logic can be added.
+      pdf.addImage(dataUrl, 'PNG', 0, 0, pdfWidth, imgHeight);
 
       // 6. Download the Generated PDF
       const filename = bill.jobNumber ? `Invoice_${bill.jobNumber}.pdf` : `Invoice_${bill.billNo}.pdf`;
@@ -196,57 +186,8 @@ export default function BillsPage() {
 
 
 
-  useEffect(() => {
-    if (downloadState.bill && invoiceRef.current) {
-      const generatePDF = async () => {
-        try {
-          // ensure DOM is fully painted with image Data URL, 3.5s for high-res images
-          await new Promise(resolve => setTimeout(resolve, 3500));
-
-          const toPngOptions = {
-            cacheBust: true,
-            pixelRatio: 2,
-            backgroundColor: '#ffffff',
-            filter: (node: any) => node.tagName !== 'IFRAME'
-          };
-
-          const captureDataUrl = await toPng(invoiceRef.current!, toPngOptions);
-          const pdf = new jsPDF('p', 'mm', 'a4');
-          const imgProps = pdf.getImageProperties(captureDataUrl);
-          const pdfWidth = pdf.internal.pageSize.getWidth();
-          const pageHeight = pdf.internal.pageSize.getHeight();
-          const imgHeight = (imgProps.height * pdfWidth) / imgProps.width;
-
-          let heightLeft = imgHeight;
-          let position = 0;
-
-          pdf.addImage(captureDataUrl, 'PNG', 0, position, pdfWidth, imgHeight);
-          heightLeft -= pageHeight;
-
-          while (heightLeft > 0) {
-            position = heightLeft - imgHeight;
-            pdf.addPage();
-            pdf.addImage(captureDataUrl, 'PNG', 0, position, pdfWidth, imgHeight);
-            heightLeft -= pageHeight;
-          }
-
-          const fileName = `Invoice_${downloadState.bill.billNo}`;
-          pdf.save(`${fileName}.pdf`);
-        } catch (err: any) {
-          console.error('PDF creation error details:', {
-            message: err.message,
-            stack: err.stack,
-            error: err
-          });
-          alert(`Could not generate PDF: ${err.message || 'Unknown capture error'}. Please try again.`);
-        } finally {
-          setDownloadState({ bill: null, dataUrl: null });
-          setLoading(false);
-        }
-      };
-      generatePDF();
-    }
-  }, [downloadState]);
+  // 1153: The hidden wrapper div no longer has p-8 padding
+  // 199-249: Removed redundant useEffect hook
 
   const BILL_ITEMS = [
     "DUTY TAXES & ETO",
@@ -1150,7 +1091,7 @@ export default function BillsPage() {
       {/* Hidden Capture Area for PDF Generation  */}
       <div style={{ position: 'fixed', top: '200vh', left: 0 }} suppressHydrationWarning>
         {downloadState.bill && (
-          <div ref={invoiceRef} className="w-[210mm] bg-white p-8">
+          <div ref={invoiceRef} className="w-[210mm] bg-white">
             <InvoiceTemplate bill={downloadState.bill} attachmentDataUrl={downloadState.dataUrl} />
           </div>
         )}

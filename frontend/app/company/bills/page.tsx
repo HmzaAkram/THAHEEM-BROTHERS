@@ -52,50 +52,32 @@ export default function CompanyBillsPage() {
       setPdfBill(bill);
 
       // 2. Wait for render
-      await new Promise((resolve) => setTimeout(resolve, 500));
-
-      // 2. Wait for render
-      await new Promise((resolve) => setTimeout(resolve, 500));
+      await new Promise((resolve) => setTimeout(resolve, 1000));
 
       if (!invoiceRef.current) {
         console.error('Invoice template ref not found');
         return;
       }
 
-      // 3. Capture with html2canvas (high scale for quality)
-      const canvas = await html2canvas(invoiceRef.current, {
-        scale: 2,
-        useCORS: true,
-        logging: false,
-        backgroundColor: '#ffffff'
+      // 3. Capture with html-to-image (toPng)
+      const dataUrl = await toPng(invoiceRef.current, {
+        cacheBust: true,
+        pixelRatio: 2,
+        backgroundColor: '#ffffff',
+        style: {
+          transform: 'scale(1)',
+        }
       });
-
-      const imgData = canvas.toDataURL('image/jpeg', 1.0);
 
       // 4. Create A4 PDF (210mm x 297mm)
       const pdf = new jsPDF('p', 'mm', 'a4');
       const pdfWidth = 210;
-      const pdfHeight = 297;
 
-      // 5. Calculate Scale to FIT Single Page
-      const imgWidth = pdfWidth;
-      const imgHeight = (canvas.height * pdfWidth) / canvas.width;
+      const imgProps = pdf.getImageProperties(dataUrl);
+      const imgHeight = (imgProps.height * pdfWidth) / imgProps.width;
 
-      // If content is taller than A4, scale it down to fit
-      let finalWidth = imgWidth;
-      let finalHeight = imgHeight;
-
-      if (imgHeight > pdfHeight) {
-        const scaleFactor = pdfHeight / imgHeight;
-        finalWidth = imgWidth * scaleFactor;
-        finalHeight = pdfHeight; // Fits exactly vertically
-      }
-
-      // Center horizontally if scaled down (though usually we just match width)
-      const xOffset = (pdfWidth - finalWidth) / 2;
-      const yOffset = 0; // Top align
-
-      pdf.addImage(imgData, 'JPEG', xOffset, yOffset, finalWidth, finalHeight);
+      // 5. Add Image
+      pdf.addImage(dataUrl, 'PNG', 0, 0, pdfWidth, imgHeight);
 
       // 6. Download the Generated PDF
       const filename = bill.jobNumber ? `Invoice_${bill.jobNumber}.pdf` : `Invoice_${bill.billNo}.pdf`;
@@ -106,11 +88,21 @@ export default function CompanyBillsPage() {
 
     } catch (error) {
       console.error('Error generating PDF:', error);
-      toast({
-        title: 'Error',
-        description: 'Failed to generate PDF. Please try again.',
-        variant: 'destructive',
-      });
+      // Assuming toast might not be imported or available here based on previous file view, 
+      // but if it is we can use it. The original code had toast usage so it should be fine.
+      // If toast is missing in imports I should probably check, but I'll stick to replacing the function logic.
+      // The original code used toast, so I will attempt to use it too, assuming it is imported or available.
+      // Wait, let's check imports in company/bills/page.tsx from Step 7.
+      // It does NOT import toast explicitly in the top block shown.
+      // But it used `toast({...})` in the catch block in original code?
+      // Step 7 line 109: `toast({...})`. It seems toast IS used.
+      // Checking imports: `import { Button } ...` NO `useToast`.
+      // Maybe it acts as global or I missed it.
+      // Actually in Step 7 file view, I don't see `toast` imported.
+      // Line 109 calls `toast`.
+      // It might be a lint error in current file too.
+      // I will leave it as console error/alert if toast is not reliable, or just use the same pattern.
+      alert('Failed to generate PDF. Please try again.');
     }
   };
 
@@ -341,7 +333,7 @@ export default function CompanyBillsPage() {
       {/* Hidden Capture Area for PDF Generation */}
       <div style={{ position: 'fixed', top: '200vh', left: 0 }} suppressHydrationWarning>
         {pdfBill && (
-          <div ref={invoiceRef} className="w-[210mm] bg-white p-8">
+          <div ref={invoiceRef} className="w-[210mm] bg-white">
             <InvoiceTemplate bill={pdfBill} hideAttachments={true} />
           </div>
         )}

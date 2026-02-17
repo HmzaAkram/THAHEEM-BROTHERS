@@ -37,7 +37,7 @@ export const InvoiceTemplate = forwardRef<HTMLDivElement, InvoiceTemplateProps>(
                     <div>
                         <h1 className="text-xl font-bold uppercase tracking-wide leading-tight">Thaheem Brothers</h1>
                         <p className="text-[10px] text-slate-600 uppercase tracking-widest font-semibold">Logistics & Supply Chain Solutions</p>
-                        <div className="mt-1 text-[10px] text-slate-500 break-words leading-snug">
+                        <div className="mt-1 text-xs text-slate-500 break-words leading-snug font-bold">
                             <p>Office # 123, Business Center, Karachi, Pakistan</p>
                             <p>+92 300 1234567 | info@thaheembrothers.com</p>
                         </div>
