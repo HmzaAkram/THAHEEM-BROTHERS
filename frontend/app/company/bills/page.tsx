@@ -2,7 +2,7 @@
 
 import { jsPDF } from 'jspdf';
 import html2canvas from 'html2canvas';
-import { toPng } from 'html-to-image';
+import { toJpeg } from 'html-to-image';
 import JSZip from 'jszip';
 import { useRef, useMemo, useState, useEffect } from 'react';
 import { InvoiceTemplate } from '@/components/invoice-template';
@@ -40,6 +40,11 @@ export default function CompanyBillsPage() {
   const invoiceRef = useRef<HTMLDivElement>(null);
   const [pdfBill, setPdfBill] = useState<Bill | null>(null);
 
+  // Filters
+  const [searchTerm, setSearchTerm] = useState('');
+  const [startDate, setStartDate] = useState('');
+  const [endDate, setEndDate] = useState('');
+
   const getPaidDate = (billId: string) => {
     // Find all payments for this bill
     const billPayments = payments.filter(p =>
@@ -73,9 +78,10 @@ export default function CompanyBillsPage() {
         return;
       }
 
-      // 3. Capture with html-to-image (toPng)
-      const dataUrl = await toPng(invoiceRef.current, {
+      // 3. Capture with html-to-image (toJpeg)
+      const dataUrl = await toJpeg(invoiceRef.current, {
         cacheBust: true,
+        quality: 0.95,
         pixelRatio: 2,
         backgroundColor: '#ffffff',
         style: {
@@ -91,7 +97,7 @@ export default function CompanyBillsPage() {
       const imgHeight = (imgProps.height * pdfWidth) / imgProps.width;
 
       // 5. Add Image
-      pdf.addImage(dataUrl, 'PNG', 0, 0, pdfWidth, imgHeight);
+      pdf.addImage(dataUrl, 'JPEG', 0, 0, pdfWidth, imgHeight);
 
       // 6. Download the Generated PDF
       const filename = bill.jobNumber ? `Invoice_${bill.jobNumber}.pdf` : `Invoice_${bill.billNo}.pdf`;
@@ -129,9 +135,29 @@ export default function CompanyBillsPage() {
 
   const companyBills = useMemo(() => {
     if (!currentCompany) return [];
-    return bills.filter(b => String(b.companyId) === String(currentCompany.id))
-      .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
-  }, [bills, currentCompany]);
+    let filtered = bills.filter(b => String(b.companyId) === String(currentCompany.id));
+
+    // Apply Filters
+    if (searchTerm) {
+      const lowerSearch = searchTerm.toLowerCase();
+      filtered = filtered.filter(b =>
+        b.billNo.toLowerCase().includes(lowerSearch) ||
+        b.jobNumber?.toLowerCase().includes(lowerSearch) ||
+        b.gdNumber?.toLowerCase().includes(lowerSearch) ||
+        b.containerNo?.toLowerCase().includes(lowerSearch)
+      );
+    }
+
+    if (startDate) {
+      filtered = filtered.filter(b => b.date >= startDate);
+    }
+
+    if (endDate) {
+      filtered = filtered.filter(b => b.date <= endDate);
+    }
+
+    return filtered.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+  }, [bills, currentCompany, searchTerm, startDate, endDate]);
 
   const stats = useMemo(() => {
     const total = companyBills.reduce((sum, b) => sum + b.grandTotal, 0);
@@ -157,13 +183,13 @@ export default function CompanyBillsPage() {
       );
       await new Promise(resolve => setTimeout(resolve, 300));
 
-      const dataUrl = await toPng(tableRef.current, { cacheBust: true, style: { background: 'white', padding: '20px' } });
+      const dataUrl = await toJpeg(tableRef.current, { cacheBust: true, quality: 0.95, style: { background: 'white', padding: '20px' } });
       const pdf = new jsPDF('p', 'mm', 'a4');
       const imgProps = pdf.getImageProperties(dataUrl);
       const pdfWidth = pdf.internal.pageSize.getWidth();
       const pdfHeight = (imgProps.height * pdfWidth) / imgProps.width;
 
-      pdf.addImage(dataUrl, 'PNG', 0, 0, pdfWidth, pdfHeight);
+      pdf.addImage(dataUrl, 'JPEG', 0, 0, pdfWidth, pdfHeight);
       pdf.save(`My_Bills_${new Date().toISOString().split('T')[0]}.pdf`);
     } catch (err) {
       console.error('Failed to export PDF', err);
@@ -202,6 +228,44 @@ export default function CompanyBillsPage() {
           </div>
 
           <Card className="shadow-md border-border/50">
+            <CardContent className="p-4 space-y-4">
+              <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                <div className="md:col-span-2">
+                  <Label className="text-xs font-semibold uppercase text-muted-foreground mb-1 block">Search</Label>
+                  <div className="relative">
+                    <FileText className="absolute left-3 top-2.5 h-4 w-4 text-muted-foreground" />
+                    <input
+                      type="text"
+                      placeholder="Search by Bill No, Job No, GD, Container..."
+                      className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 pl-9 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+                      value={searchTerm}
+                      onChange={(e) => setSearchTerm(e.target.value)}
+                    />
+                  </div>
+                </div>
+                <div>
+                  <Label className="text-xs font-semibold uppercase text-muted-foreground mb-1 block">From Date</Label>
+                  <input
+                    type="date"
+                    className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+                    value={startDate}
+                    onChange={(e) => setStartDate(e.target.value)}
+                  />
+                </div>
+                <div>
+                  <Label className="text-xs font-semibold uppercase text-muted-foreground mb-1 block">To Date</Label>
+                  <input
+                    type="date"
+                    className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+                    value={endDate}
+                    onChange={(e) => setEndDate(e.target.value)}
+                  />
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card className="shadow-md border-border/50">
             <CardHeader>
               <CardTitle className="text-base">Invoices</CardTitle>
             </CardHeader>
@@ -220,9 +284,9 @@ export default function CompanyBillsPage() {
                   <Table>
                     <TableHeader>
                       <TableRow className="bg-secondary/50">
-                        <TableHead>Invoice No</TableHead>
-                        <TableHead>Date</TableHead>
                         <TableHead>Job No</TableHead>
+                        <TableHead>Date</TableHead>
+                        <TableHead>Invoice No</TableHead>
                         <TableHead>Amount</TableHead>
                         <TableHead>Status</TableHead>
                         <TableHead className="text-right">Actions</TableHead>
@@ -232,7 +296,7 @@ export default function CompanyBillsPage() {
                       {companyBills.map((bill) => (
                         <TableRow key={bill.id} className="hover:bg-muted/30 transition-colors">
                           <TableCell className="font-mono text-sm font-bold text-primary">
-                            {bill.billNo}
+                            {bill.jobNumber || bill.billNo}
                           </TableCell>
                           <TableCell className="text-sm">
                             {formatDate(bill.date)}

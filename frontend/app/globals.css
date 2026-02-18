@@ -132,15 +132,22 @@
     display: none !important;
   }
 
-  body {
-    background: white !important;
-    color: black !important;
+  /* Ensure body and main scroll/expand for printing */
+  body,
+  html,
+  #root,
+  .overflow-hidden,
+  .overflow-auto {
+    height: auto !important;
+    overflow: visible !important;
   }
 
   main {
     margin: 0 !important;
     padding: 0 !important;
     width: 100% !important;
+    height: auto !important;
+    overflow: visible !important;
   }
 
   .print-only {

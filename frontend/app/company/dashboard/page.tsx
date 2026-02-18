@@ -16,9 +16,20 @@ import {
   Tooltip,
   ResponsiveContainer,
 } from 'recharts';
-import { Download, DollarSign, FileText, TrendingUp, Phone, Mail, MapPin } from 'lucide-react';
-import { useMemo } from 'react';
+import { Download, DollarSign, FileText, TrendingUp, Phone, Mail, MapPin, Loader2 } from 'lucide-react';
+import { useMemo, useRef, useState } from 'react';
 import { Label } from '@/components/ui/label';
+import { jsPDF } from 'jspdf';
+import { toPng } from 'html-to-image';
+import { toast } from 'sonner';
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from '@/components/ui/table';
 
 const statusStyles = {
   Paid: 'bg-green-100 text-green-800 border-green-200',
@@ -31,7 +42,9 @@ import { Badge } from '@/components/ui/badge';
 
 export default function CompanyDashboard() {
   const { user, isHydrated: authHydrated } = useAuth();
-  const { companies, bills, payments, getCompanyBalance } = useData();
+  const { companies, bills, payments, getCompanyBalance, getCompanyLedger } = useData();
+  const ledgerRef = useRef<HTMLDivElement>(null);
+  const [downloadLoading, setDownloadLoading] = useState(false);
 
   // SIMULATE LOGGED IN USER (Get current user company or first one)
   const currentCompany = useMemo(() => {
@@ -90,8 +103,8 @@ export default function CompanyDashboard() {
       ...companyBills.map(b => ({
         id: b.id,
         type: 'BILL' as const,
-        title: `Invoice #${b.billNo} Created`,
-        subtitle: `Invoice Date: ${formatDate(b.date)}`,
+        title: `Job #${b.jobNumber || b.billNo}`,
+        subtitle: `Invoice: ${b.billNo} | Date: ${formatDate(b.date)}`,
         date: b.createdAt,
         amount: b.grandTotal,
         status: b.calculatedStatus,
@@ -110,7 +123,46 @@ export default function CompanyDashboard() {
     ];
 
     return combined.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()).slice(0, 10);
+    return combined.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()).slice(0, 10);
   }, [companyBills, companyPayments]);
+
+  const ledger = useMemo(() => {
+    if (!currentCompany) return [];
+    return getCompanyLedger(currentCompany.id);
+  }, [currentCompany, getCompanyLedger]);
+
+  const summary = useMemo(() => {
+    const totalDebit = ledger.reduce((sum, entry) => sum + entry.debit, 0);
+    const totalCredit = ledger.reduce((sum, entry) => sum + entry.credit, 0);
+    return {
+      totalDebit,
+      totalCredit,
+      balance: totalDebit - totalCredit
+    };
+  }, [ledger]);
+
+  const handleDownloadStatement = async () => {
+    if (!ledgerRef.current) return;
+    setDownloadLoading(true);
+
+    try {
+      // Ensure the hidden element is visible for capture (it's off-screen but needs to be rendered)
+      const dataUrl = await toPng(ledgerRef.current, { cacheBust: true, style: { background: 'white', padding: '20px' } });
+      const pdf = new jsPDF('p', 'mm', 'a4');
+      const imgProps = pdf.getImageProperties(dataUrl);
+      const pdfWidth = pdf.internal.pageSize.getWidth();
+      const pdfHeight = (imgProps.height * pdfWidth) / imgProps.width;
+
+      pdf.addImage(dataUrl, 'PNG', 0, 0, pdfWidth, pdfHeight);
+      pdf.save(`Account_Statement_${currentCompany.name}_${new Date().toISOString().split('T')[0]}.pdf`);
+      toast.success('Statement downloaded successfully');
+    } catch (err) {
+      console.error('Failed to export PDF', err);
+      toast.error('Failed to generate statement. Please try again.');
+    } finally {
+      setDownloadLoading(false);
+    }
+  };
 
   if (!authHydrated || !currentCompany) {
     return (
@@ -132,12 +184,12 @@ export default function CompanyDashboard() {
             <p className="text-slate-300">
               Welcome back, <span className="font-semibold text-blue-300">{currentCompany.name}</span>
             </p>
-            <div className="flex gap-4 mt-6">
-              <div className="flex items-center gap-2 text-sm bg-black/20 px-3 py-1.5 rounded-full border border-white/10">
+            <div className="flex flex-wrap gap-2 sm:gap-4 mt-6">
+              <div className="flex items-center gap-2 text-xs sm:text-sm bg-black/20 px-2 py-1 sm:px-3 sm:py-1.5 rounded-full border border-white/10 shrink-0">
                 <Mail className="w-3 h-3 text-blue-400" />
-                {currentCompany.email}
+                <span className="truncate max-w-[200px] sm:max-w-none">{currentCompany.email}</span>
               </div>
-              <div className="flex items-center gap-2 text-sm bg-black/20 px-3 py-1.5 rounded-full border border-white/10">
+              <div className="flex items-center gap-2 text-xs sm:text-sm bg-black/20 px-2 py-1 sm:px-3 sm:py-1.5 rounded-full border border-white/10 shrink-0">
                 <Phone className="w-3 h-3 text-green-400" />
                 {currentCompany.phone}
               </div>
@@ -147,18 +199,14 @@ export default function CompanyDashboard() {
 
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
           {recentActivity.find(a => a.type === 'PAYMENT') && (
-            <Card className="lg:col-span-1 shadow-xl border-green-500/20 bg-green-500/5 dark:bg-green-500/10 backdrop-blur-md flex flex-col justify-center p-6 border-2 border-dashed relative overflow-hidden group">
-              <div className="absolute top-0 right-0 p-2 opacity-10 group-hover:opacity-20 transition-opacity">
-                <CheckCircle2 className="w-12 h-12 text-green-600" />
-              </div>
-              <p className="text-green-600 text-xs font-black uppercase tracking-widest mb-1">Last Payment Success</p>
-              <h3 className="text-xl font-black text-foreground">
-                PKR {recentActivity.find(a => a.type === 'PAYMENT')?.amount.toLocaleString()}
-              </h3>
-              <p className="text-muted-foreground text-[10px] font-medium mt-1 uppercase">
-                {new Date(recentActivity.find(a => a.type === 'PAYMENT')?.date || '').toLocaleDateString('en-GB', { day: '2-digit', month: 'short' })}
-              </p>
-            </Card>
+            <DashboardCard
+              title="Last Payment Success"
+              value={`PKR ${recentActivity.find(a => a.type === 'PAYMENT')?.amount.toLocaleString()}`}
+              icon={CheckCircle2}
+              change={new Date(recentActivity.find(a => a.type === 'PAYMENT')?.date || '').toLocaleDateString('en-GB', { day: '2-digit', month: 'short' })}
+              changeType="positive"
+              changeLabel=""
+            />
           )}
           <DashboardCard
             title="Total Billed"
@@ -284,8 +332,13 @@ export default function CompanyDashboard() {
               </div>
             </CardContent>
             <div className="p-6 pt-0 mt-auto">
-              <Button className="w-full gap-2 group shadow-md bg-white text-foreground hover:bg-slate-50 dark:bg-slate-800 dark:text-white dark:hover:bg-slate-700 border border-border/50" variant="secondary" onClick={() => window.print()}>
-                <Download className="w-4 h-4 group-hover:text-primary transition-colors" />
+              <Button
+                className="w-full gap-2 group shadow-md bg-white text-foreground hover:bg-slate-50 dark:bg-slate-800 dark:text-white dark:hover:bg-slate-700 border border-border/50"
+                variant="secondary"
+                onClick={handleDownloadStatement}
+                disabled={downloadLoading}
+              >
+                {downloadLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Download className="w-4 h-4 group-hover:text-primary transition-colors" />}
                 Download Statement
               </Button>
             </div>
@@ -327,6 +380,54 @@ export default function CompanyDashboard() {
           </Card>
         </div>
       </div>
-    </DashboardLayout>
+
+      {/* Hidden Ledger Table for PDF Generation */}
+      <div style={{ position: 'absolute', top: '-10000px', left: 0, width: '210mm' }}>
+        <div ref={ledgerRef} className="bg-white p-8">
+          <div className="mb-6">
+            <h1 className="text-2xl font-bold">{currentCompany.name} - Account Statement</h1>
+            <p className="text-sm text-gray-500">Generated on {new Date().toLocaleDateString()}</p>
+          </div>
+
+          <div className="grid grid-cols-3 gap-4 mb-6 border p-4 rounded-lg bg-gray-50">
+            <div>
+              <p className="text-xs font-bold text-gray-500 uppercase">Total Debit</p>
+              <p className="text-lg font-bold">PKR {summary.totalDebit.toLocaleString()}</p>
+            </div>
+            <div>
+              <p className="text-xs font-bold text-gray-500 uppercase">Total Credit</p>
+              <p className="text-lg font-bold">PKR {summary.totalCredit.toLocaleString()}</p>
+            </div>
+            <div>
+              <p className="text-xs font-bold text-gray-500 uppercase">Outstanding Balance</p>
+              <p className="text-lg font-bold text-primary">PKR {summary.balance.toLocaleString()}</p>
+            </div>
+          </div>
+
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>Date</TableHead>
+                <TableHead>Description</TableHead>
+                <TableHead className="text-right">Debit</TableHead>
+                <TableHead className="text-right">Credit</TableHead>
+                <TableHead className="text-right">Balance</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {ledger.map((entry) => (
+                <TableRow key={entry.id}>
+                  <TableCell>{formatDate(entry.date)}</TableCell>
+                  <TableCell>{entry.description}</TableCell>
+                  <TableCell className="text-right">{entry.debit > 0 ? entry.debit.toLocaleString() : '-'}</TableCell>
+                  <TableCell className="text-right">{entry.credit > 0 ? entry.credit.toLocaleString() : '-'}</TableCell>
+                  <TableCell className="text-right font-bold">{entry.balance.toLocaleString()}</TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        </div>
+      </div>
+    </DashboardLayout >
   );
 }

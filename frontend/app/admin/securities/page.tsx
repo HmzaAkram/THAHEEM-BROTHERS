@@ -51,11 +51,19 @@ import {
     Calendar,
     User
 } from 'lucide-react';
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { useData, SecurityTracking } from '@/context/data-context';
 import { Badge } from '@/components/ui/badge';
 import { formatDate, formatCurrency } from '@/lib/utils';
 import { CompanySelect } from '@/components/company-select';
+
+
+const calculateRefundDueDate = (startDate: string, days: number) => {
+    if (!startDate) return '';
+    const date = new Date(startDate);
+    date.setDate(date.getDate() + days);
+    return date.toISOString().split('T')[0];
+};
 
 export default function SecuritiesPage() {
     const { securities, companies, addSecurity, updateSecurity } = useData();
@@ -75,11 +83,16 @@ export default function SecuritiesPage() {
     const [refundDays, setRefundDays] = useState('7');
     const [port, setPort] = useState('');
     const [isDocumentSubmitted, setIsDocumentSubmitted] = useState(false);
-    const [refundDueDate, setRefundDueDate] = useState(new Date().toISOString().split('T')[0]);
+    const [refundDueDate, setRefundDueDate] = useState('');
     const [isRefundReceived, setIsRefundReceived] = useState(false);
     const [receivedAmountDate, setReceivedAmountDate] = useState('');
     const [payOrderNo, setPayOrderNo] = useState('');
     const [receiverName, setReceiverName] = useState('');
+
+    // Fix Hydration Error: Set default dates on client-side only
+    useEffect(() => {
+        setRefundDueDate(new Date().toISOString().split('T')[0]);
+    }, []);
 
     const filteredSecurities = securities.filter(s => {
         const matchesSearch = s.companyName.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -94,42 +107,52 @@ export default function SecuritiesPage() {
     });
 
     const handleSubmit = async () => {
-        if (!companyId || !gdNumber || !noOfContainers || !amountPerContainer) {
-            alert("Please fill required fields");
-            return;
-        }
-
-        const selectedCompany = companies.find(c => c.id === companyId);
-        if (!selectedCompany) return;
-
         setLoading(true);
         try {
-            const result = await addSecurity({
+            if (!companyId || !gdNumber || !noOfContainers || !amountPerContainer || !refundDays) {
+                alert('Please fill in all required fields');
+                return;
+            }
+
+            const totalAmount = Number(noOfContainers) * Number(amountPerContainer);
+            // Fix: Convert IDs to strings for comparison to avoid type mismatches
+            const companyName = companies.find((c) => String(c.id) === String(companyId))?.name || 'Unknown';
+
+            // Ensure empty strings are converted to null/undefined or proper format for backend
+            const payload = {
                 companyId,
-                companyName: selectedCompany.name,
+                companyName,
                 gdNumber,
                 noOfContainers: Number(noOfContainers),
                 containerNo,
                 amountPerContainer: Number(amountPerContainer),
+                totalAmount,
                 refundDays: Number(refundDays),
                 port,
-                isDocumentSubmitted,
-                refundDueDate,
-                isRefundReceived,
-                receivedAmountDate: receivedAmountDate || undefined,
-                payOrderNo,
-                receiverName,
-            });
+                isDocumentSubmitted: false,
+                // Use the state value for refundDueDate, or calculate it if needed. 
+                // Any calculation using new Date() inside render/submit is fine, just not in initial state.
+                refundDueDate: refundDueDate || calculateRefundDueDate(new Date().toISOString(), Number(refundDays)),
+                isRefundReceived: false,
+                payOrderNo: payOrderNo || null,
+                receiverName: receiverName || null,
+                status: 'Pending',
+                receivedAmountDate: null,
+            };
 
-            if (result.ok) {
+            console.log('Submitting Security Payload:', payload);
+
+            const result = await addSecurity(payload);
+
+            if (result && result.ok) {
                 setIsDialogOpen(false);
-                // Reset Form
+                // Reset form
                 setCompanyId('');
                 setGdNumber('');
-                setNoOfContainers('1');
+                setNoOfContainers('1'); // Reset to default '1'
                 setContainerNo('');
                 setAmountPerContainer('');
-                setRefundDays('7');
+                setRefundDays('7'); // Reset to default '7'
                 setPort('');
                 setIsDocumentSubmitted(false);
                 setRefundDueDate(new Date().toISOString().split('T')[0]);
@@ -138,11 +161,12 @@ export default function SecuritiesPage() {
                 setPayOrderNo('');
                 setReceiverName('');
             } else {
-                alert("Failed to add security record: " + result.message);
+                console.error('Security Save Failed:', result);
+                alert(`Failed to save security record: ${result?.message || 'Unknown error'}`);
             }
         } catch (error) {
-            console.error("Failed to add security:", error);
-            alert("An unexpected error occurred while saving the security record.");
+            console.error('Security Save Exception:', error);
+            alert('An unexpected error occurred while saving.');
         } finally {
             setLoading(false);
         }
@@ -382,7 +406,7 @@ export default function SecuritiesPage() {
                                         <Button
                                             className="px-10 h-12 rounded-2xl font-black bg-primary hover:bg-primary/90 shadow-xl shadow-primary/20 transition-all active:scale-95 text-base"
                                             onClick={handleSubmit}
-                                            disabled={loading}
+                                            disabled={loading || !companyId || !gdNumber || !noOfContainers || !amountPerContainer || !refundDays}
                                         >
                                             {loading ? "Saving..." : "Save Security Record"}
                                         </Button>

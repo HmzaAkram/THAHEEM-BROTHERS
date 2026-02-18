@@ -119,4 +119,61 @@ class CompanyController extends Controller
         $company->delete();
         return response()->json(null, 204);
     }
+
+    public function requestLedgerEmail(Request $request)
+    {
+        $user = auth('sanctum')->user();
+        
+        // Ensure only a company can request their own ledger, or admin
+        if ($user instanceof \App\Models\Company) {
+            $company = $user;
+        } elseif ($user instanceof \App\Models\User && $user->role === 'admin') {
+             // If admin requests, they might need to specify company_id, but for now we assume this endpoint is for Companies primarily
+             return response()->json(['message' => 'This endpoint is for company use.'], 403);
+        } else {
+            return response()->json(['message' => 'Unauthorized.'], 401);
+        }
+
+        if (!$company->email) {
+            return response()->json(['message' => 'No registered email address found.'], 400);
+        }
+
+        try {
+            // Fetch Ledger Data
+            // We need to replicate the frontend logic: fetch bills and payments, sort, calculate balance
+            // Or simpler: Just send a basic summary and a list of last 20 transactions
+            
+            $bills = $company->bills()->get(); // Assuming relationship exists
+            $payments = $company->payments()->get(); // Assuming relationship exists
+            
+            $totalBilled = $bills->sum('grand_total');
+            $totalPaid = $payments->sum('amount') + $payments->sum('adjustment');
+            $balance = $totalBilled - $totalPaid;
+
+            // Simple HTML Email Content
+            $html = "
+                <h1>Account Ledger Summary</h1>
+                <p><strong>Company:</strong> {$company->name}</p>
+                <p><strong>Date:</strong> " . date('Y-m-d') . "</p>
+                <hr>
+                <p><strong>Total Billed:</strong> PKR " . number_format($totalBilled) . "</p>
+                <p><strong>Total Paid:</strong> PKR " . number_format($totalPaid) . "</p>
+                <p><strong>Current Outstanding Balance:</strong> PKR " . number_format($balance) . "</p>
+                <hr>
+                <p>Please log in to your portal to view the detailed transaction history.</p>
+                <p>Regards,<br>Thaheem Brothers Admin</p>
+            ";
+
+            // Send Email using raw Mail facade for simplicity (or create a Mailable class if preferred)
+            \Illuminate\Support\Facades\Mail::html($html, function ($message) use ($company) {
+                $message->to($company->email)
+                        ->subject('Your Account Ledger Summary - Thaheem Brothers');
+            });
+
+            return response()->json(['message' => 'Ledger summary sent to ' . $company->email]);
+
+        } catch (\Exception $e) {
+            return response()->json(['message' => 'Failed to send email: ' . $e->getMessage()], 500);
+        }
+    }
 }

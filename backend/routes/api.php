@@ -22,6 +22,7 @@ Route::prefix('v1')->middleware('auth.token')->group(function () {
     Route::apiResource('bills', BillController::class);
     Route::apiResource('payments', PaymentController::class);
     Route::apiResource('securities', SecurityController::class);
+    Route::post('/company/request-ledger-email', [CompanyController::class, 'requestLedgerEmail']);
 
     // Backup Routes
     Route::get('/backup/export', [BackupController::class, 'export']);

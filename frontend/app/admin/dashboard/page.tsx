@@ -52,7 +52,6 @@ import {
   FileText,
   CreditCard,
   Download,
-  Printer,
   Users,
   Search,
   ArrowUpRight,
@@ -66,7 +65,7 @@ import {
 import { useMemo, useState, useRef } from 'react';
 import { formatDate, formatCurrency } from '@/lib/utils';
 import { jsPDF } from 'jspdf';
-import { toPng } from 'html-to-image';
+import { toJpeg } from 'html-to-image';
 
 export default function AdminDashboard() {
   const { bills, payments, companies, securities } = useData();
@@ -241,10 +240,6 @@ export default function AdminDashboard() {
     }
   }, [filterType]);
 
-  const handlePrint = () => {
-    window.print();
-  };
-
   const handleExport = async () => {
     if (!reportRef.current) return;
 
@@ -255,9 +250,10 @@ export default function AdminDashboard() {
       if (header) header.classList.remove('hidden');
       if (footer) footer.classList.remove('hidden');
 
-      // 2. Capture the element as PNG
+      // 2. Capture the element as JPEG
       // We use a slight delay or specify quality for better results
-      const dataUrl = await toPng(reportRef.current, {
+      const dataUrl = await toJpeg(reportRef.current, {
+        quality: 0.95,
         backgroundColor: '#f8fafc',
         style: {
           padding: '20px',
@@ -274,7 +270,7 @@ export default function AdminDashboard() {
       const pdfWidth = pdf.internal.pageSize.getWidth();
       const pdfHeight = (imgProps.height * pdfWidth) / imgProps.width;
 
-      pdf.addImage(dataUrl, 'PNG', 0, 0, pdfWidth, pdfHeight);
+      pdf.addImage(dataUrl, 'JPEG', 0, 0, pdfWidth, pdfHeight);
 
       const dateStr = new Date().toISOString().split('T')[0];
       pdf.save(`Business_Report_${dateStr}.pdf`);
@@ -287,690 +283,676 @@ export default function AdminDashboard() {
     <DashboardLayout>
       <div ref={reportRef} className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500 bg-slate-50 p-4 rounded-xl">
         {/* Print Only Header */}
-        <div className="hidden print:block print-header mb-8 pb-4 border-b-2 border-slate-900">
-          <div className="flex justify-between items-center">
+        {/* Print Only Header - Removed as per user request */}
+
+        <div className="print:hidden space-y-8">
+
+
+          <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
             <div>
-              <h1 className="text-2xl font-black text-slate-900 uppercase tracking-tighter">THAHEEM BROTHERS</h1>
-              <p className="text-sm font-bold text-slate-600">Business Performance Report</p>
+              <h1 className="text-3xl md:text-4xl font-extrabold tracking-tight text-foreground bg-gradient-to-r from-primary to-blue-600 bg-clip-text text-transparent drop-shadow-sm">
+                Dashboard
+              </h1>
+              <p className="text-muted-foreground mt-1 md:mt-2 text-sm md:text-lg">
+                Overview of your clearing & forwarding business.
+              </p>
             </div>
-            <div className="text-right">
-              <p className="text-sm font-bold text-slate-900">Date: {formatDate(new Date())}</p>
-              <p className="text-xs text-slate-600 uppercase tracking-widest font-black">{filterLabel}</p>
+            <div className="flex flex-col sm:flex-row gap-3 items-stretch sm:items-center w-full md:w-auto">
+              <Select value={filterType} onValueChange={setFilterType}>
+                <SelectTrigger className="w-full sm:w-[180px] shadow-sm order-2 sm:order-1">
+                  <SelectValue placeholder="Select Period" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="overall">Overall Stats</SelectItem>
+                  <SelectItem value="monthly">Monthly Stats</SelectItem>
+                  <SelectItem value="3_months">3 Months Stats</SelectItem>
+                  <SelectItem value="6_months">6 Months Stats</SelectItem>
+                  <SelectItem value="yearly">Yearly Stats</SelectItem>
+                </SelectContent>
+              </Select>
+
+              <Button
+                className="gap-2 shadow-md bg-primary hover:bg-blue-600 transition-all hover:scale-105 active:scale-95 w-full sm:w-auto order-1 sm:order-2"
+                onClick={handleExport}
+              >
+                <Download className="w-4 h-4" />
+                Export Report
+              </Button>
             </div>
           </div>
-        </div>
 
-        <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
-          <div>
-            <h1 className="text-4xl font-extrabold tracking-tight text-foreground bg-gradient-to-r from-primary to-blue-600 bg-clip-text text-transparent drop-shadow-sm">
-              Dashboard
-            </h1>
-            <p className="text-muted-foreground mt-2 text-lg">
-              Overview of your clearing & forwarding business.
-            </p>
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+            <DashboardCard
+              title={filterType === 'overall' ? "Total Companies" : "New Companies"}
+              value={filteredStats.activeCompanies.toString()}
+              icon={Users}
+              change={filterLabel}
+              changeType="neutral"
+            />
+            <DashboardCard
+              title={filterType === 'overall' ? "Total Billed" : "Billed"}
+              value={formatCurrency(filteredStats.totalBilled)}
+              icon={FileText}
+              change={filterLabel}
+              changeType="neutral"
+            />
+            <DashboardCard
+              title={filterType === 'overall' ? "Total Collected" : "Collected"}
+              value={formatCurrency(filteredStats.totalCollected)}
+              icon={CreditCard}
+              change={filterLabel}
+              changeType="positive"
+            />
+            <DashboardCard
+              title={filterType === 'overall' ? "Outstanding Balance" : "Outstanding"}
+              value={formatCurrency(filteredStats.outstanding)}
+              icon={DollarSign}
+              change={filterLabel}
+              changeType={filteredStats.outstanding > 0 ? "negative" : "positive"}
+            />
           </div>
-          <div className="flex gap-3 items-center">
-            <Select value={filterType} onValueChange={setFilterType}>
-              <SelectTrigger className="w-[180px] shadow-sm">
-                <SelectValue placeholder="Select Period" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="overall">Overall Stats</SelectItem>
-                <SelectItem value="monthly">Monthly Stats</SelectItem>
-                <SelectItem value="3_months">3 Months Stats</SelectItem>
-                <SelectItem value="6_months">6 Months Stats</SelectItem>
-                <SelectItem value="yearly">Yearly Stats</SelectItem>
-              </SelectContent>
-            </Select>
-            <Button
-              variant="outline"
-              className="gap-2 shadow-sm hover:bg-muted/80 transition-colors"
-              onClick={handlePrint}
-            >
-              <Printer className="w-4 h-4" />
-              Print
-            </Button>
-            <Button
-              className="gap-2 shadow-md bg-primary hover:bg-blue-600 transition-all hover:scale-105 active:scale-95"
-              onClick={handleExport}
-            >
-              <Download className="w-4 h-4" />
-              Export Report
-            </Button>
+
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            {/* Companies Overview Section */}
+            <Card className="lg:col-span-2 shadow-xl border-0 bg-white/50 dark:bg-slate-900/50 backdrop-blur-md ring-1 ring-black/5 dark:ring-white/10 overflow-hidden flex flex-col">
+              <CardHeader className="pb-4">
+                <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+                  <div>
+                    <CardTitle className="text-xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-slate-900 to-slate-600 dark:from-white dark:to-slate-400">
+                      Companies Overview
+                    </CardTitle>
+                    <p className="text-xs text-muted-foreground">Financial health across your client base</p>
+                  </div>
+                  <div className="relative w-full md:w-64">
+                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                    <Input
+                      placeholder="Search companies..."
+                      value={companySearch}
+                      onChange={(e) => setCompanySearch(e.target.value)}
+                      className="pl-9 bg-white/50 dark:bg-slate-950/50 border-border/50 h-9 rounded-lg"
+                    />
+                  </div>
+                </div>
+              </CardHeader>
+              <CardContent className="flex-1 p-0 overflow-auto">
+                <div className="min-w-[600px]">
+                  <Table>
+                    <TableHeader className="bg-muted/30 sticky top-0 z-10">
+                      <TableRow className="hover:bg-transparent border-b-0">
+                        <TableHead className="py-3 px-6 font-bold text-xs uppercase tracking-wider">Company Name</TableHead>
+                        <TableHead className="py-3 px-4 font-bold text-xs uppercase tracking-wider">Total Debit</TableHead>
+                        <TableHead className="py-3 px-4 font-bold text-xs uppercase tracking-wider">Total Credit</TableHead>
+                        <TableHead className="py-3 px-6 font-bold text-xs uppercase tracking-wider text-right">Balance</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {filteredCompanies.length === 0 ? (
+                        <TableRow>
+                          <TableCell colSpan={4} className="h-64 text-center">
+                            <div className="flex flex-col items-center justify-center text-muted-foreground/50">
+                              <Users className="w-12 h-12 mb-3 opacity-20" />
+                              <p className="font-semibold">No companies found</p>
+                              <p className="text-xs">Try adjusting your search</p>
+                            </div>
+                          </TableCell>
+                        </TableRow>
+                      ) : (
+                        filteredCompanies
+                          .slice(0, companySearch ? undefined : 5)
+                          .map((c) => (
+                            <TableRow key={c.id} className="hover:bg-primary/5 transition-colors border-b border-border/40 group">
+                              <TableCell className="py-4 px-6">
+                                <div>
+                                  <p className="font-bold text-sm text-foreground group-hover:text-primary transition-colors">{c.name}</p>
+                                  {c.identifier && <p className="text-[10px] text-muted-foreground uppercase font-black opacity-60">{c.identifier}</p>}
+                                </div>
+                              </TableCell>
+                              <TableCell className="py-4 px-4 font-mono text-xs font-bold text-slate-700 dark:text-slate-300">
+                                {formatCurrency(c.debit)}
+                              </TableCell>
+                              <TableCell className="py-4 px-4 font-mono text-xs font-bold text-emerald-600">
+                                {formatCurrency(c.credit)}
+                              </TableCell>
+                              <TableCell className="py-4 px-6 text-right">
+                                <div className="flex flex-col items-end">
+                                  <span className={`text-sm font-black font-mono tracking-tighter ${c.balance > 0 ? 'text-rose-600' : 'text-emerald-600'
+                                    }`}>
+                                    {formatCurrency(c.balance)}
+                                  </span>
+                                  <div className={`mt-0.5 flex items-center gap-1 text-[10px] font-bold uppercase ${c.balance > 0 ? 'text-rose-500/70' : 'text-emerald-500/70'
+                                    }`}>
+                                    {c.balance > 0 ? (
+                                      <>Receivable <ArrowUpRight className="w-2.5 h-2.5" /></>
+                                    ) : (
+                                      <>Cleared <ArrowDownRight className="w-2.5 h-2.5" /></>
+                                    )}
+                                  </div>
+                                </div>
+                              </TableCell>
+                            </TableRow>
+                          ))
+                      )}
+                    </TableBody>
+                  </Table>
+                </div>
+              </CardContent>
+            </Card>
+
+            <Card className="shadow-xl border-0 bg-white/50 dark:bg-slate-900/50 backdrop-blur-md ring-1 ring-black/5 dark:ring-white/10 flex flex-col h-[600px]">
+              <CardHeader className="pb-2 border-b border-border/50">
+                <CardTitle className="text-xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-blue-600 to-indigo-500">
+                  Recent Activity
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="flex-1 overflow-auto p-4">
+                <Tabs defaultValue="all" className="w-full">
+                  <TabsList className="grid w-full grid-cols-3 mb-6 h-10 bg-muted/50 p-1">
+                    <TabsTrigger value="all" className="text-[10px] font-black py-1.5 uppercase">General</TabsTrigger>
+                    <TabsTrigger value="bills" className="text-[10px] font-black py-1.5 uppercase">Bills</TabsTrigger>
+                    <TabsTrigger value="payments" className="text-[10px] font-black py-1.5 uppercase">Payments</TabsTrigger>
+                  </TabsList>
+
+                  <TabsContent value="all" className="mt-0 focus-visible:ring-0">
+                    <div className="space-y-3">
+                      {recentActions.length === 0 ? (
+                        <div className="flex flex-col items-center justify-center py-10 text-muted-foreground opacity-50">
+                          <FileText className="w-10 h-10 mb-2" />
+                          <p>No recent activity.</p>
+                        </div>
+                      ) : (
+                        recentActions.map((action) => (
+                          <div key={`${action.type}-${action.id}`} className="flex items-start justify-between group p-3 rounded-lg hover:bg-white dark:hover:bg-slate-800 transition-all duration-200 border border-transparent hover:border-border/50 shadow-sm hover:shadow-md">
+                            <div className="flex gap-4 items-center">
+                              <div className={`p-2 rounded-full ring-2 ring-opacity-20 ${action.type === 'BILL' ? 'bg-blue-100 text-blue-600 ring-blue-500' :
+                                action.type === 'PAYMENT' ? 'bg-green-100 text-green-600 ring-green-500' :
+                                  'bg-orange-100 text-orange-600 ring-orange-500'
+                                }`}>
+                                {action.type === 'BILL' && <FileText className="w-4 h-4" />}
+                                {action.type === 'PAYMENT' && <DollarSign className="w-4 h-4" />}
+                                {action.type === 'COMPANY' && <Users className="w-4 h-4" />}
+                              </div>
+                              <div>
+                                <p className="font-semibold text-sm text-foreground group-hover:text-primary transition-colors">
+                                  {action.title}
+                                </p>
+                                <p className="text-xs text-muted-foreground">
+                                  {action.subtitle}
+                                </p>
+                              </div>
+                            </div>
+                          </div>
+                        ))
+                      )}
+                    </div>
+                  </TabsContent>
+
+                  <TabsContent value="bills" className="mt-0 focus-visible:ring-0">
+                    <div className="space-y-3">
+                      {recentBills.length === 0 ? (
+                        <div className="flex flex-col items-center justify-center py-10 text-muted-foreground opacity-50">
+                          <FileText className="w-10 h-10 mb-2" />
+                          <p>No recent bills.</p>
+                        </div>
+                      ) : (
+                        recentBills.map((bill) => (
+                          <div key={`bill-${bill.id}`} className="flex items-center justify-between p-3 rounded-lg hover:bg-white dark:hover:bg-slate-800 transition-all duration-200 border border-transparent hover:border-border/50 shadow-sm hover:shadow-md py-4">
+                            <div className="flex gap-4 items-center">
+                              <div className="p-2 rounded-full ring-2 ring-opacity-20 bg-blue-100 text-blue-600 ring-blue-500">
+                                <FileText className="w-4 h-4" />
+                              </div>
+                              <div>
+                                <p className="font-semibold text-sm text-foreground group-hover:text-primary transition-colors">
+                                  {bill.title}
+                                </p>
+                                <p className="text-xs text-muted-foreground">
+                                  {bill.subtitle}
+                                </p>
+                              </div>
+                            </div>
+                          </div>
+                        ))
+                      )}
+                    </div>
+                  </TabsContent>
+
+                  <TabsContent value="payments" className="mt-0 focus-visible:ring-0">
+                    <div className="space-y-3">
+                      {recentPayments.length === 0 ? (
+                        <div className="flex flex-col items-center justify-center py-10 text-muted-foreground opacity-50">
+                          <DollarSign className="w-10 h-10 mb-2" />
+                          <p>No recent payments.</p>
+                        </div>
+                      ) : (
+                        recentPayments.map((payment) => (
+                          <div key={`payment-${payment.id}`} className="flex items-center justify-between p-3 rounded-lg hover:bg-white dark:hover:bg-slate-800 transition-all duration-200 border border-transparent hover:border-border/50 shadow-sm hover:shadow-md py-4">
+                            <div className="flex gap-4 items-center">
+                              <div className="p-2 rounded-full ring-2 ring-opacity-20 bg-green-100 text-green-600 ring-green-500">
+                                <DollarSign className="w-4 h-4" />
+                              </div>
+                              <div>
+                                <p className="font-semibold text-sm text-foreground group-hover:text-primary transition-colors">
+                                  {payment.title}
+                                </p>
+                                <p className="text-xs text-muted-foreground">
+                                  {payment.subtitle}
+                                </p>
+                              </div>
+                            </div>
+                          </div>
+                        ))
+                      )}
+                    </div>
+                  </TabsContent>
+                </Tabs>
+              </CardContent>
+              <div className="p-6 pt-0 mt-auto border-t border-border/10">
+                <Button variant="ghost" className="w-full text-muted-foreground hover:text-primary hover:bg-primary/5 group" size="sm">
+                  View All Activity
+                  <span className="inline-block transition-transform group-hover:translate-x-1 ml-1">→</span>
+                </Button>
+              </div>
+            </Card>
           </div>
-        </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-          <DashboardCard
-            title={filterType === 'overall' ? "Total Companies" : "New Companies"}
-            value={filteredStats.activeCompanies.toString()}
-            icon={Users}
-            change={filterLabel}
-            changeType="neutral"
-          />
-          <DashboardCard
-            title={filterType === 'overall' ? "Total Billed" : "Billed"}
-            value={formatCurrency(filteredStats.totalBilled)}
-            icon={FileText}
-            change={filterLabel}
-            changeType="neutral"
-          />
-          <DashboardCard
-            title={filterType === 'overall' ? "Total Collected" : "Collected"}
-            value={formatCurrency(filteredStats.totalCollected)}
-            icon={CreditCard}
-            change={filterLabel}
-            changeType="positive"
-          />
-          <DashboardCard
-            title={filterType === 'overall' ? "Outstanding Balance" : "Outstanding"}
-            value={formatCurrency(filteredStats.outstanding)}
-            icon={DollarSign}
-            change={filterLabel}
-            changeType={filteredStats.outstanding > 0 ? "negative" : "positive"}
-          />
-        </div>
-
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          {/* Companies Overview Section */}
-          <Card className="lg:col-span-2 shadow-xl border-0 bg-white/50 dark:bg-slate-900/50 backdrop-blur-md ring-1 ring-black/5 dark:ring-white/10 overflow-hidden flex flex-col">
+          {/* Securities Section */}
+          <Card className="shadow-xl border-0 bg-white/50 dark:bg-slate-900/50 backdrop-blur-md ring-1 ring-black/5 dark:ring-white/10 overflow-hidden">
             <CardHeader className="pb-4">
               <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
-                <div>
-                  <CardTitle className="text-xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-slate-900 to-slate-600 dark:from-white dark:to-slate-400">
-                    Companies Overview
-                  </CardTitle>
-                  <p className="text-xs text-muted-foreground">Financial health across your client base</p>
+                <div className="flex items-center gap-3">
+                  <Shield className="w-6 h-6 text-primary" />
+                  <div>
+                    <CardTitle className="text-xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-primary to-blue-500">
+                      Securities Tracking
+                    </CardTitle>
+                    <p className="text-xs text-muted-foreground mt-1">Monitor security deposits and refunds</p>
+                  </div>
                 </div>
-                <div className="relative w-full md:w-64">
-                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-                  <Input
-                    placeholder="Search companies..."
-                    value={companySearch}
-                    onChange={(e) => setCompanySearch(e.target.value)}
-                    className="pl-9 bg-white/50 dark:bg-slate-950/50 border-border/50 h-9 rounded-lg"
-                  />
-                </div>
+                <Tabs value={securityFilter} onValueChange={(v) => setSecurityFilter(v as any)} className="w-full md:w-auto">
+                  <TabsList className="grid w-full grid-cols-3 h-9 bg-muted/50">
+                    <TabsTrigger value="all" className="text-xs font-bold uppercase">All</TabsTrigger>
+                    <TabsTrigger value="pending" className="text-xs font-bold uppercase">Pending</TabsTrigger>
+                    <TabsTrigger value="received" className="text-xs font-bold uppercase">Received</TabsTrigger>
+                  </TabsList>
+                </Tabs>
               </div>
             </CardHeader>
-            <CardContent className="flex-1 p-0 overflow-auto">
-              <div className="min-w-[600px]">
+            <CardContent className="p-0">
+              <div className="overflow-x-auto">
                 <Table>
-                  <TableHeader className="bg-muted/30 sticky top-0 z-10">
+                  <TableHeader className="bg-muted/30">
                     <TableRow className="hover:bg-transparent border-b-0">
-                      <TableHead className="py-3 px-6 font-bold text-xs uppercase tracking-wider">Company Name</TableHead>
-                      <TableHead className="py-3 px-4 font-bold text-xs uppercase tracking-wider">Total Debit</TableHead>
-                      <TableHead className="py-3 px-4 font-bold text-xs uppercase tracking-wider">Total Credit</TableHead>
-                      <TableHead className="py-3 px-6 font-bold text-xs uppercase tracking-wider text-right">Balance</TableHead>
+                      <TableHead className="py-3 px-6 font-bold text-xs uppercase tracking-wider">GD Number</TableHead>
+                      <TableHead className="py-3 px-4 font-bold text-xs uppercase tracking-wider">Company</TableHead>
+                      <TableHead className="py-3 px-4 font-bold text-xs uppercase tracking-wider">Port</TableHead>
+                      <TableHead className="py-3 px-4 font-bold text-xs uppercase tracking-wider text-center">Containers</TableHead>
+                      <TableHead className="py-3 px-4 font-bold text-xs uppercase tracking-wider text-right">Total Amount</TableHead>
+                      <TableHead className="py-3 px-4 font-bold text-xs uppercase tracking-wider text-center">Status</TableHead>
+                      <TableHead className="py-3 px-6 font-bold text-xs uppercase tracking-wider text-center">Action</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {filteredCompanies.length === 0 ? (
-                      <TableRow>
-                        <TableCell colSpan={4} className="h-64 text-center">
-                          <div className="flex flex-col items-center justify-center text-muted-foreground/50">
-                            <Users className="w-12 h-12 mb-3 opacity-20" />
-                            <p className="font-semibold">No companies found</p>
-                            <p className="text-xs">Try adjusting your search</p>
-                          </div>
-                        </TableCell>
-                      </TableRow>
-                    ) : (
-                      filteredCompanies
-                        .slice(0, companySearch ? undefined : 5)
-                        .map((c) => (
-                          <TableRow key={c.id} className="hover:bg-primary/5 transition-colors border-b border-border/40 group">
+                    {securities
+                      .filter(s => {
+                        if (securityFilter === 'pending') return !s.isRefundReceived;
+                        if (securityFilter === 'received') return s.isRefundReceived;
+                        return true;
+                      })
+                      .map((security) => {
+                        const totalAmount = security.noOfContainers * security.amountPerContainer;
+                        return (
+                          <TableRow key={security.id} className="hover:bg-primary/5 transition-colors border-b border-border/40 group">
                             <TableCell className="py-4 px-6">
-                              <div>
-                                <p className="font-bold text-sm text-foreground group-hover:text-primary transition-colors">{c.name}</p>
-                                {c.identifier && <p className="text-[10px] text-muted-foreground uppercase font-black opacity-60">{c.identifier}</p>}
-                              </div>
+                              <p className="font-mono font-bold text-sm text-foreground">{security.gdNumber}</p>
                             </TableCell>
-                            <TableCell className="py-4 px-4 font-mono text-xs font-bold text-slate-700 dark:text-slate-300">
-                              {formatCurrency(c.debit)}
+                            <TableCell className="py-4 px-4">
+                              <p className="font-semibold text-sm text-foreground group-hover:text-primary transition-colors">{security.companyName}</p>
                             </TableCell>
-                            <TableCell className="py-4 px-4 font-mono text-xs font-bold text-emerald-600">
-                              {formatCurrency(c.credit)}
+                            <TableCell className="py-4 px-4">
+                              <p className="text-sm text-muted-foreground uppercase font-medium">{security.port}</p>
                             </TableCell>
-                            <TableCell className="py-4 px-6 text-right">
-                              <div className="flex flex-col items-end">
-                                <span className={`text-sm font-black font-mono tracking-tighter ${c.balance > 0 ? 'text-rose-600' : 'text-emerald-600'
-                                  }`}>
-                                  {formatCurrency(c.balance)}
-                                </span>
-                                <div className={`mt-0.5 flex items-center gap-1 text-[10px] font-bold uppercase ${c.balance > 0 ? 'text-rose-500/70' : 'text-emerald-500/70'
-                                  }`}>
-                                  {c.balance > 0 ? (
-                                    <>Receivable <ArrowUpRight className="w-2.5 h-2.5" /></>
-                                  ) : (
-                                    <>Cleared <ArrowDownRight className="w-2.5 h-2.5" /></>
-                                  )}
+                            <TableCell className="py-4 px-4 text-center">
+                              <span className="inline-flex items-center gap-1 px-2 py-1 rounded-md bg-primary/10 text-primary font-bold text-xs">
+                                {security.noOfContainers} × PKR {security.amountPerContainer.toLocaleString()}
+                              </span>
+                            </TableCell>
+                            <TableCell className="py-4 px-4 text-right">
+                              <p className="font-mono font-bold text-sm text-foreground">{formatCurrency(totalAmount)}</p>
+                            </TableCell>
+                            <TableCell className="py-4 px-4 text-center">
+                              {security.isRefundReceived ? (
+                                <div className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-emerald-100 text-emerald-700 border border-emerald-200">
+                                  <CheckCircle2 className="w-3.5 h-3.5" />
+                                  <span className="text-xs font-bold uppercase tracking-wide">Received</span>
                                 </div>
-                              </div>
+                              ) : (
+                                <div className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-amber-100 text-amber-700 border border-amber-200">
+                                  <Clock className="w-3.5 h-3.5" />
+                                  <span className="text-xs font-bold uppercase tracking-wide">Pending</span>
+                                </div>
+                              )}
+                            </TableCell>
+                            <TableCell className="py-4 px-6 text-center">
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                className="gap-2 hover:bg-primary/5 hover:border-primary/40 transition-all"
+                                onClick={() => {
+                                  setSelectedSecurity(security);
+                                  setIsSecurityDialogOpen(true);
+                                }}
+                              >
+                                <Eye className="w-3.5 h-3.5" />
+                                View
+                              </Button>
                             </TableCell>
                           </TableRow>
-                        ))
-                    )}
+                        );
+                      })}
+                    {securities.filter(s => {
+                      if (securityFilter === 'pending') return !s.isRefundReceived;
+                      if (securityFilter === 'received') return s.isRefundReceived;
+                      return true;
+                    }).length === 0 && (
+                        <TableRow>
+                          <TableCell colSpan={7} className="h-32 text-center">
+                            <div className="flex flex-col items-center justify-center text-muted-foreground/50">
+                              <Shield className="w-12 h-12 mb-3 opacity-20" />
+                              <p className="font-semibold">No securities found</p>
+                              <p className="text-xs">Try adjusting your filter</p>
+                            </div>
+                          </TableCell>
+                        </TableRow>
+                      )}
                   </TableBody>
                 </Table>
               </div>
-            </CardContent>
-          </Card>
 
-          <Card className="shadow-xl border-0 bg-white/50 dark:bg-slate-900/50 backdrop-blur-md ring-1 ring-black/5 dark:ring-white/10 flex flex-col h-[600px]">
-            <CardHeader className="pb-2 border-b border-border/50">
-              <CardTitle className="text-xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-blue-600 to-indigo-500">
-                Recent Activity
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="flex-1 overflow-auto p-4">
-              <Tabs defaultValue="all" className="w-full">
-                <TabsList className="grid w-full grid-cols-3 mb-6 h-10 bg-muted/50 p-1">
-                  <TabsTrigger value="all" className="text-[10px] font-black py-1.5 uppercase">General</TabsTrigger>
-                  <TabsTrigger value="bills" className="text-[10px] font-black py-1.5 uppercase">Bills</TabsTrigger>
-                  <TabsTrigger value="payments" className="text-[10px] font-black py-1.5 uppercase">Payments</TabsTrigger>
-                </TabsList>
-
-                <TabsContent value="all" className="mt-0 focus-visible:ring-0">
-                  <div className="space-y-3">
-                    {recentActions.length === 0 ? (
-                      <div className="flex flex-col items-center justify-center py-10 text-muted-foreground opacity-50">
-                        <FileText className="w-10 h-10 mb-2" />
-                        <p>No recent activity.</p>
-                      </div>
-                    ) : (
-                      recentActions.map((action) => (
-                        <div key={`${action.type}-${action.id}`} className="flex items-start justify-between group p-3 rounded-lg hover:bg-white dark:hover:bg-slate-800 transition-all duration-200 border border-transparent hover:border-border/50 shadow-sm hover:shadow-md">
-                          <div className="flex gap-4 items-center">
-                            <div className={`p-2 rounded-full ring-2 ring-opacity-20 ${action.type === 'BILL' ? 'bg-blue-100 text-blue-600 ring-blue-500' :
-                              action.type === 'PAYMENT' ? 'bg-green-100 text-green-600 ring-green-500' :
-                                'bg-orange-100 text-orange-600 ring-orange-500'
-                              }`}>
-                              {action.type === 'BILL' && <FileText className="w-4 h-4" />}
-                              {action.type === 'PAYMENT' && <DollarSign className="w-4 h-4" />}
-                              {action.type === 'COMPANY' && <Users className="w-4 h-4" />}
-                            </div>
-                            <div>
-                              <p className="font-semibold text-sm text-foreground group-hover:text-primary transition-colors">
-                                {action.title}
-                              </p>
-                              <p className="text-xs text-muted-foreground">
-                                {action.subtitle}
-                              </p>
-                            </div>
-                          </div>
-                        </div>
-                      ))
-                    )}
-                  </div>
-                </TabsContent>
-
-                <TabsContent value="bills" className="mt-0 focus-visible:ring-0">
-                  <div className="space-y-3">
-                    {recentBills.length === 0 ? (
-                      <div className="flex flex-col items-center justify-center py-10 text-muted-foreground opacity-50">
-                        <FileText className="w-10 h-10 mb-2" />
-                        <p>No recent bills.</p>
-                      </div>
-                    ) : (
-                      recentBills.map((bill) => (
-                        <div key={`bill-${bill.id}`} className="flex items-center justify-between p-3 rounded-lg hover:bg-white dark:hover:bg-slate-800 transition-all duration-200 border border-transparent hover:border-border/50 shadow-sm hover:shadow-md py-4">
-                          <div className="flex gap-4 items-center">
-                            <div className="p-2 rounded-full ring-2 ring-opacity-20 bg-blue-100 text-blue-600 ring-blue-500">
-                              <FileText className="w-4 h-4" />
-                            </div>
-                            <div>
-                              <p className="font-semibold text-sm text-foreground group-hover:text-primary transition-colors">
-                                {bill.title}
-                              </p>
-                              <p className="text-xs text-muted-foreground">
-                                {bill.subtitle}
-                              </p>
-                            </div>
-                          </div>
-                        </div>
-                      ))
-                    )}
-                  </div>
-                </TabsContent>
-
-                <TabsContent value="payments" className="mt-0 focus-visible:ring-0">
-                  <div className="space-y-3">
-                    {recentPayments.length === 0 ? (
-                      <div className="flex flex-col items-center justify-center py-10 text-muted-foreground opacity-50">
-                        <DollarSign className="w-10 h-10 mb-2" />
-                        <p>No recent payments.</p>
-                      </div>
-                    ) : (
-                      recentPayments.map((payment) => (
-                        <div key={`payment-${payment.id}`} className="flex items-center justify-between p-3 rounded-lg hover:bg-white dark:hover:bg-slate-800 transition-all duration-200 border border-transparent hover:border-border/50 shadow-sm hover:shadow-md py-4">
-                          <div className="flex gap-4 items-center">
-                            <div className="p-2 rounded-full ring-2 ring-opacity-20 bg-green-100 text-green-600 ring-green-500">
-                              <DollarSign className="w-4 h-4" />
-                            </div>
-                            <div>
-                              <p className="font-semibold text-sm text-foreground group-hover:text-primary transition-colors">
-                                {payment.title}
-                              </p>
-                              <p className="text-xs text-muted-foreground">
-                                {payment.subtitle}
-                              </p>
-                            </div>
-                          </div>
-                        </div>
-                      ))
-                    )}
-                  </div>
-                </TabsContent>
-              </Tabs>
-            </CardContent>
-            <div className="p-6 pt-0 mt-auto border-t border-border/10">
-              <Button variant="ghost" className="w-full text-muted-foreground hover:text-primary hover:bg-primary/5 group" size="sm">
-                View All Activity
-                <span className="inline-block transition-transform group-hover:translate-x-1 ml-1">→</span>
-              </Button>
-            </div>
-          </Card>
-        </div>
-
-        {/* Securities Section */}
-        <Card className="shadow-xl border-0 bg-white/50 dark:bg-slate-900/50 backdrop-blur-md ring-1 ring-black/5 dark:ring-white/10 overflow-hidden">
-          <CardHeader className="pb-4">
-            <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
-              <div className="flex items-center gap-3">
-                <Shield className="w-6 h-6 text-primary" />
-                <div>
-                  <CardTitle className="text-xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-primary to-blue-500">
-                    Securities Tracking
-                  </CardTitle>
-                  <p className="text-xs text-muted-foreground mt-1">Monitor security deposits and refunds</p>
-                </div>
-              </div>
-              <Tabs value={securityFilter} onValueChange={(v) => setSecurityFilter(v as any)} className="w-full md:w-auto">
-                <TabsList className="grid w-full grid-cols-3 h-9 bg-muted/50">
-                  <TabsTrigger value="all" className="text-xs font-bold uppercase">All</TabsTrigger>
-                  <TabsTrigger value="pending" className="text-xs font-bold uppercase">Pending</TabsTrigger>
-                  <TabsTrigger value="received" className="text-xs font-bold uppercase">Received</TabsTrigger>
-                </TabsList>
-              </Tabs>
-            </div>
-          </CardHeader>
-          <CardContent className="p-0">
-            <div className="overflow-x-auto">
-              <Table>
-                <TableHeader className="bg-muted/30">
-                  <TableRow className="hover:bg-transparent border-b-0">
-                    <TableHead className="py-3 px-6 font-bold text-xs uppercase tracking-wider">GD Number</TableHead>
-                    <TableHead className="py-3 px-4 font-bold text-xs uppercase tracking-wider">Company</TableHead>
-                    <TableHead className="py-3 px-4 font-bold text-xs uppercase tracking-wider">Port</TableHead>
-                    <TableHead className="py-3 px-4 font-bold text-xs uppercase tracking-wider text-center">Containers</TableHead>
-                    <TableHead className="py-3 px-4 font-bold text-xs uppercase tracking-wider text-right">Total Amount</TableHead>
-                    <TableHead className="py-3 px-4 font-bold text-xs uppercase tracking-wider text-center">Status</TableHead>
-                    <TableHead className="py-3 px-6 font-bold text-xs uppercase tracking-wider text-center">Action</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {securities
-                    .filter(s => {
-                      if (securityFilter === 'pending') return !s.isRefundReceived;
-                      if (securityFilter === 'received') return s.isRefundReceived;
-                      return true;
-                    })
-                    .map((security) => {
-                      const totalAmount = security.noOfContainers * security.amountPerContainer;
-                      return (
-                        <TableRow key={security.id} className="hover:bg-primary/5 transition-colors border-b border-border/40 group">
-                          <TableCell className="py-4 px-6">
-                            <p className="font-mono font-bold text-sm text-foreground">{security.gdNumber}</p>
-                          </TableCell>
-                          <TableCell className="py-4 px-4">
-                            <p className="font-semibold text-sm text-foreground group-hover:text-primary transition-colors">{security.companyName}</p>
-                          </TableCell>
-                          <TableCell className="py-4 px-4">
-                            <p className="text-sm text-muted-foreground uppercase font-medium">{security.port}</p>
-                          </TableCell>
-                          <TableCell className="py-4 px-4 text-center">
-                            <span className="inline-flex items-center gap-1 px-2 py-1 rounded-md bg-primary/10 text-primary font-bold text-xs">
-                              {security.noOfContainers} × PKR {security.amountPerContainer.toLocaleString()}
-                            </span>
-                          </TableCell>
-                          <TableCell className="py-4 px-4 text-right">
-                            <p className="font-mono font-bold text-sm text-foreground">{formatCurrency(totalAmount)}</p>
-                          </TableCell>
-                          <TableCell className="py-4 px-4 text-center">
-                            {security.isRefundReceived ? (
-                              <div className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-emerald-100 text-emerald-700 border border-emerald-200">
-                                <CheckCircle2 className="w-3.5 h-3.5" />
-                                <span className="text-xs font-bold uppercase tracking-wide">Received</span>
-                              </div>
-                            ) : (
-                              <div className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-amber-100 text-amber-700 border border-amber-200">
-                                <Clock className="w-3.5 h-3.5" />
-                                <span className="text-xs font-bold uppercase tracking-wide">Pending</span>
-                              </div>
-                            )}
-                          </TableCell>
-                          <TableCell className="py-4 px-6 text-center">
-                            <Button
-                              variant="outline"
-                              size="sm"
-                              className="gap-2 hover:bg-primary/5 hover:border-primary/40 transition-all"
-                              onClick={() => {
-                                setSelectedSecurity(security);
-                                setIsSecurityDialogOpen(true);
-                              }}
-                            >
-                              <Eye className="w-3.5 h-3.5" />
-                              View
-                            </Button>
-                          </TableCell>
-                        </TableRow>
-                      );
-                    })}
-                  {securities.filter(s => {
-                    if (securityFilter === 'pending') return !s.isRefundReceived;
-                    if (securityFilter === 'received') return s.isRefundReceived;
-                    return true;
-                  }).length === 0 && (
-                      <TableRow>
-                        <TableCell colSpan={7} className="h-32 text-center">
-                          <div className="flex flex-col items-center justify-center text-muted-foreground/50">
-                            <Shield className="w-12 h-12 mb-3 opacity-20" />
-                            <p className="font-semibold">No securities found</p>
-                            <p className="text-xs">Try adjusting your filter</p>
-                          </div>
-                        </TableCell>
-                      </TableRow>
-                    )}
-                </TableBody>
-              </Table>
-            </div>
-
-            {/* Totaling Section */}
-            {securities.length > 0 && (
-              <div className="bg-muted/20 px-6 py-4 border-t-2 border-border/50">
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                  <div className="flex items-center justify-between p-3 rounded-lg bg-white dark:bg-slate-900 border border-border/30">
-                    <div>
-                      <p className="text-xs font-bold uppercase tracking-wider text-muted-foreground mb-1">Total Pending</p>
-                      <p className="text-lg font-black text-amber-600 font-mono">{formatCurrency(securities.filter(s => !s.isRefundReceived).reduce((sum, s) => sum + (s.noOfContainers * s.amountPerContainer), 0))}</p>
-                    </div>
-                    <Clock className="w-8 h-8 text-amber-500/30" />
-                  </div>
-                  <div className="flex items-center justify-between p-3 rounded-lg bg-white dark:bg-slate-900 border border-border/30">
-                    <div>
-                      <p className="text-xs font-bold uppercase tracking-wider text-muted-foreground mb-1">Total Received</p>
-                      <p className="text-lg font-black text-emerald-600 font-mono">{formatCurrency(securities.filter(s => s.isRefundReceived).reduce((sum, s) => sum + (s.noOfContainers * s.amountPerContainer), 0))}</p>
-                    </div>
-                    <CheckCircle2 className="w-8 h-8 text-emerald-500/30" />
-                  </div>
-                  <div className="flex items-center justify-between p-3 rounded-lg bg-primary/5 border-2 border-primary/20">
-                    <div>
-                      <p className="text-xs font-bold uppercase tracking-wider text-primary/70 mb-1">Grand Total</p>
-                      <p className="text-lg font-black text-primary font-mono">{formatCurrency(securities.reduce((sum, s) => sum + (s.noOfContainers * s.amountPerContainer), 0))}</p>
-                    </div>
-                    <Shield className="w-8 h-8 text-primary/30" />
-                  </div>
-                </div>
-                <div className="mt-3 pt-3 border-t border-border/30 flex justify-between items-center text-xs">
-                  <span className="text-muted-foreground font-medium">
-                    Showing {securities.filter(s => {
-                      if (securityFilter === 'pending') return !s.isRefundReceived;
-                      if (securityFilter === 'received') return s.isRefundReceived;
-                      return true;
-                    }).length} of {securities.length} securities
-                  </span>
-                  <span className="text-muted-foreground font-medium">
-                    {securities.filter(s => !s.isRefundReceived).length} Pending • {securities.filter(s => s.isRefundReceived).length} Received
-                  </span>
-                </div>
-              </div>
-            )}
-          </CardContent>
-        </Card>
-
-        {/* Security Details Dialog */}
-        <Dialog open={isSecurityDialogOpen} onOpenChange={setIsSecurityDialogOpen}>
-          <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
-            <DialogHeader>
-              <DialogTitle className="flex items-center gap-3 text-2xl">
-                <Shield className="w-6 h-6 text-primary" />
-                Security Details - {selectedSecurity?.gdNumber}
-              </DialogTitle>
-            </DialogHeader>
-            {selectedSecurity && (
-              <div className="space-y-6 pt-4">
-                {/* Company & Basic Info */}
-                <div className="bg-muted/30 p-5 rounded-xl border border-border/50">
-                  <h3 className="text-sm font-bold uppercase tracking-wider text-muted-foreground mb-4 flex items-center gap-2">
-                    <Users className="w-4 h-4" /> Company Information
-                  </h3>
-                  <div className="grid grid-cols-2 gap-4">
-                    <div>
-                      <p className="text-xs text-muted-foreground font-semibold mb-1">Company Name</p>
-                      <p className="font-bold text-foreground">{selectedSecurity.companyName}</p>
-                    </div>
-                    <div>
-                      <p className="text-xs text-muted-foreground font-semibold mb-1">GD Number</p>
-                      <p className="font-mono font-bold text-foreground">{selectedSecurity.gdNumber}</p>
-                    </div>
-                  </div>
-                </div>
-
-                {/* Container Details */}
-                <div className="bg-muted/30 p-5 rounded-xl border border-border/50">
-                  <h3 className="text-sm font-bold uppercase tracking-wider text-muted-foreground mb-4 flex items-center gap-2">
-                    <FileText className="w-4 h-4" /> Container & Amount Details
-                  </h3>
-                  <div className="grid grid-cols-2 gap-4">
-                    <div>
-                      <p className="text-xs text-muted-foreground font-semibold mb-1">Number of Containers</p>
-                      <p className="font-bold text-foreground">{selectedSecurity.noOfContainers}</p>
-                    </div>
-                    <div>
-                      <p className="text-xs text-muted-foreground font-semibold mb-1">Container Number</p>
-                      <p className="font-mono font-bold text-foreground">{selectedSecurity.containerNo}</p>
-                    </div>
-                    <div>
-                      <p className="text-xs text-muted-foreground font-semibold mb-1">Amount Per Container</p>
-                      <p className="font-mono font-bold text-foreground">PKR {selectedSecurity.amountPerContainer.toLocaleString()}</p>
-                    </div>
-                    <div>
-                      <p className="text-xs text-muted-foreground font-semibold mb-1">Total Amount</p>
-                      <p className="font-mono font-black text-primary text-lg">
-                        PKR {(selectedSecurity.noOfContainers * selectedSecurity.amountPerContainer).toLocaleString()}
-                      </p>
-                    </div>
-                  </div>
-                </div>
-
-                {/* Port & Refund Details */}
-                <div className="bg-muted/30 p-5 rounded-xl border border-border/50">
-                  <h3 className="text-sm font-bold uppercase tracking-wider text-muted-foreground mb-4 flex items-center gap-2">
-                    <Clock className="w-4 h-4" /> Port & Refund Information
-                  </h3>
-                  <div className="grid grid-cols-2 gap-4">
-                    <div>
-                      <p className="text-xs text-muted-foreground font-semibold mb-1">Port</p>
-                      <p className="font-bold text-foreground uppercase">{selectedSecurity.port}</p>
-                    </div>
-                    <div>
-                      <p className="text-xs text-muted-foreground font-semibold mb-1">Refund Days</p>
-                      <p className="font-bold text-foreground">{selectedSecurity.refundDays} days</p>
-                    </div>
-                    <div>
-                      <p className="text-xs text-muted-foreground font-semibold mb-1">Refund Due Date</p>
-                      <p className="font-mono font-bold text-foreground">{formatDate(selectedSecurity.refundDueDate)}</p>
-                    </div>
-                    <div>
-                      <p className="text-xs text-muted-foreground font-semibold mb-1">Pay Order Number</p>
-                      <p className="font-mono font-bold text-foreground">{selectedSecurity.payOrderNo}</p>
-                    </div>
-                  </div>
-                </div>
-
-                {/* Status Information */}
-                <div className="bg-muted/30 p-5 rounded-xl border border-border/50">
-                  <h3 className="text-sm font-bold uppercase tracking-wider text-muted-foreground mb-4 flex items-center gap-2">
-                    <CheckCircle2 className="w-4 h-4" /> Status & Tracking
-                  </h3>
-                  <div className="grid grid-cols-2 gap-4">
-                    <div>
-                      <p className="text-xs text-muted-foreground font-semibold mb-1">Receiver Name</p>
-                      <p className="font-bold text-foreground">{selectedSecurity.receiverName}</p>
-                    </div>
-                    <div>
-                      <p className="text-xs text-muted-foreground font-semibold mb-1">Document Submitted</p>
-                      <div className="inline-flex items-center gap-1.5">
-                        {selectedSecurity.isDocumentSubmitted ? (
-                          <>
-                            <CheckCircle2 className="w-4 h-4 text-emerald-600" />
-                            <span className="font-bold text-emerald-600">Yes</span>
-                          </>
-                        ) : (
-                          <>
-                            <Clock className="w-4 h-4 text-amber-600" />
-                            <span className="font-bold text-amber-600">No</span>
-                          </>
-                        )}
-                      </div>
-                    </div>
-                    <div>
-                      <p className="text-xs text-muted-foreground font-semibold mb-1">Refund Received</p>
-                      <div className="inline-flex items-center gap-1.5">
-                        {selectedSecurity.isRefundReceived ? (
-                          <>
-                            <CheckCircle2 className="w-4 h-4 text-emerald-600" />
-                            <span className="font-bold text-emerald-600">Yes</span>
-                          </>
-                        ) : (
-                          <>
-                            <Clock className="w-4 h-4 text-amber-600" />
-                            <span className="font-bold text-amber-600">Pending</span>
-                          </>
-                        )}
-                      </div>
-                    </div>
-                    {selectedSecurity.receivedAmountDate && (
+              {/* Totaling Section */}
+              {securities.length > 0 && (
+                <div className="bg-muted/20 px-6 py-4 border-t-2 border-border/50">
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    <div className="flex items-center justify-between p-3 rounded-lg bg-white dark:bg-slate-900 border border-border/30">
                       <div>
-                        <p className="text-xs text-muted-foreground font-semibold mb-1">Received Date</p>
-                        <p className="font-mono font-bold text-foreground">{formatDate(selectedSecurity.receivedAmountDate)}</p>
+                        <p className="text-xs font-bold uppercase tracking-wider text-muted-foreground mb-1">Total Pending</p>
+                        <p className="text-lg font-black text-amber-600 font-mono">{formatCurrency(securities.filter(s => !s.isRefundReceived).reduce((sum, s) => sum + (s.noOfContainers * s.amountPerContainer), 0))}</p>
                       </div>
-                    )}
+                      <Clock className="w-8 h-8 text-amber-500/30" />
+                    </div>
+                    <div className="flex items-center justify-between p-3 rounded-lg bg-white dark:bg-slate-900 border border-border/30">
+                      <div>
+                        <p className="text-xs font-bold uppercase tracking-wider text-muted-foreground mb-1">Total Received</p>
+                        <p className="text-lg font-black text-emerald-600 font-mono">{formatCurrency(securities.filter(s => s.isRefundReceived).reduce((sum, s) => sum + (s.noOfContainers * s.amountPerContainer), 0))}</p>
+                      </div>
+                      <CheckCircle2 className="w-8 h-8 text-emerald-500/30" />
+                    </div>
+                    <div className="flex items-center justify-between p-3 rounded-lg bg-primary/5 border-2 border-primary/20">
+                      <div>
+                        <p className="text-xs font-bold uppercase tracking-wider text-primary/70 mb-1">Grand Total</p>
+                        <p className="text-lg font-black text-primary font-mono">{formatCurrency(securities.reduce((sum, s) => sum + (s.noOfContainers * s.amountPerContainer), 0))}</p>
+                      </div>
+                      <Shield className="w-8 h-8 text-primary/30" />
+                    </div>
+                  </div>
+                  <div className="mt-3 pt-3 border-t border-border/30 flex justify-between items-center text-xs">
+                    <span className="text-muted-foreground font-medium">
+                      Showing {securities.filter(s => {
+                        if (securityFilter === 'pending') return !s.isRefundReceived;
+                        if (securityFilter === 'received') return s.isRefundReceived;
+                        return true;
+                      }).length} of {securities.length} securities
+                    </span>
+                    <span className="text-muted-foreground font-medium">
+                      {securities.filter(s => !s.isRefundReceived).length} Pending • {securities.filter(s => s.isRefundReceived).length} Received
+                    </span>
                   </div>
                 </div>
-              </div>
-            )}
-          </DialogContent>
-        </Dialog>
-
-        {/* Financial Overview moved down */}
-        <Card className="shadow-xl border-0 bg-white/50 dark:bg-slate-900/50 backdrop-blur-md ring-1 ring-black/5 dark:ring-white/10">
-          <CardHeader>
-            <CardTitle className="text-xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-primary to-blue-500">
-              Financial Overview
-            </CardTitle>
-            <p className="text-xs text-muted-foreground">Revenue vs Collections over the last 6 months</p>
-          </CardHeader>
-          <CardContent>
-            <div className="h-[350px] w-full">
-              <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={monthlyData} margin={{ top: 20, right: 30, left: 20, bottom: 5 }}>
-                  <defs>
-                    <linearGradient id="colorBills" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="5%" stopColor="hsl(var(--primary))" stopOpacity={0.8} />
-                      <stop offset="95%" stopColor="hsl(var(--primary))" stopOpacity={0.2} />
-                    </linearGradient>
-                    <linearGradient id="colorPayments" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="5%" stopColor="#10b981" stopOpacity={0.8} />
-                      <stop offset="95%" stopColor="#10b981" stopOpacity={0.2} />
-                    </linearGradient>
-                  </defs>
-                  <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="var(--border)" opacity={0.5} />
-                  <XAxis
-                    dataKey="month"
-                    stroke="var(--muted-foreground)"
-                    fontSize={12}
-                    tickLine={false}
-                    axisLine={false}
-                  />
-                  <YAxis
-                    stroke="var(--muted-foreground)"
-                    fontSize={12}
-                    tickLine={false}
-                    axisLine={false}
-                    tickFormatter={(value: number) => `PKR ${value / 1000}k`}
-                  />
-                  <Tooltip
-                    cursor={{ fill: 'var(--muted)', opacity: 0.2 }}
-                    contentStyle={{
-                      backgroundColor: 'var(--card)',
-                      border: '1px solid var(--border)',
-                      borderRadius: '12px',
-                      boxShadow: '0 10px 25px -5px rgba(0, 0, 0, 0.1), 0 8px 10px -6px rgba(0, 0, 0, 0.1)'
-                    }}
-                  />
-                  <Legend wrapperStyle={{ paddingTop: '20px' }} iconType="circle" />
-                  <Bar
-                    dataKey="bills"
-                    fill="url(#colorBills)"
-                    name="Billed"
-                    radius={[6, 6, 0, 0]}
-                    barSize={24}
-                  />
-                  <Bar
-                    dataKey="payments"
-                    fill="url(#colorPayments)"
-                    name="Collected"
-                    radius={[6, 6, 0, 0]}
-                    barSize={24}
-                  />
-                </BarChart>
-              </ResponsiveContainer>
-            </div>
-          </CardContent>
-        </Card>
-
-        {/* Print Only: Detailed Pending Bills */}
-        <div className="hidden print:block mt-8">
-          <h2 className="text-xl font-bold mb-4 border-b pb-2">Detail of Pending Bills (Unpaid)</h2>
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Date</TableHead>
-                <TableHead>Bill No</TableHead>
-                <TableHead>Company</TableHead>
-                <TableHead>Job No</TableHead>
-                <TableHead className="text-right">Balance Due</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {bills.filter(b => b.status !== 'Paid').length === 0 ? (
-                <TableRow>
-                  <TableCell colSpan={5} className="text-center py-4 text-muted-foreground">No pending bills</TableCell>
-                </TableRow>
-              ) : (
-                bills.filter(b => b.status !== 'Paid').map((bill) => (
-                  <TableRow key={bill.id}>
-                    <TableCell className="text-xs">{formatDate(bill.date)}</TableCell>
-                    <TableCell className="text-xs font-bold">{bill.billNo}</TableCell>
-                    <TableCell className="text-xs">{bill.companyName}</TableCell>
-                    <TableCell className="text-xs font-mono">{bill.jobNumber}</TableCell>
-                    <TableCell className="text-xs text-right font-bold">
-                      PKR {(bill.totalAmount - (bill.paidAmount || 0)).toLocaleString()}
-                    </TableCell>
-                  </TableRow>
-                ))
               )}
-            </TableBody>
-          </Table>
-          <div className="mt-4 text-right">
-            <p className="text-sm font-black">
-              Total Outstanding: PKR {bills.reduce((s, b) => s + (b.totalAmount - (b.paidAmount || 0)), 0).toLocaleString()}
-            </p>
+            </CardContent>
+          </Card>
+
+          {/* Security Details Dialog */}
+          <Dialog open={isSecurityDialogOpen} onOpenChange={setIsSecurityDialogOpen}>
+            <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
+              <DialogHeader>
+                <DialogTitle className="flex items-center gap-3 text-2xl">
+                  <Shield className="w-6 h-6 text-primary" />
+                  Security Details - {selectedSecurity?.gdNumber}
+                </DialogTitle>
+              </DialogHeader>
+              {selectedSecurity && (
+                <div className="space-y-6 pt-4">
+                  {/* Company & Basic Info */}
+                  <div className="bg-muted/30 p-5 rounded-xl border border-border/50">
+                    <h3 className="text-sm font-bold uppercase tracking-wider text-muted-foreground mb-4 flex items-center gap-2">
+                      <Users className="w-4 h-4" /> Company Information
+                    </h3>
+                    <div className="grid grid-cols-2 gap-4">
+                      <div>
+                        <p className="text-xs text-muted-foreground font-semibold mb-1">Company Name</p>
+                        <p className="font-bold text-foreground">{selectedSecurity.companyName}</p>
+                      </div>
+                      <div>
+                        <p className="text-xs text-muted-foreground font-semibold mb-1">GD Number</p>
+                        <p className="font-mono font-bold text-foreground">{selectedSecurity.gdNumber}</p>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Container Details */}
+                  <div className="bg-muted/30 p-5 rounded-xl border border-border/50">
+                    <h3 className="text-sm font-bold uppercase tracking-wider text-muted-foreground mb-4 flex items-center gap-2">
+                      <FileText className="w-4 h-4" /> Container & Amount Details
+                    </h3>
+                    <div className="grid grid-cols-2 gap-4">
+                      <div>
+                        <p className="text-xs text-muted-foreground font-semibold mb-1">Number of Containers</p>
+                        <p className="font-bold text-foreground">{selectedSecurity.noOfContainers}</p>
+                      </div>
+                      <div>
+                        <p className="text-xs text-muted-foreground font-semibold mb-1">Container Number</p>
+                        <p className="font-mono font-bold text-foreground">{selectedSecurity.containerNo}</p>
+                      </div>
+                      <div>
+                        <p className="text-xs text-muted-foreground font-semibold mb-1">Amount Per Container</p>
+                        <p className="font-mono font-bold text-foreground">PKR {selectedSecurity.amountPerContainer.toLocaleString()}</p>
+                      </div>
+                      <div>
+                        <p className="text-xs text-muted-foreground font-semibold mb-1">Total Amount</p>
+                        <p className="font-mono font-black text-primary text-lg">
+                          PKR {(selectedSecurity.noOfContainers * selectedSecurity.amountPerContainer).toLocaleString()}
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Port & Refund Details */}
+                  <div className="bg-muted/30 p-5 rounded-xl border border-border/50">
+                    <h3 className="text-sm font-bold uppercase tracking-wider text-muted-foreground mb-4 flex items-center gap-2">
+                      <Clock className="w-4 h-4" /> Port & Refund Information
+                    </h3>
+                    <div className="grid grid-cols-2 gap-4">
+                      <div>
+                        <p className="text-xs text-muted-foreground font-semibold mb-1">Port</p>
+                        <p className="font-bold text-foreground uppercase">{selectedSecurity.port}</p>
+                      </div>
+                      <div>
+                        <p className="text-xs text-muted-foreground font-semibold mb-1">Refund Days</p>
+                        <p className="font-bold text-foreground">{selectedSecurity.refundDays} days</p>
+                      </div>
+                      <div>
+                        <p className="text-xs text-muted-foreground font-semibold mb-1">Refund Due Date</p>
+                        <p className="font-mono font-bold text-foreground">{formatDate(selectedSecurity.refundDueDate)}</p>
+                      </div>
+                      <div>
+                        <p className="text-xs text-muted-foreground font-semibold mb-1">Pay Order Number</p>
+                        <p className="font-mono font-bold text-foreground">{selectedSecurity.payOrderNo}</p>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Status Information */}
+                  <div className="bg-muted/30 p-5 rounded-xl border border-border/50">
+                    <h3 className="text-sm font-bold uppercase tracking-wider text-muted-foreground mb-4 flex items-center gap-2">
+                      <CheckCircle2 className="w-4 h-4" /> Status & Tracking
+                    </h3>
+                    <div className="grid grid-cols-2 gap-4">
+                      <div>
+                        <p className="text-xs text-muted-foreground font-semibold mb-1">Receiver Name</p>
+                        <p className="font-bold text-foreground">{selectedSecurity.receiverName}</p>
+                      </div>
+                      <div>
+                        <p className="text-xs text-muted-foreground font-semibold mb-1">Document Submitted</p>
+                        <div className="inline-flex items-center gap-1.5">
+                          {selectedSecurity.isDocumentSubmitted ? (
+                            <>
+                              <CheckCircle2 className="w-4 h-4 text-emerald-600" />
+                              <span className="font-bold text-emerald-600">Yes</span>
+                            </>
+                          ) : (
+                            <>
+                              <Clock className="w-4 h-4 text-amber-600" />
+                              <span className="font-bold text-amber-600">No</span>
+                            </>
+                          )}
+                        </div>
+                      </div>
+                      <div>
+                        <p className="text-xs text-muted-foreground font-semibold mb-1">Refund Received</p>
+                        <div className="inline-flex items-center gap-1.5">
+                          {selectedSecurity.isRefundReceived ? (
+                            <>
+                              <CheckCircle2 className="w-4 h-4 text-emerald-600" />
+                              <span className="font-bold text-emerald-600">Yes</span>
+                            </>
+                          ) : (
+                            <>
+                              <Clock className="w-4 h-4 text-amber-600" />
+                              <span className="font-bold text-amber-600">Pending</span>
+                            </>
+                          )}
+                        </div>
+                      </div>
+                      {selectedSecurity.receivedAmountDate && (
+                        <div>
+                          <p className="text-xs text-muted-foreground font-semibold mb-1">Received Date</p>
+                          <p className="font-mono font-bold text-foreground">{formatDate(selectedSecurity.receivedAmountDate)}</p>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              )}
+            </DialogContent>
+          </Dialog>
+
+          {/* Financial Overview moved down */}
+          <Card className="shadow-xl border-0 bg-white/50 dark:bg-slate-900/50 backdrop-blur-md ring-1 ring-black/5 dark:ring-white/10">
+            <CardHeader>
+              <CardTitle className="text-xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-primary to-blue-500">
+                Financial Overview
+              </CardTitle>
+              <p className="text-xs text-muted-foreground">Revenue vs Collections over the last 6 months</p>
+            </CardHeader>
+            <CardContent>
+              <div className="h-[350px] w-full">
+                <ResponsiveContainer width="100%" height="100%">
+                  <BarChart data={monthlyData} margin={{ top: 20, right: 30, left: 20, bottom: 5 }}>
+                    <defs>
+                      <linearGradient id="colorBills" x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="5%" stopColor="hsl(var(--primary))" stopOpacity={0.8} />
+                        <stop offset="95%" stopColor="hsl(var(--primary))" stopOpacity={0.2} />
+                      </linearGradient>
+                      <linearGradient id="colorPayments" x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="5%" stopColor="#10b981" stopOpacity={0.8} />
+                        <stop offset="95%" stopColor="#10b981" stopOpacity={0.2} />
+                      </linearGradient>
+                    </defs>
+                    <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="var(--border)" opacity={0.5} />
+                    <XAxis
+                      dataKey="month"
+                      stroke="var(--muted-foreground)"
+                      fontSize={12}
+                      tickLine={false}
+                      axisLine={false}
+                    />
+                    <YAxis
+                      stroke="var(--muted-foreground)"
+                      fontSize={12}
+                      tickLine={false}
+                      axisLine={false}
+                      tickFormatter={(value: number) => `PKR ${value / 1000}k`}
+                    />
+                    <Tooltip
+                      cursor={{ fill: 'var(--muted)', opacity: 0.2 }}
+                      contentStyle={{
+                        backgroundColor: 'var(--card)',
+                        border: '1px solid var(--border)',
+                        borderRadius: '12px',
+                        boxShadow: '0 10px 25px -5px rgba(0, 0, 0, 0.1), 0 8px 10px -6px rgba(0, 0, 0, 0.1)'
+                      }}
+                    />
+                    <Legend wrapperStyle={{ paddingTop: '20px' }} iconType="circle" />
+                    <Bar
+                      dataKey="bills"
+                      fill="url(#colorBills)"
+                      name="Billed"
+                      radius={[6, 6, 0, 0]}
+                      barSize={24}
+                    />
+                    <Bar
+                      dataKey="payments"
+                      fill="url(#colorPayments)"
+                      name="Collected"
+                      radius={[6, 6, 0, 0]}
+                      barSize={24}
+                    />
+                  </BarChart>
+                </ResponsiveContainer>
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Print Only: Detailed Pending Bills */}
+          <div className="hidden print:block mt-8">
+            <h2 className="text-xl font-bold mb-4 border-b pb-2">Detail of Pending Bills (Unpaid)</h2>
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Date</TableHead>
+                  <TableHead>Bill No</TableHead>
+                  <TableHead>Company</TableHead>
+                  <TableHead>Job No</TableHead>
+                  <TableHead className="text-right">Balance Due</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {bills.filter(b => b.status !== 'Paid').length === 0 ? (
+                  <TableRow>
+                    <TableCell colSpan={5} className="text-center py-4 text-muted-foreground">No pending bills</TableCell>
+                  </TableRow>
+                ) : (
+                  bills.filter(b => b.status !== 'Paid').map((bill) => (
+                    <TableRow key={bill.id}>
+                      <TableCell className="text-xs">{formatDate(bill.date)}</TableCell>
+                      <TableCell className="text-xs font-bold">{bill.billNo}</TableCell>
+                      <TableCell className="text-xs">{bill.companyName}</TableCell>
+                      <TableCell className="text-xs font-mono">{bill.jobNumber}</TableCell>
+                      <TableCell className="text-xs text-right font-bold">
+                        PKR {(bill.totalAmount - (bill.paidAmount || 0)).toLocaleString()}
+                      </TableCell>
+                    </TableRow>
+                  ))
+                )}
+              </TableBody>
+            </Table>
+            <div className="mt-4 text-right">
+              <p className="text-sm font-black">
+                Total Outstanding: PKR {bills.reduce((s, b) => s + (b.totalAmount - (b.paidAmount || 0)), 0).toLocaleString()}
+              </p>
+            </div>
           </div>
         </div>
       </div>
-    </DashboardLayout>
+    </DashboardLayout >
   );
 }

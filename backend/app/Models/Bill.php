@@ -34,6 +34,7 @@ class Bill extends Model
         'grand_total',
         'attachment',
         'status',
+        'note',
     ];
 
     protected $casts = [

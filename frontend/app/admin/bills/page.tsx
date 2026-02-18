@@ -54,7 +54,7 @@ import { useData, BillItem, Bill } from '@/context/data-context';
 import { formatDate, formatCurrency } from '@/lib/utils';
 import JSZip from 'jszip';
 import { jsPDF } from 'jspdf';
-import { toPng } from 'html-to-image';
+import { toJpeg } from 'html-to-image';
 import { InvoiceTemplate } from '@/components/invoice-template';
 import { CompanySelect } from '@/components/company-select';
 import html2canvas from 'html2canvas';
@@ -102,10 +102,11 @@ export default function BillsPage() {
         return;
       }
 
-      // 3. Capture with html-to-image (toPng) for better fidelity
-      const dataUrl = await toPng(invoiceRef.current, {
+      // 3. Capture with html-to-image (toJpeg) for better compression
+      const dataUrl = await toJpeg(invoiceRef.current, {
         cacheBust: true,
-        pixelRatio: 2, // High resolution
+        quality: 0.95,
+        pixelRatio: 2, // High resolution but compressed
         backgroundColor: '#ffffff',
         style: {
           transform: 'scale(1)', // Ensure no unintended scaling
@@ -123,7 +124,7 @@ export default function BillsPage() {
       // 5. Add Image to PDF
       // If content is slightly larger, we scale it to fit width. 
       // Pagination is not expected for single page invoices, but if needed logic can be added.
-      pdf.addImage(dataUrl, 'PNG', 0, 0, pdfWidth, imgHeight);
+      pdf.addImage(dataUrl, 'JPEG', 0, 0, pdfWidth, imgHeight);
 
       // 6. Download the Generated PDF
       const filename = bill.jobNumber ? `Invoice_${bill.jobNumber}.pdf` : `Invoice_${bill.billNo}.pdf`;
@@ -243,6 +244,7 @@ export default function BillsPage() {
   const [via, setVia] = useState('');
   const [weight, setWeight] = useState('');
   const [attachment, setAttachment] = useState<File | null>(null);
+  const [note, setNote] = useState<string>('All Necessary documents enclosed.');
 
   // Table Filters State
   const [timeFilter, setTimeFilter] = useState<'overall' | 'monthly' | '3months' | '6months' | 'yearly'>('overall');
@@ -344,6 +346,7 @@ export default function BillsPage() {
         salesTax: calculatedSalesTax,
         advancePayment: Number(advancePayment) || 0,
         grandTotal: grandTotal,
+        note: note,
       });
 
       if (result && result.ok) {
@@ -368,6 +371,7 @@ export default function BillsPage() {
         setContainerNo('');
         setPackages('');
         setAttachment(null);
+        setNote('All Necessary documents enclosed.');
         setItems([
           { description: 'DUTY TAXES & ETO', notes: '', amount: 0, invoiceNo: '' },
           { description: 'CIVIL AVIATION AUTHORITY', notes: '', amount: 0, invoiceNo: '' },
@@ -439,13 +443,13 @@ export default function BillsPage() {
     if (!tableRef.current) return;
 
     try {
-      const dataUrl = await toPng(tableRef.current, { cacheBust: true, style: { background: 'white', padding: '20px' } });
+      const dataUrl = await toJpeg(tableRef.current, { cacheBust: true, quality: 0.95, style: { background: 'white', padding: '20px' } });
       const pdf = new jsPDF('p', 'mm', 'a4');
       const imgProps = pdf.getImageProperties(dataUrl);
       const pdfWidth = pdf.internal.pageSize.getWidth();
       const pdfHeight = (imgProps.height * pdfWidth) / imgProps.width;
 
-      pdf.addImage(dataUrl, 'PNG', 0, 0, pdfWidth, pdfHeight);
+      pdf.addImage(dataUrl, 'JPEG', 0, 0, pdfWidth, pdfHeight);
       pdf.save(`Bills_Report_${new Date().toISOString().split('T')[0]}.pdf`);
     } catch (err) {
       console.error('Failed to export PDF', err);
@@ -866,26 +870,72 @@ export default function BillsPage() {
                             <p className="text-xs text-muted-foreground mt-1">Upload PDF Document</p>
                           </div>
                           <div className="relative w-full max-w-xs mt-2">
-                            <Input
-                              type="file"
-                              className="opacity-0 absolute inset-0 w-full h-full cursor-pointer z-10"
-                              accept="application/pdf"
-                              onChange={(e) => {
-                                const file = e.target.files?.[0];
-                                if (file) setAttachment(file);
-                              }}
-                            />
-                            <div className="flex items-center justify-center gap-2 px-6 py-2.5 border-2 rounded-xl bg-white dark:bg-slate-950 text-sm font-medium text-foreground/80 shadow-sm border-border/50">
+                            {/* File Input is ONLY active when no attachment is selected, OR keeps hidden to allow change if needed (but UI request implies separating actions) */}
+                            {/* Better approach: If attachment exists, hide the input completely or move it, so it doesn't block the delete button */}
+
+                            {!attachment && (
+                              <Input
+                                type="file"
+                                className="opacity-0 absolute inset-0 w-full h-full cursor-pointer z-10"
+                                accept="application/pdf"
+                                onChange={(e) => {
+                                  const file = e.target.files?.[0];
+                                  if (file) setAttachment(file);
+                                }}
+                              />
+                            )}
+
+                            <div className="flex items-center gap-2">
                               {attachment ? (
-                                <span className="truncate flex items-center gap-2">
-                                  <FileText className="w-4 h-4 text-primary" />
-                                  {attachment.name}
-                                </span>
+                                <>
+                                  <div className="flex-1 flex items-center gap-2 px-4 py-2.5 border-2 rounded-xl bg-white dark:bg-slate-950 text-sm font-medium text-foreground/80 shadow-sm border-border/50 relative">
+                                    <FileText className="w-4 h-4 text-primary shrink-0" />
+                                    <span className="truncate">{attachment.name}</span>
+                                  </div>
+                                  <Button
+                                    type="button"
+                                    variant="outline"
+                                    size="icon"
+                                    className="h-[42px] w-[42px] shrink-0 bg-white dark:bg-slate-950 border-2 rounded-xl border-destructive/20 text-destructive hover:bg-destructive/10 hover:border-destructive/40 shadow-sm z-50 relative pointer-events-auto"
+                                    onClick={(e) => {
+                                      e.preventDefault();
+                                      e.stopPropagation();
+                                      console.log("Deleting attachment...");
+                                      setAttachment(null);
+                                    }}
+                                  >
+                                    <Trash2 className="w-4 h-4" />
+                                  </Button>
+                                </>
                               ) : (
-                                "Select PDF"
+                                <div className="w-full flex items-center justify-center gap-2 px-6 py-2.5 border-2 rounded-xl bg-white dark:bg-slate-950 text-sm font-medium text-foreground/80 shadow-sm border-border/50">
+                                  Select PDF
+                                </div>
                               )}
                             </div>
                           </div>
+                        </div>
+                      </div>
+
+                      {/* Note Dropdown Section */}
+                      <div className="bg-muted/30 p-6 rounded-2xl border border-border/50 shadow-sm transition-all hover:bg-muted/40 group mt-4">
+                        <div className="flex items-center gap-3 mb-4 pb-2 border-b border-border/50">
+                          <FileText className="w-5 h-5 text-primary group-hover:scale-110 transition-transform" />
+                          <h3 className="text-[10px] font-bold uppercase tracking-[0.2em] text-muted-foreground/80">Invoice Note</h3>
+                        </div>
+                        <div>
+                          <Label className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground mb-1.5 block">Select Note</Label>
+                          <Select value={note} onValueChange={setNote}>
+                            <SelectTrigger className="h-10 bg-white dark:bg-slate-950 border-border/50">
+                              <SelectValue placeholder="Select a note" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="All Necessary documents enclosed.">All Necessary documents enclosed.</SelectItem>
+                              <SelectItem value="The consignee has not made any advance payment.">The consignee has not made any advance payment.</SelectItem>
+                              <SelectItem value="All Necessary documents enclosed. The consignee has not made any advance payment.">All Necessary documents enclosed. & No advance payment.</SelectItem>
+                              <SelectItem value=" ">None</SelectItem>
+                            </SelectContent>
+                          </Select>
                         </div>
                       </div>
 
@@ -972,10 +1022,10 @@ export default function BillsPage() {
                   <Table>
                     <TableHeader>
                       <TableRow className="bg-secondary/50">
-                        <TableHead>Bill No</TableHead>
+                        <TableHead>Job No</TableHead>
                         <TableHead>Company</TableHead>
                         <TableHead>Date</TableHead>
-                        <TableHead>Job No</TableHead>
+                        <TableHead>Bill Ref</TableHead>
                         <TableHead>Amount</TableHead>
                         <TableHead>Paid</TableHead>
                         <TableHead>Status</TableHead>
@@ -986,7 +1036,7 @@ export default function BillsPage() {
                       {filteredBills.map((item) => (
                         <TableRow key={item.id} className="hover:bg-muted/50 transition-colors">
                           <TableCell className="font-mono text-sm font-medium">
-                            {item.billNo}
+                            {item.jobNumber || item.billNo}
                           </TableCell>
                           <TableCell>
                             {item.companyName}
@@ -995,7 +1045,7 @@ export default function BillsPage() {
                             {formatDate(item.date)}
                           </TableCell>
                           <TableCell className="text-sm text-muted-foreground font-mono">
-                            {item.jobNumber}
+                            {item.billNo}
                           </TableCell>
                           <TableCell className="font-semibold">
                             PKR {item.grandTotal?.toLocaleString() || '0'}

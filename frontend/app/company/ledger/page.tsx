@@ -11,7 +11,9 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
-import { Download, Printer } from 'lucide-react';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Download, Printer, Search, Calendar } from 'lucide-react';
 import { jsPDF } from 'jspdf';
 import { toPng } from 'html-to-image';
 
@@ -26,6 +28,11 @@ export default function CompanyLedgerPage() {
   const { companies, getCompanyLedger } = useData();
   const tableRef = useRef<HTMLDivElement>(null);
 
+  // Filters
+  const [searchTerm, setSearchTerm] = useState('');
+  const [startDate, setStartDate] = useState('');
+  const [endDate, setEndDate] = useState('');
+
   const currentCompany = useMemo(() => {
     if (user?.role === 'company' && user.id) {
       return companies.find(c => String(c.id) === String(user.id)) || companies[0];
@@ -35,8 +42,28 @@ export default function CompanyLedgerPage() {
 
   const ledgerEntries = useMemo(() => {
     if (!currentCompany) return [];
-    return getCompanyLedger(currentCompany.id);
-  }, [currentCompany, getCompanyLedger]);
+    let entries = getCompanyLedger(currentCompany.id);
+
+    // Apply Filters - NOTE: Balance is pre-calculated from the FULL list, so we just hide rows here.
+    if (searchTerm) {
+      const lowerSearch = searchTerm.toLowerCase();
+      entries = entries.filter(e =>
+        e.description.toLowerCase().includes(lowerSearch) ||
+        (e.debit > 0 && String(e.debit).includes(lowerSearch)) ||
+        (e.credit > 0 && String(e.credit).includes(lowerSearch))
+      );
+    }
+
+    if (startDate) {
+      entries = entries.filter(e => e.date >= startDate);
+    }
+
+    if (endDate) {
+      entries = entries.filter(e => e.date <= endDate);
+    }
+
+    return entries;
+  }, [currentCompany, getCompanyLedger, searchTerm, startDate, endDate]);
 
   const stats = useMemo(() => {
     const totalCharged = ledgerEntries.reduce((sum, item) => sum + item.debit, 0);
@@ -80,6 +107,42 @@ export default function CompanyLedgerPage() {
           </p>
         </div>
 
+        <Card className="shadow-md border-border/50">
+          <CardContent className="p-4 space-y-4">
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+              <div className="md:col-span-2">
+                <Label className="text-xs font-semibold uppercase text-muted-foreground mb-1 block">Search Ledger</Label>
+                <div className="relative">
+                  <Search className="absolute left-3 top-2.5 h-4 w-4 text-muted-foreground" />
+                  <Input
+                    type="text"
+                    placeholder="Search description, amount..."
+                    className="pl-9"
+                    value={searchTerm}
+                    onChange={(e) => setSearchTerm(e.target.value)}
+                  />
+                </div>
+              </div>
+              <div>
+                <Label className="text-xs font-semibold uppercase text-muted-foreground mb-1 block">From Date</Label>
+                <Input
+                  type="date"
+                  value={startDate}
+                  onChange={(e) => setStartDate(e.target.value)}
+                />
+              </div>
+              <div>
+                <Label className="text-xs font-semibold uppercase text-muted-foreground mb-1 block">To Date</Label>
+                <Input
+                  type="date"
+                  value={endDate}
+                  onChange={(e) => setEndDate(e.target.value)}
+                />
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
         <Card>
           <CardHeader>
             <div className="flex items-center justify-between">
@@ -103,6 +166,7 @@ export default function CompanyLedgerPage() {
                   <TableRow>
                     <TableHead>Date</TableHead>
                     <TableHead>Description</TableHead>
+                    <TableHead>Job No</TableHead>
                     <TableHead className="text-right">Debit</TableHead>
                     <TableHead className="text-right">Credit</TableHead>
                     <TableHead className="text-right">Balance</TableHead>
@@ -123,6 +187,9 @@ export default function CompanyLedgerPage() {
                         </TableCell>
                         <TableCell className="text-sm">
                           {entry.description}
+                        </TableCell>
+                        <TableCell className="font-mono text-sm">
+                          {entry.jobNumber || entry.billNo || '-'}
                         </TableCell>
                         <TableCell className="text-right text-sm">
                           {entry.debit > 0 ? (

@@ -47,6 +47,7 @@ export interface Bill {
   via?: string;
   weight?: string | number;
   exporter?: string;
+  note?: string;
   beNumber?: string;
   packages?: string | number;
   igm?: string;
@@ -90,6 +91,13 @@ export interface LedgerEntry {
   companyId: string;
   referenceId: string; // Bill ID or Payment ID
   type: 'BILL' | 'PAYMENT';
+  companyName?: string;
+  timestamp?: number;
+  billNo?: string;
+  jobNumber?: string;
+  paymentRef?: string;
+  method?: string;
+  note?: string;
 }
 
 export interface SecurityTracking {
@@ -105,9 +113,9 @@ export interface SecurityTracking {
   isDocumentSubmitted: boolean;
   refundDueDate: string;
   isRefundReceived: boolean;
-  receivedAmountDate?: string;
-  payOrderNo: string;
-  receiverName: string;
+  receivedAmountDate?: string | null;
+  payOrderNo?: string | null;
+  receiverName?: string | null;
   status: 'Pending' | 'Completed';
   createdAt: string;
 }
@@ -353,7 +361,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
       return {
         id: p.id + '_credit',
         date: p.date,
-        description: p.note ? `Payment: ${p.note}` : `Payment Received`,
+        description: p.description ? `Payment: ${p.description}` : `Payment Received`,
         debit: 0,
         credit: Number(p.amount) + (Number(p.adjustment) || 0),
         balance: 0,
@@ -369,7 +377,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
       };
     });
 
-    const allEntries = [...companyBills, ...companyPayments].sort((a, b) => a.timestamp - b.timestamp);
+    const allEntries = [...companyBills, ...companyPayments].sort((a, b) => (a.timestamp || 0) - (b.timestamp || 0));
 
     let runningBalance = 0;
     return allEntries.map(entry => {

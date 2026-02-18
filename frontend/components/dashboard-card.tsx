@@ -7,6 +7,7 @@ interface DashboardCardProps {
   icon: LucideIcon;
   change?: string;
   changeType?: 'positive' | 'negative' | 'neutral';
+  changeLabel?: string;
 }
 
 export function DashboardCard({
@@ -15,6 +16,7 @@ export function DashboardCard({
   icon: Icon,
   change,
   changeType = 'neutral',
+  changeLabel = 'Data',
 }: DashboardCardProps) {
   return (
     <Card className="glass-card hover-scale overflow-hidden relative group border-0 shadow-lg transition-all duration-300">
@@ -44,7 +46,7 @@ export function DashboardCard({
               {changeType === 'positive' && '+'}
               {change}
             </span>
-            <span className="opacity-70 group-hover:opacity-100 transition-opacity">Data</span>
+            <span className="opacity-70 group-hover:opacity-100 transition-opacity">{changeLabel}</span>
           </p>
         )}
       </CardContent>

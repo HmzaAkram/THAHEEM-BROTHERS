@@ -20,13 +20,13 @@ import {
 } from '@/components/ui/select';
 import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
-import { Download, Printer, Filter, Check, ChevronsUpDown, Search, DollarSign, ArrowUpCircle, ArrowDownCircle, Scale } from 'lucide-react';
+import { Download, Filter, Check, ChevronsUpDown, Search, DollarSign, ArrowUpCircle, ArrowDownCircle, Scale } from 'lucide-react';
 import { useRef, useState, useMemo } from 'react';
 import { useData, LedgerEntry } from '@/context/data-context';
 import { Input } from '@/components/ui/input';
 import { formatDate, cn, formatCurrency } from '@/lib/utils';
 import { jsPDF } from 'jspdf';
-import { toPng } from 'html-to-image';
+import { toJpeg } from 'html-to-image';
 import { DashboardCard } from '@/components/dashboard-card';
 import { CompanySelect } from '@/components/company-select';
 
@@ -98,13 +98,13 @@ export default function LedgerPage() {
     if (!tableRef.current) return;
 
     try {
-      const dataUrl = await toPng(tableRef.current, { cacheBust: true, style: { background: 'white', padding: '20px' } });
+      const dataUrl = await toJpeg(tableRef.current, { cacheBust: true, quality: 0.95, style: { background: 'white', padding: '20px' } });
       const pdf = new jsPDF('p', 'mm', 'a4');
       const imgProps = pdf.getImageProperties(dataUrl);
       const pdfWidth = pdf.internal.pageSize.getWidth();
       const pdfHeight = (imgProps.height * pdfWidth) / imgProps.width;
 
-      pdf.addImage(dataUrl, 'PNG', 0, 0, pdfWidth, pdfHeight);
+      pdf.addImage(dataUrl, 'JPEG', 0, 0, pdfWidth, pdfHeight);
       pdf.save(`General_Ledger_${selectedCompanyId !== 'all' ? companies.find(c => c.id === selectedCompanyId)?.name : 'All'}_${new Date().toISOString().split('T')[0]}.pdf`);
     } catch (err) {
       console.error('Failed to export PDF', err);
@@ -163,10 +163,7 @@ export default function LedgerPage() {
                   <Download className="w-4 h-4" />
                   Export
                 </Button>
-                <Button variant="outline" className="flex-1 gap-2 bg-transparent hover:bg-muted">
-                  <Printer className="w-4 h-4" />
-                  Print
-                </Button>
+
               </div>
             </div>
           </CardContent>
@@ -175,13 +172,13 @@ export default function LedgerPage() {
         {/* Ledger Table */}
         <Card className="shadow-md border-border/50">
           <CardContent ref={tableRef} className="pt-6">
-            <div className="rounded-md border bg-card">
+            <div className="rounded-md border bg-card overflow-x-auto">
               <Table>
                 <TableHeader>
                   <TableRow className="bg-muted/50">
                     <TableHead className="w-[120px]">Date</TableHead>
                     <TableHead className="min-w-[250px]">Description</TableHead>
-                    <TableHead className="w-[150px]">Job / Invoice #</TableHead>
+                    <TableHead className="w-[150px]">Job No</TableHead>
                     <TableHead className="text-right text-destructive w-[120px]">Debit</TableHead>
                     <TableHead className="text-right text-green-600 w-[120px]">Credit</TableHead>
                     {selectedCompanyId !== 'all' && (

@@ -67,6 +67,7 @@ class BillController extends Controller
             'grand_total' => 'required|numeric',
             'status' => 'nullable|string',
             'attachment' => 'nullable|string',
+            'note' => 'nullable|string',
             'items' => 'required|array',
             'items.*.description' => 'required|string',
             'items.*.notes' => 'nullable|string',

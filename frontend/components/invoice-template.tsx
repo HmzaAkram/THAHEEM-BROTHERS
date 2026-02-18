@@ -203,13 +203,18 @@ export const InvoiceTemplate = forwardRef<HTMLDivElement, InvoiceTemplateProps>(
 
                     {/* Conditional Notes */}
                     <div className="mt-4 space-y-1">
-                        {/* Default Note if attachment exists */}
-                        {bill.attachment && (
-                            <p className="text-[10px] text-slate-600 italic font-medium">Note: All Necessary documents enclosed.</p>
-                        )}
-                        {/* Note if NO advance payment was made */}
-                        {advance === 0 && (
-                            <p className="text-[10px] text-slate-600 italic font-medium">Note: The consignee has not made any advance payment.</p>
+                        {bill.note ? (
+                            <p className="text-[10px] text-slate-600 italic font-medium">Note: {bill.note}</p>
+                        ) : (
+                            /* Fallback for old bills without note field */
+                            <>
+                                {bill.attachment && (
+                                    <p className="text-[10px] text-slate-600 italic font-medium">Note: All Necessary documents enclosed.</p>
+                                )}
+                                {advance === 0 && (
+                                    <p className="text-[10px] text-slate-600 italic font-medium">Note: The consignee has not made any advance payment.</p>
+                                )}
+                            </>
                         )}
                     </div>
                 </div>

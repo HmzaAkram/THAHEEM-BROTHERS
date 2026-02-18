@@ -155,7 +155,8 @@ export default function PaymentsPage() {
   const billOptions = useMemo(() => {
     return companyBills.map(b => ({
       id: b.id,
-      label: `BILL: ${b.billNo} | JOB: ${b.jobNumber} (Due: ${formatCurrency((b.grandTotal || b.totalAmount) - b.paidAmount)})`
+      id: b.id,
+      label: `JOB: ${b.jobNumber || b.billNo} (Due: ${formatCurrency((b.grandTotal || b.totalAmount) - b.paidAmount)})`
     }));
   }, [companyBills]);
 
@@ -278,7 +279,7 @@ export default function PaymentsPage() {
                         <div key={id} className="space-y-2 pb-3 border-b border-muted last:border-0 last:pb-0">
                           <div className="flex justify-between items-center">
                             <span className="text-xs font-bold text-foreground truncate max-w-[150px]">
-                              {bill?.billNo} | {bill?.jobNumber}
+                              {bill?.jobNumber || bill?.billNo}
                             </span>
                             <span className="text-[10px] text-muted-foreground">
                               Due: {formatCurrency(((bill?.grandTotal || bill?.totalAmount) || 0) - (bill?.paidAmount || 0))}
@@ -492,7 +493,7 @@ export default function PaymentsPage() {
                             {payment.companyName}
                           </TableCell>
                           <TableCell className="text-sm font-mono text-muted-foreground">
-                            {linkedBill?.jobNumber || '-'}
+                            {linkedBill?.jobNumber || linkedBill?.billNo || '-'}
                           </TableCell>
                           <TableCell className="text-sm">
                             {payment.method}

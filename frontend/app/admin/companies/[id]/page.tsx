@@ -220,19 +220,19 @@ export default function CompanyDetailsPage() {
                                         <Separator />
                                         <div className="space-y-1">
                                             <p className="text-xs text-muted-foreground uppercase tracking-wider">Company Email</p>
-                                            <p className="font-medium">{company.email}</p>
+                                            <p className="font-medium break-all">{company.email}</p>
                                         </div>
                                         <div className="space-y-1">
                                             <p className="text-xs text-muted-foreground uppercase tracking-wider flex items-center gap-1">
                                                 <Phone className="w-3 h-3" /> Company Phone
                                             </p>
-                                            <p className="font-medium">{company.phone}</p>
+                                            <p className="font-medium break-all">{company.phone}</p>
                                         </div>
                                         <div className="space-y-1">
                                             <p className="text-xs text-muted-foreground uppercase tracking-wider flex items-center gap-1">
                                                 <MapPin className="w-3 h-3" /> Company Address
                                             </p>
-                                            <p className="font-medium">{company.address}</p>
+                                            <p className="font-medium break-words">{company.address}</p>
                                         </div>
                                         <Separator />
                                         <div className="space-y-1">
@@ -241,14 +241,14 @@ export default function CompanyDetailsPage() {
                                             </p>
                                             <div className="bg-muted/50 p-3 rounded-md border border-border/50 space-y-2">
                                                 {company.username && (
-                                                    <div className="flex justify-between items-center">
+                                                    <div className="flex flex-col sm:flex-row justify-between sm:items-center gap-1">
                                                         <span className="text-sm text-muted-foreground">Username:</span>
-                                                        <span className="font-mono text-sm">{company.username}</span>
+                                                        <span className="font-mono text-sm break-all">{company.username}</span>
                                                     </div>
                                                 )}
-                                                <div className="flex justify-between items-center">
+                                                <div className="flex flex-col sm:flex-row justify-between sm:items-center gap-1">
                                                     <span className="text-sm text-muted-foreground">Email:</span>
-                                                    <span className="font-mono text-sm">{company.email}</span>
+                                                    <span className="font-mono text-sm break-all">{company.email}</span>
                                                 </div>
                                                 <div className="flex justify-between items-center">
                                                     <span className="text-sm text-muted-foreground">Password:</span>
