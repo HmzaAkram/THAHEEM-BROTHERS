@@ -46,17 +46,20 @@ export const InvoiceTemplate = forwardRef<HTMLDivElement, InvoiceTemplateProps>(
                 </div>
                 <div className="text-right flex-shrink-0">
                     <h2 className="text-2xl font-black uppercase text-slate-900 tracking-tighter leading-none">Invoice</h2>
-                    <p className="text-xs font-bold text-slate-500 mt-0.5">#{bill.billNo}</p>
-                    <div className="mt-1 bg-slate-100 px-2 py-0.5 rounded inline-block">
+                    {/* Job Number Highlight */}
+                    <div className="mt-1 text-right">
+                        <p className="text-[10px] font-bold uppercase text-slate-400 leading-none">Job Number</p>
+                        <p className="text-xl font-mono font-black leading-tight">{bill.jobNumber || bill.billNo}</p>
+                    </div>
+                    <div className="mt-2 text-right">
+                        <p className="text-[10px] font-bold uppercase text-slate-400 leading-none">Date</p>
+                        <p className="text-sm font-bold leading-tight">{formatDate(bill.date)}</p>
+                    </div>
+                    <div className="mt-2 bg-slate-100 px-2 py-0.5 rounded inline-block">
                         <span className="text-[10px] font-bold uppercase text-slate-500 mr-1.5">Status:</span>
                         <span className={`text-[10px] font-black uppercase ${bill.calculatedStatus === 'Paid' ? 'text-green-600' : 'text-red-600'}`}>
                             {bill.calculatedStatus || 'Unpaid'}
                         </span>
-                    </div>
-                    {/* Job Number Highlight */}
-                    <div className="mt-1">
-                        <p className="text-[10px] font-bold uppercase text-slate-400 leading-none">Job Number</p>
-                        <p className="text-base font-mono font-black leading-tight">{bill.jobNumber || bill.billNo}</p>
                     </div>
                 </div>
             </div>
@@ -86,15 +89,7 @@ export const InvoiceTemplate = forwardRef<HTMLDivElement, InvoiceTemplateProps>(
                             <p className="font-bold break-words leading-tight">{bill.exporter || '-'}</p>
                         </div>
                         <div>
-                            <p className="text-[9px] text-slate-500 font-semibold uppercase leading-none">Date</p>
-                            <p className="font-bold leading-tight">{formatDate(bill.date)}</p>
-                        </div>
-                        <div>
-                            <p className="text-[9px] text-slate-500 font-semibold uppercase leading-none">Arrival Date</p>
-                            <p className="font-bold leading-tight">{bill.invoiceDate ? formatDate(bill.invoiceDate) : '-'}</p>
-                        </div>
-                        <div>
-                            <p className="text-[9px] text-slate-500 font-semibold uppercase leading-none">GD Ref</p>
+                            <p className="text-[9px] text-slate-500 font-semibold uppercase leading-none">GD No</p>
                             <p className="font-bold break-words leading-tight">{bill.gdNumber || '-'}</p>
                         </div>
                         <div>

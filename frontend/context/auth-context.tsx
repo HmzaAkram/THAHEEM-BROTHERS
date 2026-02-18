@@ -11,6 +11,7 @@ interface User {
 
 interface AuthContextType {
   user: User | null;
+  token: string | null;
   isAuthenticated: boolean;
   login: (userData: User, token?: string) => void;
   logout: () => void;
@@ -21,27 +22,34 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
+  const [token, setToken] = useState<string | null>(null);
   const [isHydrated, setIsHydrated] = useState(false);
 
   useEffect(() => {
-    // Load user from localStorage after hydration
+    // Load user and token from localStorage after hydration
     const savedUser = localStorage.getItem('currentUser');
+    const savedToken = localStorage.getItem('auth_token');
     if (savedUser) {
       setUser(JSON.parse(savedUser));
+    }
+    if (savedToken) {
+      setToken(savedToken);
     }
     setIsHydrated(true);
   }, []);
 
-  const login = (userData: User, token?: string) => {
+  const login = (userData: User, newToken?: string) => {
     setUser(userData);
-    if (token) {
-      localStorage.setItem('auth_token', token);
+    if (newToken) {
+      setToken(newToken);
+      localStorage.setItem('auth_token', newToken);
     }
     localStorage.setItem('currentUser', JSON.stringify(userData));
   };
 
   const logout = () => {
     setUser(null);
+    setToken(null);
     localStorage.removeItem('currentUser');
     localStorage.removeItem('auth_token');
   };
@@ -49,6 +57,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   return (
     <AuthContext.Provider value={{
       user,
+      token,
       isAuthenticated: !!user,
       login,
       logout,

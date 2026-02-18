@@ -26,6 +26,16 @@ class CheckToken
         $user = auth('sanctum')->user();
         
         if (!$user) {
+            $token = $request->bearerToken();
+            $accessToken = \Laravel\Sanctum\PersonalAccessToken::findToken($token);
+            
+            \Illuminate\Support\Facades\Log::info('CheckToken failed', [
+                'headers' => $request->headers->all(),
+                'bearer_token' => $token,
+                'access_token_db' => $accessToken,
+                'tokenable' => $accessToken ? $accessToken->tokenable : 'null',
+            ]);
+            
             return response()->json([
                 'message' => 'Unauthenticated. Invalid or missing token.'
             ], 401);

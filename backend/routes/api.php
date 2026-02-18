@@ -7,6 +7,7 @@ use App\Http\Controllers\BillController;
 use App\Http\Controllers\PaymentController;
 use App\Http\Controllers\SecurityController;
 use App\Http\Controllers\BackupController;
+use App\Http\Controllers\QueryController;
 
 // Public routes
 Route::post('/v1/login', [AuthController::class, 'login'])
@@ -27,4 +28,10 @@ Route::prefix('v1')->middleware('auth.token')->group(function () {
     // Backup Routes
     Route::get('/backup/export', [BackupController::class, 'export']);
     Route::post('/backup/import', [BackupController::class, 'import']);
+
+    // Query Routes
+    Route::get('/queries', [QueryController::class, 'index']);
+    Route::get('/queries/{id}', [QueryController::class, 'show']);
+    Route::post('/queries', [QueryController::class, 'store']);
+    Route::post('/queries/{id}/messages', [QueryController::class, 'sendMessage']);
 });

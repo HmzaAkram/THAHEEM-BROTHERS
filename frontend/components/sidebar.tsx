@@ -14,6 +14,7 @@ import {
   LogOut,
   ShieldCheck,
   Database,
+  MessageSquare,
 } from 'lucide-react';
 import { useState } from 'react';
 import { Button } from '@/components/ui/button';
@@ -40,6 +41,7 @@ export function Sidebar({ user, onLogout }: SidebarProps) {
     { href: '/admin/reports', label: 'Reports', icon: FileBarChart },
     { href: '/admin/securities', label: 'Securities', icon: ShieldCheck },
     { href: '/admin/backup', label: 'Backup', icon: Database },
+    { href: '/admin/queries', label: 'Queries', icon: MessageSquare },
   ];
 
   const companyLinks = [
@@ -47,6 +49,7 @@ export function Sidebar({ user, onLogout }: SidebarProps) {
     { href: '/company/bills', label: 'My Bills', icon: FileText },
     { href: '/company/ledger', label: 'Ledger', icon: BookOpen },
     { href: '/company/summary', label: 'Account Summary', icon: CreditCard },
+    { href: '/company/queries', label: 'My Queries', icon: MessageSquare },
   ];
 
   const links = role === 'admin' ? adminLinks : companyLinks;
