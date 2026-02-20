@@ -42,7 +42,7 @@ import { Badge } from '@/components/ui/badge';
 
 export default function CompanyDashboard() {
   const { user, isHydrated: authHydrated } = useAuth();
-  const { companies, bills, payments, getCompanyBalance, getCompanyLedger } = useData();
+  const { companies, bills, payments, getCompanyBalance, getCompanyLedger, isLoaded } = useData();
   const ledgerRef = useRef<HTMLDivElement>(null);
   const [downloadLoading, setDownloadLoading] = useState(false);
 
@@ -164,11 +164,24 @@ export default function CompanyDashboard() {
     }
   };
 
-  if (!authHydrated || !currentCompany) {
+  if (!authHydrated || !isLoaded) {
+    return (
+      <DashboardLayout>
+        <div className="flex h-full items-center justify-center p-10 animate-in fade-in">
+          <div className="flex flex-col items-center gap-4 text-muted-foreground">
+            <Loader2 className="w-10 h-10 animate-spin text-primary opacity-50" />
+            <p className="font-medium animate-pulse">Loading dashboard data...</p>
+          </div>
+        </div>
+      </DashboardLayout>
+    )
+  }
+
+  if (!currentCompany) {
     return (
       <DashboardLayout>
         <div className="flex h-full items-center justify-center p-10 text-muted-foreground animate-in fade-in">
-          {!authHydrated ? "Loading..." : "No company data available. Please add a company in the admin panel first."}
+          No company data available. Please contact the administrator to set up your profile.
         </div>
       </DashboardLayout>
     )

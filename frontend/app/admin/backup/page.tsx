@@ -22,6 +22,7 @@ import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import { formatDate, formatCurrency } from '@/lib/utils';
 import { Company, Bill, Payment } from '@/context/data-context';
+import Swal from 'sweetalert2';
 
 export default function BackupPage() {
     const { user } = useAuth();
@@ -58,11 +59,11 @@ export default function BackupPage() {
                 window.URL.revokeObjectURL(url);
             } else {
                 const result = await response.json();
-                alert(`Failed to export database: ${result.error || 'Unknown error'}`);
+                Swal.fire({ title: 'Export Failed', text: `Failed to export database: ${result.error || 'Unknown error'}`, icon: 'error', confirmButtonColor: '#3b82f6' });
             }
         } catch (error) {
             console.error('Export error:', error);
-            alert('An error occurred during export.');
+            Swal.fire({ title: 'Export Error', text: 'An error occurred during export.', icon: 'error', confirmButtonColor: '#3b82f6' });
         } finally {
             setExportLoading(false);
         }
@@ -70,11 +71,21 @@ export default function BackupPage() {
 
     const handleImport = async () => {
         if (!selectedFile) {
-            alert('Please select a backup file first.');
+            Swal.fire({ title: 'No File Selected', text: 'Please select a backup file first.', icon: 'warning', confirmButtonColor: '#3b82f6' });
             return;
         }
 
-        if (!window.confirm('WARNING: This will overwrite your current database. This action CANNOT be undone. Are you sure you want to proceed?')) {
+        const confirmResult = await Swal.fire({
+            title: 'WARNING',
+            text: 'This will overwrite your current database. This action CANNOT be undone. Are you sure you want to proceed?',
+            icon: 'warning',
+            showCancelButton: true,
+            confirmButtonColor: '#ef4444',
+            cancelButtonColor: '#3b82f6',
+            confirmButtonText: 'Yes, proceed!'
+        });
+
+        if (!confirmResult.isConfirmed) {
             return;
         }
 
@@ -93,15 +104,15 @@ export default function BackupPage() {
             });
 
             if (response.ok) {
-                alert('Database restored successfully! The application will now reload.');
+                await Swal.fire({ title: 'Success!', text: 'Database restored successfully! The application will now reload.', icon: 'success', confirmButtonColor: '#10b981' });
                 window.location.reload();
             } else {
                 const data = await response.json();
-                alert(`Restore failed: ${data.error || 'Unknown error'}`);
+                Swal.fire({ title: 'Restore Failed', text: `Restore failed: ${data.error || 'Unknown error'}`, icon: 'error', confirmButtonColor: '#3b82f6' });
             }
         } catch (error) {
             console.error('Import error:', error);
-            alert('An error occurred during the restore process.');
+            Swal.fire({ title: 'Restore Error', text: 'An error occurred during the restore process.', icon: 'error', confirmButtonColor: '#3b82f6' });
         } finally {
             setImportLoading(false);
         }
@@ -249,11 +260,11 @@ export default function BackupPage() {
             });
 
             doc.save(`Full_System_Backup_${new Date().toISOString().split('T')[0]}.pdf`);
-            alert('PDF Backup generated successfully!');
+            Swal.fire({ title: 'Success!', text: 'PDF Backup generated successfully!', icon: 'success', confirmButtonColor: '#10b981' });
 
         } catch (error) {
             console.error(error);
-            alert('Failed to generate PDF backup.');
+            Swal.fire({ title: 'Error', text: 'Failed to generate PDF backup.', icon: 'error', confirmButtonColor: '#3b82f6' });
         } finally {
             setPdfLoading(false);
         }

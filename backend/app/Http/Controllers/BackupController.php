@@ -21,7 +21,7 @@ class BackupController extends Controller
             $tables = DB::select('SHOW TABLES');
             $tables = array_map('current', $tables);
 
-            $return = '';
+            $return = "SET FOREIGN_KEY_CHECKS=0;\n\n";
             
             // 2. Cycle through each table
             foreach ($tables as $table) {
@@ -58,6 +58,8 @@ class BackupController extends Controller
                 $return .= "\n\n\n";
             }
 
+            $return .= "SET FOREIGN_KEY_CHECKS=1;\n";
+
             // 3. Generate Filename
             $fileName = 'backup_' . Carbon::now()->format('Y-m-d_H-i-s') . '.sql';
 
@@ -90,11 +92,14 @@ class BackupController extends Controller
             // Note: This is a basic split. Complex SQL with triggers/procedures might need a robust parser.
             // For simple dumps (CREATE/INSERT), splitting by ";\n" is usually sufficient or just DB::unprepared.
             
+            DB::statement('SET FOREIGN_KEY_CHECKS=0;');
             DB::unprepared($sql);
+            DB::statement('SET FOREIGN_KEY_CHECKS=1;');
 
             return response()->json(['message' => 'Database restored successfully.']);
 
         } catch (\Exception $e) {
+            DB::statement('SET FOREIGN_KEY_CHECKS=1;');
             Log::error("Backup Import Failed: " . $e->getMessage());
             return response()->json(['error' => 'Restore failed: ' . $e->getMessage()], 500);
         }

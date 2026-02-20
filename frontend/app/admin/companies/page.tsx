@@ -33,6 +33,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
+import Swal from 'sweetalert2';
 
 export default function CompaniesPage() {
   const { companies, bills, payments, addCompany, deleteCompany, getCompanyBalance } = useData();
@@ -165,11 +166,21 @@ export default function CompaniesPage() {
         setFormData({ name: '', ntn: '', email: '', phone: '', address: '', username: '', password: '' });
         setIsDialogOpen(false);
       } else {
-        alert(result.message || "Failed to create company");
+        Swal.fire({
+          title: 'Error',
+          text: result.message || "Failed to create company",
+          icon: 'error',
+          confirmButtonColor: '#3b82f6'
+        });
       }
     } catch (error) {
       console.error("Critical failure adding company:", error);
-      alert("A critical error occurred while adding the company.");
+      Swal.fire({
+        title: 'Error',
+        text: 'A critical error occurred while adding the company.',
+        icon: 'error',
+        confirmButtonColor: '#3b82f6'
+      });
     } finally {
       setLoading(false);
     }
@@ -421,8 +432,17 @@ export default function CompaniesPage() {
                                   variant="ghost"
                                   size="sm"
                                   className="h-8 w-8 p-0 hover:bg-red-100"
-                                  onClick={() => {
-                                    if (confirm('Are you sure you want to delete ' + company.name + '?')) {
+                                  onClick={async () => {
+                                    const result = await Swal.fire({
+                                      title: 'Are you sure?',
+                                      text: `Are you sure you want to delete ${company.name}?`,
+                                      icon: 'warning',
+                                      showCancelButton: true,
+                                      confirmButtonColor: '#ef4444',
+                                      cancelButtonColor: '#6b7280',
+                                      confirmButtonText: 'Yes, delete it!'
+                                    });
+                                    if (result.isConfirmed) {
                                       deleteCompany(company.id);
                                     }
                                   }}

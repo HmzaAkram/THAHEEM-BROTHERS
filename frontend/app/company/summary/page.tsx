@@ -5,29 +5,19 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { useData } from '@/context/data-context';
 import { useAuth } from '@/context/auth-context';
-import { useMemo } from 'react';
+import { useMemo, useRef, useState } from 'react';
 import { formatDate } from '@/lib/utils';
-import { Download, Mail, Building, Phone as PhoneIcon, MapPin, Hash, User as UserIcon, Loader2 } from 'lucide-react';
-import { jsPDF } from 'jspdf';
-import { toPng } from 'html-to-image';
-import { useRef, useState } from 'react';
+import { Building, Phone as PhoneIcon, MapPin, Hash, User as UserIcon, Loader2, Download } from 'lucide-react';
 import { toast } from 'sonner';
 import ApiService from '@/lib/api';
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from '@/components/ui/table';
+import { jsPDF } from 'jspdf';
+import { toJpeg } from 'html-to-image';
 
 export default function AccountSummaryPage() {
   const { user, isHydrated: authHydrated } = useAuth();
   const { companies, getCompanyLedger } = useData();
-  const ledgerRef = useRef<HTMLDivElement>(null);
-  const [emailLoading, setEmailLoading] = useState(false);
   const [downloadLoading, setDownloadLoading] = useState(false);
+  const summaryRef = useRef<HTMLDivElement>(null);
 
   const currentCompany = useMemo(() => {
     if (user?.role === 'company' && user.id) {
@@ -51,48 +41,24 @@ export default function AccountSummaryPage() {
     };
   }, [ledger]);
 
-  const handleDownloadStatement = async () => {
-    if (!ledgerRef.current) return;
-    setDownloadLoading(true);
 
+  const handleDownload = async () => {
+    if (!summaryRef.current) return;
+    setDownloadLoading(true);
     try {
-      // Ensure the hidden element is visible for capture (it's off-screen but needs to be rendered)
-      const dataUrl = await toPng(ledgerRef.current, { cacheBust: true, style: { background: 'white', padding: '20px' } });
+      const dataUrl = await toJpeg(summaryRef.current, { cacheBust: true, quality: 0.95, style: { background: 'white', padding: '20px' } });
       const pdf = new jsPDF('p', 'mm', 'a4');
       const imgProps = pdf.getImageProperties(dataUrl);
       const pdfWidth = pdf.internal.pageSize.getWidth();
       const pdfHeight = (imgProps.height * pdfWidth) / imgProps.width;
 
-      pdf.addImage(dataUrl, 'PNG', 0, 0, pdfWidth, pdfHeight);
-      pdf.save(`Account_Statement_${currentCompany.name}_${new Date().toISOString().split('T')[0]}.pdf`);
-      toast.success('Statement downloaded successfully');
+      pdf.addImage(dataUrl, 'JPEG', 0, 0, pdfWidth, pdfHeight);
+      pdf.save(`Account_Summary_${currentCompany?.name.replace(/\s+/g, '_')}.pdf`);
     } catch (err) {
       console.error('Failed to export PDF', err);
-      toast.error('Failed to generate statement. Please try again.');
+      toast.error("Failed to generate PDF.");
     } finally {
       setDownloadLoading(false);
-    }
-  };
-
-  const handleRequestEmail = async () => {
-    if (!currentCompany.email) {
-      toast.error("No email address found for this company.");
-      return;
-    }
-
-    setEmailLoading(true);
-    try {
-      const response = await ApiService.post('/company/request-ledger-email', {});
-      if (response.message) {
-        toast.success(response.message);
-      } else {
-        toast.success("Ledger has been emailed to your registered address.");
-      }
-    } catch (error) {
-      console.error("Email request failed:", error);
-      toast.error("Failed to make request. Please contact admin.");
-    } finally {
-      setEmailLoading(false);
     }
   };
   if (!authHydrated || !currentCompany) {
@@ -105,7 +71,7 @@ export default function AccountSummaryPage() {
 
   return (
     <DashboardLayout>
-      <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
+      <div ref={summaryRef} className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500 bg-background/50 relative">
         <div>
           <h1 className="text-3xl font-bold text-foreground font-display">Account Summary</h1>
           <p className="text-muted-foreground mt-1">
@@ -153,10 +119,7 @@ export default function AccountSummaryPage() {
 
                 <div className="space-y-1 pt-2 border-t border-dashed">
                   <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest">Business Email</p>
-                  <div className="flex items-center gap-2 mt-1">
-                    <Mail className="w-3.5 h-3.5 text-muted-foreground" />
-                    <p className="font-semibold text-foreground">{currentCompany.email}</p>
-                  </div>
+                  <p className="font-semibold text-foreground mt-1">{currentCompany.email}</p>
                 </div>
 
                 <div className="space-y-1 pt-2 border-t border-dashed">
@@ -198,7 +161,7 @@ export default function AccountSummaryPage() {
           </div>
 
           <div className="space-y-6">
-            <Card className="shadow-2xl border-0 bg-primary text-primary-foreground overflow-hidden group">
+            <Card className="shadow-2xl border-0 bg-primary text-primary-foreground overflow-hidden group relative">
               <div className="absolute top-0 right-0 w-32 h-32 bg-white/10 rounded-full blur-2xl -mr-16 -mt-16 group-hover:scale-120 transition-transform duration-700" />
               <CardHeader>
                 <CardTitle className="text-base font-bold uppercase tracking-[0.2em] opacity-80">Financial Summary</CardTitle>
@@ -233,73 +196,17 @@ export default function AccountSummaryPage() {
               </CardHeader>
               <CardContent className="space-y-3">
                 <Button
-                  className="w-full h-11 justify-start gap-4 font-bold shadow-md hover:scale-[1.02] transition-transform"
-                  onClick={handleDownloadStatement}
+                  variant="default"
+                  className="w-full h-11 justify-start gap-4 font-bold transition-all"
+                  onClick={handleDownload}
                   disabled={downloadLoading}
                 >
                   {downloadLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Download className="w-4 h-4" />}
-                  Download Statement
-                </Button>
-                <Button
-                  variant="outline"
-                  className="w-full h-11 justify-start gap-4 font-bold border-primary/20 hover:bg-primary/5 hover:text-primary transition-all"
-                  onClick={handleRequestEmail}
-                  disabled={emailLoading}
-                >
-                  {emailLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Mail className="w-4 h-4" />}
-                  Request Ledger Email
+                  Download Report (PDF)
                 </Button>
               </CardContent>
             </Card>
           </div>
-        </div>
-      </div>
-
-      {/* Hidden Ledger Table for PDF Generation */}
-      <div style={{ position: 'fixed', left: '-9999px', top: 0, width: '210mm', height: 'auto', overflow: 'hidden', visibility: 'hidden' }}>
-        <div ref={ledgerRef} className="bg-white p-8">
-          <div className="mb-6">
-            <h1 className="text-2xl font-bold">{currentCompany.name} - Account Statement</h1>
-            <p className="text-sm text-gray-500">Generated on {new Date().toLocaleDateString()}</p>
-          </div>
-
-          <div className="grid grid-cols-3 gap-4 mb-6 border p-4 rounded-lg bg-gray-50">
-            <div>
-              <p className="text-xs font-bold text-gray-500 uppercase">Total Debit</p>
-              <p className="text-lg font-bold">PKR {summary.totalDebit.toLocaleString()}</p>
-            </div>
-            <div>
-              <p className="text-xs font-bold text-gray-500 uppercase">Total Credit</p>
-              <p className="text-lg font-bold">PKR {summary.totalCredit.toLocaleString()}</p>
-            </div>
-            <div>
-              <p className="text-xs font-bold text-gray-500 uppercase">Outstanding Balance</p>
-              <p className="text-lg font-bold text-primary">PKR {summary.balance.toLocaleString()}</p>
-            </div>
-          </div>
-
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Date</TableHead>
-                <TableHead>Description</TableHead>
-                <TableHead className="text-right">Debit</TableHead>
-                <TableHead className="text-right">Credit</TableHead>
-                <TableHead className="text-right">Balance</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {ledger.map((entry) => (
-                <TableRow key={entry.id}>
-                  <TableCell>{formatDate(entry.date)}</TableCell>
-                  <TableCell>{entry.description}</TableCell>
-                  <TableCell className="text-right">{entry.debit > 0 ? entry.debit.toLocaleString() : '-'}</TableCell>
-                  <TableCell className="text-right">{entry.credit > 0 ? entry.credit.toLocaleString() : '-'}</TableCell>
-                  <TableCell className="text-right font-bold">{entry.balance.toLocaleString()}</TableCell>
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
         </div>
       </div>
     </DashboardLayout>

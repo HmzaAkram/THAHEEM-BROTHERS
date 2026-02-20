@@ -13,7 +13,7 @@ import {
 } from '@/components/ui/table';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Download, Printer, Search, Calendar } from 'lucide-react';
+import { Download, Search, Calendar } from 'lucide-react';
 import { jsPDF } from 'jspdf';
 import { toPng } from 'html-to-image';
 
@@ -151,10 +151,6 @@ export default function CompanyLedgerPage() {
                 <Button variant="outline" size="sm" className="gap-2 bg-transparent" onClick={handleExportPDF}>
                   <Download className="w-4 h-4" />
                   Export
-                </Button>
-                <Button variant="outline" size="sm" className="gap-2 bg-transparent" onClick={() => window.print()}>
-                  <Printer className="w-4 h-4" />
-                  Print
                 </Button>
               </div>
             </div>

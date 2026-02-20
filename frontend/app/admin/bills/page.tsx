@@ -47,7 +47,8 @@ import {
   Filter,
   DollarSign,
   TrendingUp,
-  CreditCard
+  CreditCard,
+  Pencil,
 } from 'lucide-react';
 import { useState, useMemo, useRef, useEffect } from 'react';
 import { useData, BillItem, Bill } from '@/context/data-context';
@@ -59,6 +60,7 @@ import { InvoiceTemplate } from '@/components/invoice-template';
 import { CompanySelect } from '@/components/company-select';
 import html2canvas from 'html2canvas';
 import { toast } from '@/components/ui/use-toast';
+import Swal from 'sweetalert2';
 
 const statusStyles = {
   Paid: 'bg-green-100 text-green-800 border-green-200',
@@ -69,11 +71,13 @@ const statusStyles = {
 import { PDFDocument } from 'pdf-lib';
 
 export default function BillsPage() {
-  const { bills, companies, addBill, payments } = useData();
+  const { bills, companies, addBill, updateBill, payments } = useData();
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [isViewOpen, setIsViewOpen] = useState(false);
   const [selectedBill, setSelectedBill] = useState<Bill | null>(null);
   const [loading, setLoading] = useState(false);
+  const [isEditing, setIsEditing] = useState(false);
+  const [editingId, setEditingId] = useState<string | null>(null);
   const tableRef = useRef<HTMLDivElement>(null);
   const invoiceRef = useRef<HTMLDivElement>(null);
   // Consolidated PDF generation state
@@ -264,6 +268,45 @@ export default function BillsPage() {
   const calculatedSalesTax = (Number(salesTax) * 0.15) || 0;
   const grandTotal = totalAmount + (Number(serviceCharges) || 0) + calculatedSalesTax; // Gross Total (Advance not deducted)
 
+
+  const handleEditClick = (bill: Bill) => {
+    setCompanyId(bill.companyId);
+    setDate(bill.date ? bill.date.split('T')[0] : '');
+    setExporter(bill.exporter || '');
+    setInvoiceNo(bill.invoiceNo || '');
+    setInvoiceDate(bill.invoiceDate ? bill.invoiceDate.split('T')[0] : '');
+    setBeNumber(bill.beNumber || '');
+    setHawb(bill.hawb || '');
+    setIgm(bill.igm || '');
+    setIndexNo(String(bill.indexNo || ''));
+    setGdNumber(bill.gdNumber || '');
+    setNoOfContainers(String(bill.noOfContainers || ''));
+    setContainerNo(bill.containerNo || '');
+    setPackages(String(bill.packages || ''));
+    setJobNumber(bill.jobNumber || '');
+    setVia(bill.via || '');
+    setWeight(String(bill.weight || ''));
+    setServiceCharges(String(bill.serviceCharges || ''));
+    setSalesTax(String(bill.salesTax || ''));
+    setAdvancePayment(String(bill.advancePayment || ''));
+    setNote(bill.note || 'All Necessary documents enclosed.');
+    setAttachment(null); // Reset attachment as file input can't be pre-filled with URL
+
+    // Map existing items
+    const existingItems = bill.items.map(item => ({
+      description: item.description,
+      notes: item.notes || '',
+      amount: item.amount,
+      invoiceNo: item.invoiceNo || ''
+    }));
+
+    setItems(existingItems.length > 0 ? existingItems : [{ description: 'DUTY TAXES & ETO', notes: '', amount: 0, invoiceNo: '' }]);
+
+    setEditingId(bill.id);
+    setIsEditing(true);
+    setIsDialogOpen(true);
+  };
+
   const handleAddItem = () => {
     setItems([...items, { description: 'DUTY TAXES & ETO', notes: '', amount: 0, invoiceNo: '' }]);
   };
@@ -282,13 +325,13 @@ export default function BillsPage() {
 
   const handleSubmit = async () => {
     if (!companyId || !date) {
-      alert("Please fill all required fields");
+      Swal.fire({ title: 'Missing Information', text: "Please fill all required fields", icon: 'warning', confirmButtonColor: '#3b82f6' });
       return;
     }
 
     const selectedCompany = companies.find(c => String(c.id) === String(companyId));
     if (!selectedCompany) {
-      alert("Selected company not found. Please try re-selecting the company.");
+      Swal.fire({ title: 'Error', text: "Selected company not found. Please try re-selecting the company.", icon: 'error', confirmButtonColor: '#3b82f6' });
       return;
     }
 
@@ -300,7 +343,7 @@ export default function BillsPage() {
     })).filter(i => i.description && i.amount > 0);
 
     if (finalItems.length === 0) {
-      alert("Please add at least one valid item");
+      Swal.fire({ title: 'Invalid Items', text: "Please add at least one valid item", icon: 'warning', confirmButtonColor: '#3b82f6' });
       return;
     }
 
@@ -315,13 +358,12 @@ export default function BillsPage() {
 
     setLoading(true);
     try {
-      let attachmentBase64 = undefined;
+      let attachmentBase64;
       if (attachment) {
         attachmentBase64 = await fileToBase64(attachment);
       }
 
-      const result = await addBill({
-        billNo: `BILL-${String(bills.length + 1).padStart(3, '0')}`,
+      const billData = {
         companyId: selectedCompany.id,
         companyName: selectedCompany.name,
         date,
@@ -347,7 +389,17 @@ export default function BillsPage() {
         advancePayment: Number(advancePayment) || 0,
         grandTotal: grandTotal,
         note: note,
-      });
+      };
+
+      let result;
+      if (isEditing && editingId) {
+        result = await updateBill(editingId, billData);
+      } else {
+        result = await addBill({
+          ...billData,
+          billNo: `BILL-${String(bills.length + 1).padStart(3, '0')}`,
+        });
+      }
 
       if (result && result.ok) {
         setIsDialogOpen(false);
@@ -377,12 +429,14 @@ export default function BillsPage() {
           { description: 'CIVIL AVIATION AUTHORITY', notes: '', amount: 0, invoiceNo: '' },
           { description: "GERRYS' DANATA PVT LTD", notes: '', amount: 0, invoiceNo: '' },
         ]);
+        setIsEditing(false);
+        setEditingId(null);
       } else {
-        alert(`Failed to generate bill: ${result?.message || 'Unknown error'}`);
+        Swal.fire({ title: 'Error', text: `Failed to ${isEditing ? 'update' : 'generate'} bill: ${result?.message || 'Unknown error'}`, icon: 'error', confirmButtonColor: '#3b82f6' });
       }
     } catch (error) {
-      console.error("Failed to add bill:", error);
-      alert("An unexpected error occurred while generating the bill.");
+      console.error(`Failed to ${isEditing ? 'update' : 'add'} bill:`, error);
+      Swal.fire({ title: 'Error', text: `An unexpected error occurred while ${isEditing ? 'updating' : 'generating'} the bill.`, icon: 'error', confirmButtonColor: '#3b82f6' });
     } finally {
       setLoading(false);
     }
@@ -473,7 +527,20 @@ export default function BillsPage() {
                 <Download className="mr-2 h-4 w-4" />
                 Download List (PDF)
               </Button>
-              <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
+              <Dialog open={isDialogOpen} onOpenChange={(open) => {
+                setIsDialogOpen(open);
+                if (!open) {
+                  setIsEditing(false);
+                  setEditingId(null);
+                  // Optional: Reset form fields here if desired, otherwise they persist until next open/new click
+                  // For better UX, usually better to reset on 'Create New' click or reset here.
+                  // Let's reset here to avoid stale data when clicking "Create New" after closing "Edit"
+                  setCompanyId('');
+                  setItems([{ description: 'DUTY TAXES & ETO', notes: '', amount: 0, invoiceNo: '' }, { description: 'CIVIL AVIATION AUTHORITY', notes: '', amount: 0, invoiceNo: '' }, { description: "GERRYS' DANATA PVT LTD", notes: '', amount: 0, invoiceNo: '' }]);
+                  // Reset other fields... (Doing full reset might be verbose here, maybe extract reset logic)
+                  setJobNumber(''); setVia(''); setWeight(''); setExporter(''); setInvoiceNo(''); setInvoiceDate(new Date().toISOString().split('T')[0]); setBeNumber(''); setHawb(''); setIgm(''); setIndexNo(''); setGdNumber(''); setServiceCharges(''); setSalesTax(''); setAdvancePayment(''); setNoOfContainers(''); setContainerNo(''); setPackages(''); setAttachment(null); setNote('All Necessary documents enclosed.');
+                }
+              }}>
                 <DialogTrigger asChild>
                   <Button className="gap-2 shadow-md hover:bg-primary/90">
                     <Plus className="w-4 h-4" />
@@ -482,7 +549,7 @@ export default function BillsPage() {
                 </DialogTrigger>
                 <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
                   <DialogHeader>
-                    <DialogTitle>Create New Bill</DialogTitle>
+                    <DialogTitle>{isEditing ? 'Edit Bill' : 'Create New Bill'}</DialogTitle>
                   </DialogHeader>
                   <div className="space-y-6 pt-4">
                     {/* Bill Details Section */}
@@ -945,7 +1012,7 @@ export default function BillsPage() {
                           onClick={handleSubmit}
                           disabled={loading}
                         >
-                          {loading ? "Generating..." : "Generate Invoice"}
+                          {loading ? (isEditing ? "Updating..." : "Generating...") : (isEditing ? "Update Invoice" : "Generate Invoice")}
                         </Button>
                         <Button
                           variant="ghost"
@@ -1070,6 +1137,15 @@ export default function BillsPage() {
                                 onClick={() => handleViewBill(item)}
                               >
                                 <Eye className="w-4 h-4" />
+                              </Button>
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                className="hover:text-primary hover:bg-primary/5 transition-colors"
+                                onClick={() => handleEditClick(item)}
+                                title="Edit Bill"
+                              >
+                                <Pencil className="w-4 h-4" />
                               </Button>
                               <Button
                                 variant="ghost"

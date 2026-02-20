@@ -30,6 +30,7 @@ import { Badge } from '@/components/ui/badge';
 import { useData } from '@/context/data-context';
 import { useAuth } from '@/context/auth-context';
 import { formatDate } from '@/lib/utils';
+import Swal from 'sweetalert2';
 
 export default function CompanyBillsPage() {
   const { user, isHydrated: authHydrated } = useAuth();
@@ -122,7 +123,12 @@ export default function CompanyBillsPage() {
       // Line 109 calls `toast`.
       // It might be a lint error in current file too.
       // I will leave it as console error/alert if toast is not reliable, or just use the same pattern.
-      alert('Failed to generate PDF. Please try again.');
+      Swal.fire({
+        title: 'Error',
+        text: 'Failed to generate PDF. Please try again.',
+        icon: 'error',
+        confirmButtonColor: '#3b82f6'
+      });
     }
   };
 

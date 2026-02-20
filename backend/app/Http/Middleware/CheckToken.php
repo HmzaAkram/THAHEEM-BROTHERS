@@ -27,13 +27,21 @@ class CheckToken
         
         if (!$user) {
             $token = $request->bearerToken();
-            $accessToken = \Laravel\Sanctum\PersonalAccessToken::findToken($token);
+            if ($token) {
+                // Manually check if token belongs to an alternative model like Company
+                $accessToken = \Laravel\Sanctum\PersonalAccessToken::findToken($token);
+                if ($accessToken && $accessToken->tokenable) {
+                    // Authenticate the user for the current request
+                    auth()->setUser($accessToken->tokenable);
+                    // Also set it in sanctum guard if needed elsewhere
+                    // auth('sanctum')->setUser($accessToken->tokenable);
+                    return $next($request);
+                }
+            }
             
             \Illuminate\Support\Facades\Log::info('CheckToken failed', [
                 'headers' => $request->headers->all(),
                 'bearer_token' => $token,
-                'access_token_db' => $accessToken,
-                'tokenable' => $accessToken ? $accessToken->tokenable : 'null',
             ]);
             
             return response()->json([

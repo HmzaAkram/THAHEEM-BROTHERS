@@ -37,10 +37,9 @@ export const InvoiceTemplate = forwardRef<HTMLDivElement, InvoiceTemplateProps>(
                     </div>
                     <div>
                         <h1 className="text-xl font-bold uppercase tracking-wide leading-tight">Thaheem Brothers</h1>
-                        <p className="text-[10px] text-slate-600 uppercase tracking-widest font-semibold">Logistics & Supply Chain Solutions</p>
-                        <div className="mt-1 text-xs text-slate-500 break-words leading-snug font-bold">
-                            <p>Office # 123, Business Center, Karachi, Pakistan</p>
-                            <p>+92 300 1234567 | info@thaheembrothers.com</p>
+                        <div className="mt-2 text-xs text-slate-500 break-words leading-snug font-bold">
+                            <p>Suite 23, 2nd Floor, R.K. Square Ext, Shahrah-e-Liaquat, Karachi</p>
+                            <p>+92 21 32421347 | +92 300 2791780 | import.khi@hotmail.com</p>
                         </div>
                     </div>
                 </div>
@@ -239,7 +238,7 @@ export const InvoiceTemplate = forwardRef<HTMLDivElement, InvoiceTemplateProps>(
                         </div>
                         <div className="flex justify-between pt-2 border-t-2 border-slate-900 mt-1 items-center">
                             <span className="font-black uppercase tracking-widest text-slate-900 text-sm">Net Payable</span>
-                            <span className="font-mono font-black text-xl bg-slate-900 text-white px-2 py-0.5 rounded">
+                            <span className="font-mono font-black text-xl text-slate-900">
                                 {netPayable.toLocaleString()}
                             </span>
                         </div>

@@ -91,11 +91,11 @@ export function PublicFooter() {
                     <div>
                         <h3 className="font-semibold mb-4">Our Services</h3>
                         <ul className="space-y-2">
-                            <li className="text-sm text-muted-foreground">Customs Clearance</li>
                             <li className="text-sm text-muted-foreground">Freight Forwarding</li>
-                            <li className="text-sm text-muted-foreground">Import & Export</li>
-                            <li className="text-sm text-muted-foreground">Warehousing</li>
-                            <li className="text-sm text-muted-foreground">Licensed Brokerage</li>
+                            <li className="text-sm text-muted-foreground">Regulatory Compliance</li>
+                            <li className="text-sm text-muted-foreground">Project Logistics</li>
+                            <li className="text-sm text-muted-foreground">Customs Brokerage</li>
+                            <li className="text-sm text-muted-foreground">Warehousing & Distribution</li>
                         </ul>
                     </div>
 
@@ -105,15 +105,18 @@ export function PublicFooter() {
                         <ul className="space-y-4">
                             <li className="flex items-start gap-3 text-sm text-muted-foreground">
                                 <MapPin className="h-5 w-5 text-primary shrink-0 mt-0.5" />
-                                <span>R.K Ext Suit# 2/23 2nd Floor, Shahrah-e-Liaquat, Karachi</span>
+                                <span>Suite 23, 2nd Floor, R.K. Square Ext, Shahrah-e-Liaquat, Karachi</span>
                             </li>
-                            <li className="flex items-center gap-3 text-sm text-muted-foreground">
-                                <Phone className="h-5 w-5 text-primary shrink-0" />
-                                <span>+92 (021) 32421347</span>
+                            <li className="flex items-start gap-3 text-sm text-muted-foreground">
+                                <Phone className="h-5 w-5 text-primary shrink-0 mt-0.5" />
+                                <div>
+                                    <p>+92 21 32421347</p>
+                                    <p>+92 300 2791780</p>
+                                </div>
                             </li>
                             <li className="flex items-center gap-3 text-sm text-muted-foreground">
                                 <Mail className="h-5 w-5 text-primary shrink-0" />
-                                <span>Import.khi@hotmail.com</span>
+                                <span>import.khi@hotmail.com</span>
                             </li>
                         </ul>
                     </div>

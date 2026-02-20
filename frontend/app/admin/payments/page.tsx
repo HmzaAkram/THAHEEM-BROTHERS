@@ -34,6 +34,7 @@ import { formatDate, formatCurrency } from '@/lib/utils';
 import { CompanySelect } from '@/components/company-select';
 import { GenericSearchSelect } from '@/components/search-select';
 import { MultiSearchSelect } from '@/components/multi-search-select';
+import Swal from 'sweetalert2';
 
 export default function PaymentsPage() {
   const { payments, companies, addPayment, bills } = useData();
@@ -62,7 +63,12 @@ export default function PaymentsPage() {
 
   const handleSubmit = async () => {
     if (!companyId || !date || selectedBillIds.length === 0) {
-      alert("Please select a company, date, and at least one bill.");
+      Swal.fire({
+        title: 'Missing Information',
+        text: 'Please select a company, date, and at least one bill.',
+        icon: 'warning',
+        confirmButtonColor: '#3b82f6'
+      });
       return;
     }
 
@@ -70,7 +76,12 @@ export default function PaymentsPage() {
     for (const id of selectedBillIds) {
       const p = billPayments[id];
       if (!p || !p.amount || Number(p.amount) <= 0) {
-        alert(`Please enter a valid amount for all selected bills.`);
+        Swal.fire({
+          title: 'Invalid Amount',
+          text: 'Please enter a valid amount for all selected bills.',
+          icon: 'warning',
+          confirmButtonColor: '#3b82f6'
+        });
         return;
       }
     }
@@ -116,9 +127,14 @@ export default function PaymentsPage() {
       }
 
       if (successCount > 0) {
-        alert(errorCount === 0
-          ? `Successfully recorded ${successCount} payment(s).`
-          : `Recorded ${successCount} payments. ${errorCount} failed.`);
+        Swal.fire({
+          title: errorCount === 0 ? 'Success' : 'Partial Success',
+          text: errorCount === 0
+            ? `Successfully recorded ${successCount} payment(s).`
+            : `Recorded ${successCount} payments. ${errorCount} failed.`,
+          icon: errorCount === 0 ? 'success' : 'warning',
+          confirmButtonColor: '#3b82f6'
+        });
 
         setIsDialogOpen(false);
         // Reset state
@@ -132,11 +148,21 @@ export default function PaymentsPage() {
         setPayOrderNo('');
         setDescription('');
       } else {
-        alert("Failed to record any payments. Please check console for details.");
+        Swal.fire({
+          title: 'Error',
+          text: 'Failed to record any payments. Please check console for details.',
+          icon: 'error',
+          confirmButtonColor: '#3b82f6'
+        });
       }
     } catch (error) {
       console.error("Failed to record payments:", error);
-      alert("An unexpected error occurred while recording payments.");
+      Swal.fire({
+        title: 'Error',
+        text: 'An unexpected error occurred while recording payments.',
+        icon: 'error',
+        confirmButtonColor: '#3b82f6'
+      });
     } finally {
       setLoading(false);
     }
@@ -154,7 +180,6 @@ export default function PaymentsPage() {
 
   const billOptions = useMemo(() => {
     return companyBills.map(b => ({
-      id: b.id,
       id: b.id,
       label: `JOB: ${b.jobNumber || b.billNo} (Due: ${formatCurrency((b.grandTotal || b.totalAmount) - b.paidAmount)})`
     }));

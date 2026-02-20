@@ -168,11 +168,93 @@ class BillController extends Controller
         }
 
         $validated = $request->validate([
-            'status' => 'required|string',
+            'company_id' => 'sometimes|exists:companies,id',
+            'company_name' => 'sometimes|string',
+            'bill_no' => 'nullable|string',
+            'date' => 'required|date',
+            'job_number' => 'nullable|string',
+            'via' => 'nullable|string',
+            'weight' => 'nullable|string',
+            'packages' => 'nullable|string',
+            'exporter' => 'nullable|string',
+            'invoice_no' => 'nullable|string',
+            'invoice_date' => 'nullable|date',
+            'be_number' => 'nullable|string',
+            'hawb' => 'nullable|string',
+            'igm' => 'nullable|string',
+            'index_no' => 'nullable|string',
+            'gd_number' => 'nullable|string',
+            'no_of_containers' => 'nullable|integer',
+            'container_no' => 'nullable|string',
+            'total_amount' => 'required|numeric',
+            'service_charges' => 'required|numeric',
+            'sales_tax' => 'required|numeric',
+            'advance_payment' => 'required|numeric',
+            'grand_total' => 'required|numeric',
+            'status' => 'nullable|string',
+            'attachment' => 'nullable|string', // Can be null (no change) or base64 (new file)
+            'note' => 'nullable|string',
+            'items' => 'required|array',
+            'items.*.description' => 'required|string',
+            'items.*.notes' => 'nullable|string',
+            'items.*.amount' => 'required|numeric',
+            'items.*.invoice_no' => 'nullable|string',
         ]);
 
-        $bill->update($validated);
-        return response()->json($bill);
+        return DB::transaction(function () use ($validated, $request, $bill) {
+            $billData = collect($validated)->except(['items', 'attachment'])->toArray();
+
+            // Handle Attachment Update
+            if ($request->filled('attachment')) {
+                 $attachmentData = $request->input('attachment');
+                 
+                 // If it's a new base64 string, process it
+                 if (str_starts_with($attachmentData, 'data:')) {
+                    // Start of Base64 processing (Similiar to store method)
+                    $mimeTypePart = explode(':', substr($attachmentData, 0, strpos($attachmentData, ';')))[1];
+                    $image = str_replace(' ', '+', explode(',', $attachmentData)[1]);
+                    $decodedData = base64_decode($image);
+                    $finfo = new \finfo(FILEINFO_MIME_TYPE);
+                    $actualMimeType = $finfo->buffer($decodedData);
+                     
+                    $allowedMimes = ['application/pdf' => 'pdf'];
+                     
+                    if (!isset($allowedMimes[$actualMimeType])) {
+                         return response()->json([
+                            'message' => 'Invalid file type. Only PDF files are allowed.',
+                            'errors' => ['attachment' => ['Only PDF files are supported']]
+                        ], 422);
+                    }
+                     
+                    $extension = 'pdf';
+                    $fileName = 'bill_' . \Illuminate\Support\Str::uuid() . '.' . $extension;
+                    \Illuminate\Support\Facades\Storage::disk('public')->put('attachments/' . $fileName, $decodedData);
+                    $url = \Illuminate\Support\Facades\Storage::url('attachments/' . $fileName);
+                    $billData['attachment'] = str_starts_with($url, 'http') ? $url : config('app.url') . $url;
+                 } 
+                 // If it's not base64, we assume it's the existing URL or path, so we don't update the field
+                 // OR if explicitly null passed (cleared), but frontend sends null in that case? 
+                 // For now, if it's existing URL string, we just ignore updating it to keep current value 
+                 // unless we want to allow 'clearing' it, which isn't in requirements yet.
+            }
+
+            $bill->update($billData);
+
+            // Sync Items: Delete all and recreate to ensure perfect sync
+            $bill->items()->delete();
+            foreach ($validated['items'] as $itemData) {
+                $bill->items()->create($itemData);
+            }
+
+            $bill->refresh();
+            $bill->load(['items', 'company']);
+            
+            if ($bill->attachment) {
+                $bill->attachment = $this->ensureAbsoluteUrl($bill->attachment);
+            }
+
+            return response()->json($bill);
+        });
     }
 
     public function destroy(Bill $bill)

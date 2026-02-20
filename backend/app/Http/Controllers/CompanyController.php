@@ -42,7 +42,7 @@ class CompanyController extends Controller
                 'city' => 'nullable|string|max:100',
                 'ntn' => 'nullable|string|max:50',
                 'username' => 'nullable|string|max:50|unique:companies,username|regex:/^[a-zA-Z0-9_]+$/',
-                'password' => 'nullable|string|min:6',
+                'password' => 'nullable|string',
                 'status' => 'nullable|string|in:Active,Inactive',
             ]);
 
@@ -96,7 +96,7 @@ class CompanyController extends Controller
             'city' => 'nullable|string|max:100',
             'ntn' => 'nullable|string|max:50',
             'username' => 'nullable|string|max:50|unique:companies,username,' . $id . '|regex:/^[a-zA-Z0-9_]+$/',
-            'password' => 'nullable|string|min:6',
+            'password' => 'nullable|string',
             'status' => 'nullable|string|in:Active,Inactive',
         ]);
 

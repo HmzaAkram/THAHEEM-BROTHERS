@@ -1,6 +1,6 @@
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
-import { ArrowRight, Plane, Ship, Truck, PackageCheck } from 'lucide-react';
+import { ArrowRight, Plane, Ship, Truck, PackageCheck, Globe as Global, Monitor } from 'lucide-react';
 
 export default function HomePage() {
     return (
@@ -19,7 +19,7 @@ export default function HomePage() {
                         Global Logistics <span className="text-primary">Partner</span>
                     </h1>
                     <p className="text-lg md:text-xl text-slate-200 mb-8 max-w-2xl mx-auto animate-in slide-in-from-bottom-5 duration-1000 delay-200">
-                        Simplifying international trade with reliable freight forwarding, customs clearance, and supply chain solutions.
+                        Pakistan's leading licensed customs brokerage and freight forwarding company, built on a decade of excellence and client trust.
                     </p>
                     <div className="flex flex-col sm:flex-row gap-4 justify-center animate-in zoom-in duration-1000 delay-300">
                         <Link href="/contact">
@@ -46,27 +46,37 @@ export default function HomePage() {
                         </p>
                     </div>
 
-                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8">
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
                         {[
                             {
+                                icon: <PackageCheck className="h-10 w-10 text-primary" />,
+                                title: "In-depth Knowledge",
+                                desc: "Extensive expertise in Customs & Global Trade regulations."
+                            },
+                            {
                                 icon: <Ship className="h-10 w-10 text-primary" />,
-                                title: "Ocean Freight",
-                                desc: "Reliable FCL and LCL shipping solutions for global trade connecting major ports worldwide."
+                                title: "Seamless Integration",
+                                desc: "Perfect harmony between Forwarding & Clearance operations."
                             },
                             {
                                 icon: <Plane className="h-10 w-10 text-primary" />,
-                                title: "Air Freight",
-                                desc: "Expedited air cargo services for time-sensitive shipments with varied priority options."
+                                title: "Multinational Team",
+                                desc: "Highly experienced professionals dedicated to your success."
                             },
                             {
                                 icon: <Truck className="h-10 w-10 text-primary" />,
-                                title: "Land Transport",
-                                desc: "Seamless cross-border trucking and inland transportation networks for door-to-door delivery."
+                                title: "24/7 Support",
+                                desc: "Round-the-clock client support availability for peace of mind."
                             },
                             {
-                                icon: <PackageCheck className="h-10 w-10 text-primary" />,
-                                title: "Customs Brokerage",
-                                desc: "Expert handling of documentation and compliance to ensure smooth customs clearance."
+                                icon: <Global className="h-10 w-10 text-primary" />,
+                                title: "Global Reach",
+                                desc: "Competitive pricing tailored with expansive international reach."
+                            },
+                            {
+                                icon: <Monitor className="h-10 w-10 text-primary" />,
+                                title: "Advanced Tech",
+                                desc: "Technology-Driven Shipment Monitoring for full visibility."
                             }
                         ].map((feature, idx) => (
                             <div key={idx} className="bg-card border rounded-xl p-6 hover:shadow-lg transition-shadow hover:-translate-y-1 duration-300">
@@ -86,10 +96,10 @@ export default function HomePage() {
                 <div className="container px-4">
                     <div className="grid grid-cols-2 lg:grid-cols-4 gap-8 text-center">
                         {[
-                            { label: "Years Experience", value: "28+" },
+                            { label: "Years Experience", value: "10+" },
                             { label: "Global Partners", value: "50+" },
                             { label: "Happy Clients", value: "2000+" },
-                            { label: "Shipments/Year", value: "10k+" }
+                            { label: "Customs Clearances", value: "15k+" }
                         ].map((stat, idx) => (
                             <div key={idx}>
                                 <p className="text-4xl lg:text-5xl font-bold text-primary mb-2">{stat.value}</p>

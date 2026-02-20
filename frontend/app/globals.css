@@ -95,10 +95,16 @@
 @layer base {
   * {
     @apply border-border;
+    box-sizing: border-box;
+  }
+
+  html {
+    overflow-x: hidden;
   }
 
   body {
     @apply bg-background text-foreground transition-colors duration-300;
+    overflow-x: hidden;
   }
 }
 

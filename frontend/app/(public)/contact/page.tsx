@@ -19,6 +19,8 @@ export default function ContactPage() {
 
     return (
         <div className="container px-4 py-16">
+            
+
             <div className="text-center max-w-3xl mx-auto mb-16">
                 <h1 className="text-4xl font-bold tracking-tight mb-4">Contact Us</h1>
                 <p className="text-xl text-muted-foreground">
@@ -31,29 +33,42 @@ export default function ContactPage() {
                 <div className="space-y-8">
                     <Card>
                         <CardHeader>
-                            <CardTitle>Contact Information</CardTitle>
+                            <CardTitle>Head Office</CardTitle>
                             <CardDescription>Reach out to us directly through any of these channels.</CardDescription>
                         </CardHeader>
                         <CardContent className="space-y-6">
                             <div className="flex items-start gap-4">
                                 <MapPin className="h-6 w-6 text-primary shrink-0 mt-1" />
                                 <div>
-                                    <p className="font-semibold">Head Office</p>
-                                    <p className="text-muted-foreground">R.K Ext Suit# 2/23 2nd Floor, Shahrah-e-Liaquat, Karachi</p>
+                                    <p className="font-semibold">Address</p>
+                                    <p className="text-muted-foreground">
+                                        Suite 23, 2nd Floor, R.K. Square Extension,<br />
+                                        Shahrah-e-Liaquat, New Challi,<br />
+                                        Karachi, Pakistan
+                                    </p>
                                 </div>
                             </div>
-                            <div className="flex items-center gap-4">
-                                <Phone className="h-6 w-6 text-primary shrink-0" />
+                            <div className="flex items-start gap-4">
+                                <Phone className="h-6 w-6 text-primary shrink-0 mt-1" />
                                 <div>
-                                    <p className="font-semibold">Phone</p>
-                                    <p className="text-muted-foreground">+92 (021) 32421347</p>
+                                    <p className="font-semibold">Phone & Fax</p>
+                                    <p className="text-muted-foreground">
+                                        +92 21 32421347<br />
+                                        +92 300 2791780<br />
+                                        +92 330 2791786<br />
+                                        +92 317 2004257<br />
+                                        +92 320 2017200<br />
+                                        <span className="text-sm">Fax: +92 21 32421347</span>
+                                    </p>
                                 </div>
                             </div>
                             <div className="flex items-center gap-4">
                                 <Mail className="h-6 w-6 text-primary shrink-0" />
                                 <div>
                                     <p className="font-semibold">Email</p>
-                                    <p className="text-muted-foreground">Import.khi@hotmail.com</p>
+                                    <p className="text-muted-foreground">
+                                        <a href="mailto:import.khi@hotmail.com" className="hover:underline">import.khi@hotmail.com</a>
+                                    </p>
                                 </div>
                             </div>
                         </CardContent>

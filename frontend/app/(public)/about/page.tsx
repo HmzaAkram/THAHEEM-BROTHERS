@@ -1,29 +1,31 @@
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Award, Target, Users, History, Globe } from 'lucide-react';
+import { 
+  Award, Target, Users, History, Globe, Mail, Phone, MapPin, 
+  Shield, Ship, Headphones, DollarSign, Activity, CheckCircle 
+} from 'lucide-react';
 
 export default function AboutPage() {
     return (
         <div className="container px-4 py-16">
+            
+
             <div className="max-w-4xl mx-auto space-y-20">
                 {/* Header */}
                 <div className="text-center space-y-4">
                     <h1 className="text-4xl font-bold tracking-tight">About Thaheem Brothers</h1>
                     <p className="text-xl text-muted-foreground">
-                        A legacy of excellence in global logistics and supply chain management.
+                        A decade of excellence, innovation, and client trust in customs brokerage and freight forwarding.
                     </p>
                 </div>
 
-                {/* Company Overview & History */}
+                {/* Company Overview */}
                 <div className="grid grid-cols-1 lg:grid-cols-2 gap-12 items-center">
                     <div className="prose prose-lg dark:prose-invert">
                         <p className="text-xl leading-relaxed font-medium text-foreground">
-                            Founded in 1995, Thaheem Brothers has grown from a local freight forwarding company into a global logistics partner. With over two decades of experience, we specialize in providing comprehensive supply chain solutions that drive efficiency and growth for our clients.
+                            Thaheem Brothers is one of Pakistan's leading licensed customs brokerage and freight forwarding companies, built on a decade of excellence, innovation, and client trust.
                         </p>
                         <p>
-                            Our journey began with a single mission: to simplify the complexities of international trade. Today, we operate at the intersection of traditional logistics and modern technology, ensuring every shipment is handled with precision and care.
-                        </p>
-                        <p>
-                            Our commitment to reliability, transparency, and innovation has earned us the trust of businesses across diverse industries, from retail and manufacturing to healthcare and technology.
+                            Established to redefine industry standards, we offer comprehensive, tailor-made logistics solutions that combine reliability, cost-effectiveness, and compliance under one roof. With over 10 years of experience and an expanding international footprint, Thaheem Brothers proudly serves a diverse portfolio of national and multinational clients across various industries including textiles, IT, engineering, and more.
                         </p>
                     </div>
                     <div className="relative h-[400px] rounded-2xl overflow-hidden shadow-xl">
@@ -31,61 +33,139 @@ export default function AboutPage() {
                     </div>
                 </div>
 
-                {/* Values Section */}
+                {/* Mission & Vision */}
                 <div className="bg-slate-50 -mx-4 px-4 py-16 rounded-3xl">
                     <div className="max-w-4xl mx-auto">
                         <h2 className="text-3xl font-bold text-center mb-12">Our Guiding Principles</h2>
-                        <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-8 max-w-3xl mx-auto">
                             <Card className="bg-white border-0 shadow-md">
                                 <CardHeader>
                                     <Target className="h-10 w-10 text-primary mb-2" />
-                                    <CardTitle>Mission</CardTitle>
+                                    <CardTitle>Our Mission</CardTitle>
                                 </CardHeader>
                                 <CardContent>
-                                    To simplify global trade by delivering reliable, cost-effective, and innovative logistics solutions tailored to our clients' unique needs.
+                                    To deliver seamless, efficient, and intelligent supply chain services by blending industry knowledge with cutting-edge logistics and a human-centric approach.
                                 </CardContent>
                             </Card>
                             <Card className="bg-white border-0 shadow-md">
                                 <CardHeader>
                                     <Award className="h-10 w-10 text-primary mb-2" />
-                                    <CardTitle>Vision</CardTitle>
+                                    <CardTitle>Our Vision</CardTitle>
                                 </CardHeader>
                                 <CardContent>
-                                    To be the preferred logistics partner for businesses worldwide, recognized for our operational excellence and customer-centric approach.
-                                </CardContent>
-                            </Card>
-                            <Card className="bg-white border-0 shadow-md">
-                                <CardHeader>
-                                    <Users className="h-10 w-10 text-primary mb-2" />
-                                    <CardTitle>Values</CardTitle>
-                                </CardHeader>
-                                <CardContent>
-                                    Integrity, Transparency, and relentless Commitment to customer success are the pillars of our organization.
+                                    To be a global leader in innovative and integrated freight forwarding, customs clearance, and logistics solutions.
                                 </CardContent>
                             </Card>
                         </div>
                     </div>
                 </div>
 
-                {/* Team Section */}
+                {/* CEO Message */}
                 <div>
-                    <h2 className="text-3xl font-bold mb-12 text-center">Meet Our Leadership</h2>
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-                        {[
-                            { name: "Abdul Thaheem", role: "CEO & Founder", img: "https://images.unsplash.com/photo-1560250097-0b93528c311a?ixlib=rb-4.0.3&auto=format&fit=crop&w=687&q=80" },
-                            { name: "Sarah Ahmed", role: "Head of Operations", img: "https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?ixlib=rb-4.0.3&auto=format&fit=crop&w=688&q=80" },
-                            { name: "Michael Chen", role: "Global Strategy Director", img: "https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?ixlib=rb-4.0.3&auto=format&fit=crop&w=1170&q=80" }
-                        ].map((leader, i) => (
-                            <div key={i} className="group">
-                                <div className="relative h-80 bg-muted rounded-xl overflow-hidden mb-4 shadow-sm group-hover:shadow-md transition-all">
-                                    <div className="absolute inset-0 bg-cover bg-center transition-transform duration-500 group-hover:scale-105" style={{ backgroundImage: `url(${leader.img})` }} />
+                    <h2 className="text-3xl font-bold mb-12 text-center">Message From The CEO</h2>
+                    <div className="grid grid-cols-1 md:grid-cols-12 gap-12 items-center">
+                        <div className="md:col-span-5">
+                            <div className="relative h-[500px] bg-muted rounded-2xl overflow-hidden shadow-xl">
+                                <div className="absolute inset-0 bg-cover bg-center" style={{ backgroundImage: `url('https://images.unsplash.com/photo-1560250097-0b93528c311a?ixlib=rb-4.0.3&auto=format&fit=crop&w=687&q=80')` }} />
+                            </div>
+                        </div>
+                        <div className="md:col-span-7 space-y-6">
+                            <h3 className="text-3xl font-bold">Rana Irfan Ali</h3>
+                            <p className="text-primary font-bold text-xl uppercase tracking-wider">Chief Executive Officer</p>
+                            <div className="prose prose-lg dark:prose-invert">
+                                <blockquote className="border-l-4 border-primary pl-6 italic text-muted-foreground text-lg leading-relaxed">
+                                    "When we founded Thaheem Brothers, we set out not just to provide freight services—but to make a difference. Our purpose was clear: to go beyond the conventional and offer customized, client-centric solutions. Over the past decade, our relentless focus on quality, trust, and efficiency has enabled us to become a recognized force in the freight and logistics industry."
+                                </blockquote>
+                                <p className="text-foreground leading-relaxed">
+                                    "As we move into the global market, we remain committed to innovation, collaboration, and customer satisfaction. I extend my heartfelt thanks to our clients, partners, and team—whose continued loyalty and trust have brought us this far."
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                {/* Why Thaheem Brothers */}
+                <div className="bg-slate-50 -mx-4 px-4 py-16 rounded-3xl">
+                    <div className="max-w-4xl mx-auto">
+                        <h2 className="text-3xl font-bold text-center mb-12">Why Thaheem Brothers?</h2>
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                            {[
+                                { icon: Shield, title: "In-depth Knowledge of Customs & Global Trade" },
+                                { icon: Ship, title: "Seamless Integration of Forwarding & Clearance" },
+                                { icon: Users, title: "Experienced Multinational Team" },
+                                { icon: Headphones, title: "24/7 Client Support Availability" },
+                                { icon: DollarSign, title: "Competitive Pricing with Global Reach" },
+                                { icon: Activity, title: "Technology-Driven Shipment Monitoring" }
+                            ].map((item, i) => (
+                                <div key={i} className="flex items-start gap-4 p-4 bg-white rounded-xl shadow-sm">
+                                    <item.icon className="h-6 w-6 text-primary shrink-0 mt-1" />
+                                    <span className="font-medium">{item.title}</span>
                                 </div>
-                                <div className="text-center">
-                                    <h3 className="font-bold text-xl">{leader.name}</h3>
-                                    <p className="text-primary font-medium">{leader.role}</p>
+                            ))}
+                        </div>
+                    </div>
+                </div>
+
+                {/* Trusted Clients */}
+                <div>
+                    <h2 className="text-3xl font-bold mb-8 text-center">Our Trusted Clients</h2>
+                    <p className="text-center text-muted-foreground mb-12 max-w-2xl mx-auto">
+                        We are proud to serve a diverse portfolio of national and multinational clients across various industries.
+                    </p>
+                    <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
+                        {['Textiles', 'IT & Technology', 'Engineering', 'Pharmaceuticals', 'Automotive', 'Consumer Goods', 'Heavy Equipment', 'Export Processing'].map((industry, i) => (
+                            <Card key={i} className="bg-slate-50 border-0 shadow-sm hover:shadow-md transition">
+                                <CardContent className="p-6 text-center">
+                                    <Users className="h-8 w-8 mx-auto mb-3 text-primary" />
+                                    <p className="font-semibold">{industry}</p>
+                                </CardContent>
+                            </Card>
+                        ))}
+                    </div>
+                </div>
+
+                {/* Total Information Services */}
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-12 items-center">
+                    <div className="prose prose-lg dark:prose-invert">
+                        <h2 className="text-3xl font-bold mb-4">Total Information Services</h2>
+                        <p>
+                            Our integrated logistics system provides real-time access to shipment movement and information, optimizing delivery and reducing cost. From generation to final delivery, we ensure full visibility and control of your freight.
+                        </p>
+                    </div>
+                    <div className="relative h-[300px] rounded-2xl overflow-hidden shadow-xl">
+                        <div className="absolute inset-0 bg-[url('https://images.unsplash.com/photo-1586528116311-ad8dd3c8310d?ixlib=rb-4.0.3&auto=format&fit=crop&w=1170&q=80')] bg-cover bg-center" />
+                    </div>
+                </div>
+
+                {/* Contact Info */}
+                <div className="bg-primary/5 -mx-4 px-4 py-16 rounded-3xl">
+                    <div className="max-w-4xl mx-auto text-center">
+                        <h2 className="text-3xl font-bold mb-8">Head Office</h2>
+                        <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+                            <div className="flex flex-col items-center gap-2">
+                                <MapPin className="h-8 w-8 text-primary" />
+                                <address className="not-italic text-lg">
+                                    Suite 23, 2nd Floor, R.K. Square Extension,<br />
+                                    Shahrah-e-Liaquat, New Challi,<br />
+                                    Karachi, Pakistan
+                                </address>
+                            </div>
+                            <div className="flex flex-col items-center gap-2">
+                                <Phone className="h-8 w-8 text-primary" />
+                                <div className="text-lg">
+                                    <div>+92 21 32421347</div>
+                                    <div>+92 300 2791780</div>
+                                    <div>+92 330 2791786</div>
+                                    <div>+92 317 2004257</div>
+                                    <div>+92 320 2017200</div>
+                                    <div className="text-sm text-muted-foreground mt-1">Fax: +92 21 32421347</div>
                                 </div>
                             </div>
-                        ))}
+                            <div className="flex flex-col items-center gap-2">
+                                <Mail className="h-8 w-8 text-primary" />
+                                <a href="mailto:import.khi@hotmail.com" className="text-lg hover:underline">import.khi@hotmail.com</a>
+                            </div>
+                        </div>
                     </div>
                 </div>
             </div>

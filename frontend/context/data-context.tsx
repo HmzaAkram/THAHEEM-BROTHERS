@@ -128,6 +128,7 @@ interface DataContextType {
   updateCompany: (id: string, data: Partial<Company>) => void;
   deleteCompany: (id: string) => void;
   addBill: (bill: Omit<Bill, 'id' | 'createdAt' | 'paidAmount' | 'status' | 'calculatedStatus'>) => Promise<any>;
+  updateBill: (id: string, bill: Partial<Bill>) => Promise<any>;
   addPayment: (payment: Omit<Payment, 'id' | 'createdAt'>) => Promise<any>;
   addSecurity: (security: Omit<SecurityTracking, 'id' | 'createdAt' | 'status'>) => Promise<any>;
   updateSecurity: (id: string, data: Partial<SecurityTracking>) => void;
@@ -141,6 +142,7 @@ interface DataContextType {
     activeCompanies: number;
   };
   refreshData: () => Promise<void>;
+  isLoaded: boolean;
 }
 
 const DataContext = createContext<DataContextType | undefined>(undefined);
@@ -252,6 +254,15 @@ export function DataProvider({ children }: { children: ReactNode }) {
     const result = await ApiService.post('/bills', billData, token);
     if (result.ok && result.data) {
       setBills(prev => [...prev, result.data]);
+    }
+    return result;
+  };
+
+  const updateBill = async (id: string, billData: Partial<Bill>) => {
+    const token = localStorage.getItem('auth_token');
+    const result = await ApiService.put(`/bills/${id}`, billData, token);
+    if (result.ok && result.data) {
+      setBills(prev => prev.map(b => b.id === id ? result.data : b));
     }
     return result;
   };
@@ -410,6 +421,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
         updateCompany,
         deleteCompany,
         addBill,
+        updateBill,
         addPayment,
         addSecurity,
         updateSecurity,
@@ -418,6 +430,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
         getCompanyBalance,
         getDashboardStats,
         refreshData,
+        isLoaded,
       }}
     >
       {children}

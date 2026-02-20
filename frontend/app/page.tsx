@@ -1,10 +1,17 @@
 'use client';
 
 import Link from 'next/link';
+import Image from 'next/image';
 import { Button } from '@/components/ui/button';
 import { ArrowRight, Plane, Ship, Truck, PackageCheck } from 'lucide-react';
 import { PublicNavbar } from '@/components/public/navbar';
 import { PublicFooter } from '@/components/public/footer';
+
+const CLIENT_LOGOS = Array.from({ length: 40 }, (_, i) => ({
+  id: i + 1,
+  src: `/clients/${(i + 1).toString().padStart(2, '0')}.PNG`,
+  alt: `Trusted Client ${i + 1}`
+}));
 
 export default function HomePage() {
   return (
@@ -91,6 +98,7 @@ export default function HomePage() {
                       title: "Compliance & Security",
                       desc: "Rigorous adherence to international trade regulations and security protocols so you never have to worry."
                     }
+
                   ].map((item, idx) => (
                     <div key={idx} className="flex gap-4">
                       <div className="h-10 w-10 shrink-0 rounded-full bg-primary/10 flex items-center justify-center text-primary font-bold">
@@ -118,7 +126,38 @@ export default function HomePage() {
           </div>
         </section>
 
-        {/* Services Overview Grid */}
+      
+        {/* List of Our Trusted Clients */}
+        <section className="py-24 bg-slate-50">
+          <div className="container mx-auto px-4">
+            <div className="text-center max-w-3xl mx-auto mb-16">
+              <h2 className="text-3xl font-bold mb-4">LIST OF OUR TRUSTED CLIENTS</h2>
+              <p className="text-muted-foreground text-lg">
+                We are proud to partner with industry leaders who trust us with their global logistics needs.
+              </p>
+            </div>
+
+            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6 gap-6">
+              {CLIENT_LOGOS.map((logo) => (
+                <div
+                  key={logo.id}
+                  className="flex items-center justify-center p-4 bg-white border border-slate-100 rounded-xl shadow-sm hover:shadow-md hover:scale-105 transition-all duration-300 h-24 sm:h-28 group"
+                >
+                  <div className="relative w-full h-full">
+                    <Image
+                      src={logo.src}
+                      alt={logo.alt}
+                      fill
+                      className="object-contain filter grayscale group-hover:grayscale-0 transition-all duration-300"
+                      sizes="(max-width: 768px) 50vw, (max-width: 1024px) 33vw, (max-width: 1280px) 25vw, 16vw"
+                    />
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        </section>
+          {/* Services Overview Grid */}
         <section className="py-24 bg-background">
           <div className="container mx-auto px-4">
             <div className="text-center max-w-3xl mx-auto mb-16">
@@ -183,6 +222,7 @@ export default function HomePage() {
             </div>
           </div>
         </section>
+
 
         {/* Trusted Partners / CTA */}
         <section className="py-24 bg-slate-900 text-white">

@@ -56,6 +56,7 @@ import { useData, SecurityTracking } from '@/context/data-context';
 import { Badge } from '@/components/ui/badge';
 import { formatDate, formatCurrency } from '@/lib/utils';
 import { CompanySelect } from '@/components/company-select';
+import Swal from 'sweetalert2';
 
 
 const calculateRefundDueDate = (startDate: string, days: number) => {
@@ -110,7 +111,12 @@ export default function SecuritiesPage() {
         setLoading(true);
         try {
             if (!companyId || !gdNumber || !noOfContainers || !amountPerContainer || !refundDays) {
-                alert('Please fill in all required fields');
+                Swal.fire({
+                    title: 'Missing Fields',
+                    text: 'Please fill in all required fields',
+                    icon: 'warning',
+                    confirmButtonColor: '#3b82f6'
+                });
                 return;
             }
 
@@ -162,11 +168,21 @@ export default function SecuritiesPage() {
                 setReceiverName('');
             } else {
                 console.error('Security Save Failed:', result);
-                alert(`Failed to save security record: ${result?.message || 'Unknown error'}`);
+                Swal.fire({
+                    title: 'Error',
+                    text: `Failed to save security record: ${result?.message || 'Unknown error'}`,
+                    icon: 'error',
+                    confirmButtonColor: '#3b82f6'
+                });
             }
         } catch (error) {
             console.error('Security Save Exception:', error);
-            alert('An unexpected error occurred while saving.');
+            Swal.fire({
+                title: 'Error',
+                text: 'An unexpected error occurred while saving.',
+                icon: 'error',
+                confirmButtonColor: '#3b82f6'
+            });
         } finally {
             setLoading(false);
         }
@@ -510,12 +526,35 @@ export default function SecuritiesPage() {
                                                             size="icon"
                                                             className="h-9 w-9 rounded-xl text-muted-foreground hover:bg-white hover:text-primary hover:shadow-md transition-all active:scale-95"
                                                             onClick={async () => {
-                                                                if (window.confirm("Mark as refund received?")) {
+                                                                const confirmResult = await Swal.fire({
+                                                                    title: 'Mark as Received?',
+                                                                    text: "Are you sure you want to mark this refund as received?",
+                                                                    icon: 'warning',
+                                                                    showCancelButton: true,
+                                                                    confirmButtonColor: '#10b981',
+                                                                    cancelButtonColor: '#ef4444',
+                                                                    confirmButtonText: 'Yes, mark it!'
+                                                                });
+
+                                                                if (confirmResult.isConfirmed) {
                                                                     try {
                                                                         const result = await updateSecurity(security.id, { isRefundReceived: true, status: 'Completed' });
+                                                                        Swal.fire({
+                                                                            title: 'Success!',
+                                                                            text: 'Security refund marked as received.',
+                                                                            icon: 'success',
+                                                                            confirmButtonColor: '#10b981',
+                                                                            timer: 2000,
+                                                                            showConfirmButton: false
+                                                                        });
                                                                     } catch (err) {
                                                                         console.error("Failed to update security:", err);
-                                                                        alert("Failed to update security record.");
+                                                                        Swal.fire({
+                                                                            title: 'Error',
+                                                                            text: 'Failed to update security record.',
+                                                                            icon: 'error',
+                                                                            confirmButtonColor: '#3b82f6'
+                                                                        });
                                                                     }
                                                                 }
                                                             }}
