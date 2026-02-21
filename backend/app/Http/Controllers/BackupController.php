@@ -16,6 +16,11 @@ class BackupController extends Controller
      */
     public function export()
     {
+        $user = auth('sanctum')->user();
+        if (!$user instanceof \App\Models\User || $user->role !== 'admin') {
+            return response()->json(['message' => 'Unauthorized. Admin access required.'], 403);
+        }
+
         try {
             // 1. Get all tables
             $tables = DB::select('SHOW TABLES');
@@ -80,6 +85,11 @@ class BackupController extends Controller
      */
     public function import(Request $request)
     {
+        $user = auth('sanctum')->user();
+        if (!$user instanceof \App\Models\User || $user->role !== 'admin') {
+            return response()->json(['message' => 'Unauthorized. Admin access required.'], 403);
+        }
+
         $request->validate([
             'backup_file' => 'required|file' // Removing strict mimes check for raw sql text files often sent as text/plain
         ]);

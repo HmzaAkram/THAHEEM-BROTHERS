@@ -28,30 +28,37 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     // Load user and token from localStorage after hydration
     const savedUser = localStorage.getItem('currentUser');
-    const savedToken = localStorage.getItem('auth_token');
+    // Token state removed entirely from localStorage
     if (savedUser) {
       setUser(JSON.parse(savedUser));
     }
-    if (savedToken) {
-      setToken(savedToken);
-    }
     setIsHydrated(true);
+
+    const handleUnauthorized = () => {
+      setUser(null);
+      setToken(null);
+      localStorage.removeItem('currentUser');
+      // Optionally could hit the logout endpoint here too, but frontend clear is usually enough
+    };
+
+    window.addEventListener('auth:unauthorized', handleUnauthorized);
+    return () => window.removeEventListener('auth:unauthorized', handleUnauthorized);
   }, []);
 
   const login = (userData: User, newToken?: string) => {
     setUser(userData);
-    if (newToken) {
-      setToken(newToken);
-      localStorage.setItem('auth_token', newToken);
-    }
     localStorage.setItem('currentUser', JSON.stringify(userData));
   };
 
-  const logout = () => {
+  const logout = async () => {
+    try {
+      await fetch('/api/auth/logout', { method: 'POST' });
+    } catch (e) {
+      console.error(e);
+    }
     setUser(null);
     setToken(null);
     localStorage.removeItem('currentUser');
-    localStorage.removeItem('auth_token');
   };
 
   return (

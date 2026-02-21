@@ -23,11 +23,14 @@ Route::prefix('v1')->middleware('auth.token')->group(function () {
     Route::apiResource('bills', BillController::class);
     Route::apiResource('payments', PaymentController::class);
     Route::apiResource('securities', SecurityController::class);
-    Route::post('/company/request-ledger-email', [CompanyController::class, 'requestLedgerEmail']);
+    Route::post('/company/request-ledger-email', [CompanyController::class, 'requestLedgerEmail'])
+        ->middleware('throttle:3,1');
 
     // Backup Routes
-    Route::get('/backup/export', [BackupController::class, 'export']);
-    Route::post('/backup/import', [BackupController::class, 'import']);
+    Route::get('/backup/export', [BackupController::class, 'export'])
+        ->middleware('throttle:3,1');
+    Route::post('/backup/import', [BackupController::class, 'import'])
+        ->middleware('throttle:3,1');
 
     // Query Routes
     Route::get('/queries', [QueryController::class, 'index']);

@@ -3,7 +3,8 @@
  * Supports automatic JSON ↔ FormData switching for file uploads.
  */
 
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000/api/v1';
+const IS_CLIENT = typeof window !== 'undefined';
+const API_BASE_URL = IS_CLIENT ? '/api-proxy' : (process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000/api/v1');
 
 export interface ApiResponse<T = any> {
     ok: boolean;
@@ -16,8 +17,8 @@ class ApiService {
     // ─────────────────────────────────────────────────────────────────────
     // Private helpers
     // ─────────────────────────────────────────────────────────────────────
-    private static getHeaders(token?: string | null): HeadersInit {
-        const headers: HeadersInit = {
+    private static getHeaders(token?: string | null): Record<string, string> {
+        const headers: Record<string, string> = {
             'Accept': 'application/json',
         };
         // Content-Type is NOT set here – it will be added automatically
@@ -32,6 +33,10 @@ class ApiService {
     private static async handleResponse(response: Response): Promise<ApiResponse> {
         if (response.status === 204) {
             return { ok: true, status: 204 };
+        }
+
+        if (response.status === 401 && typeof window !== 'undefined') {
+            window.dispatchEvent(new Event('auth:unauthorized'));
         }
 
         if (!response.ok) {

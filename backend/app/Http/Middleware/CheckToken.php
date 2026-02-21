@@ -25,8 +25,20 @@ class CheckToken
         // This ensures Bearer tokens are validated properly
         $user = auth('sanctum')->user();
         
+        // --- DEV BYPASS ---
+        // Restore development bypass so that the frontend can fetch mock data or company list 
+        // to authenticate companies using frontend state while in development workflow.
+        if (config('app.env') !== 'production' && !$user && empty($request->bearerToken()) && empty($request->cookie('auth_token'))) {
+            // Mock an admin user just to let requests pass locally for frontend dev
+            $mockUser = \App\Models\User::first() ?? new \App\Models\User(['id' => 1, 'role' => 'admin']);
+            auth()->setUser($mockUser);
+            auth('sanctum')->setUser($mockUser);
+            return $next($request);
+        }
+        // ------------------
+        
         if (!$user) {
-            $token = $request->bearerToken();
+            $token = $request->bearerToken() ?? $request->cookie('auth_token');
             if ($token) {
                 // Manually check if token belongs to an alternative model like Company
                 $accessToken = \Laravel\Sanctum\PersonalAccessToken::findToken($token);
@@ -34,7 +46,7 @@ class CheckToken
                     // Authenticate the user for the current request
                     auth()->setUser($accessToken->tokenable);
                     // Also set it in sanctum guard if needed elsewhere
-                    // auth('sanctum')->setUser($accessToken->tokenable);
+                    auth('sanctum')->setUser($accessToken->tokenable);
                     return $next($request);
                 }
             }

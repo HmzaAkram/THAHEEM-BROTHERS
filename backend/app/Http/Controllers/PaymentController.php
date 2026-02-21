@@ -24,6 +24,11 @@ class PaymentController extends Controller
 
     public function store(Request $request)
     {
+        $user = auth('sanctum')->user();
+        if (!$user instanceof \App\Models\User || $user->role !== 'admin') {
+            return response()->json(['message' => 'Unauthorized. Admin access required.'], 403);
+        }
+
         $validated = $request->validate([
             'company_id' => 'required|exists:companies,id',
             'company_name' => 'required|string',
@@ -46,8 +51,8 @@ class PaymentController extends Controller
     public function destroy(Payment $payment)
     {
         $user = auth('sanctum')->user();
-        if ($user instanceof \App\Models\Company && $payment->company_id !== $user->id) {
-            return response()->json(['message' => 'Unauthorized'], 403);
+        if (!$user instanceof \App\Models\User || $user->role !== 'admin') {
+            return response()->json(['message' => 'Unauthorized. Admin access required.'], 403);
         }
 
         $payment->delete();

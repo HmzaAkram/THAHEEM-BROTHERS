@@ -3,62 +3,59 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'; // Assuming Tabs component exists, if not I'll need to use state. But standard shadcn has it. I'll gamble on it or check. Wait, I saw imports in other files.
-// better to allow for missing tabs by using state if I'm not sure. But let's assume standard shadcn setup.
-// Actually, to be 100% safe and avoid build errors if Tabs is missing, I will build a custom tab switcher using buttons.
 import { useAuth } from '@/context/auth-context';
 import { useData } from '@/context/data-context';
-import { Building2, Lock, User, Key, Mail, ArrowRight } from 'lucide-react';
+import { Building2, Lock, User, Key, Mail, ArrowRight, Loader2 } from 'lucide-react';
 
 export function Login() {
   const { login } = useAuth();
-  const { companies, getDashboardStats } = useData();
-  const stats = getDashboardStats();
-
   const [activeTab, setActiveTab] = useState<'admin' | 'company'>('admin');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
+  const [isLoading, setIsLoading] = useState(false);
+  const { companies, getDashboardStats } = useData();
+  const stats = getDashboardStats();
 
-  const handleLogin = () => {
+  const handleLogin = async () => {
     setError('');
+    setIsLoading(true);
 
-    if (activeTab === 'admin') {
-      if (password === 'admin123') {
-        login({
-          id: 'admin',
-          name: 'Administrator',
-          email: 'admin@thaheem.com',
-          role: 'admin'
-        });
+    try {
+      const loginEmail = activeTab === 'admin' ? 'admin@thaheem.com' : email;
+
+      const res = await fetch('/api/auth/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: loginEmail, password }),
+      });
+
+      const data = await res.json();
+
+      if (!res.ok) {
+        setError(data.message || 'Invalid login details');
       } else {
-        setError('Invalid admin password');
+        // Remove token setting; handled by HttpOnly cookie
+        login(data.user);
       }
-    } else {
-      const company = companies.find(c => c.email === email && c.password === password);
-      if (company) {
-        login({
-          id: company.id,
-          name: company.name,
-          email: company.email,
-          role: 'company'
-        });
-      } else {
-        setError('Invalid email or password');
-      }
+    } catch (e) {
+      setError('Connection failed. Please check the backend.');
+    } finally {
+      setIsLoading(false);
     }
   };
 
   const handleDemoFill = (type: 'admin' | 'company', idx?: number) => {
+    // Demo login helper should still just fill out fields natively, not auto-login
     if (type === 'admin') {
       setActiveTab('admin');
-      setPassword('admin123');
+      setPassword('admin123'); // Assuming standard demo password
     } else {
       setActiveTab('company');
       const company = companies[idx || 0];
       if (company) {
         setEmail(company.email);
-        setPassword(company.password || 'password123');
+        setPassword('password123');
       }
     }
     setError('');
@@ -155,8 +152,13 @@ export function Login() {
               </div>
             )}
 
-            <Button className="w-full h-11 text-base shadow-lg hover:shadow-xl transition-all" onClick={handleLogin}>
-              Sign In <ArrowRight className="ml-2 w-4 h-4" />
+            <Button
+              className="w-full h-11 text-base shadow-lg hover:shadow-xl transition-all"
+              onClick={handleLogin}
+              disabled={isLoading}
+            >
+              {isLoading ? <Loader2 className="animate-spin mr-2 w-4 h-4" /> : 'Sign In'}
+              {!isLoading && <ArrowRight className="ml-2 w-4 h-4" />}
             </Button>
           </CardContent>
 

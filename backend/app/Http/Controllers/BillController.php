@@ -41,6 +41,11 @@ class BillController extends Controller
 
     public function store(Request $request)
     {
+        $user = auth('sanctum')->user();
+        if (!$user instanceof \App\Models\User || $user->role !== 'admin') {
+            return response()->json(['message' => 'Unauthorized. Admin access required.'], 403);
+        }
+
         $validated = $request->validate([
             'company_id' => 'required|exists:companies,id',
             'company_name' => 'required|string',
@@ -104,8 +109,13 @@ class BillController extends Controller
                         ], 422);
                     }
                     
-                    // SECURITY: Check file size (no limit as requested)
-                    // if (strlen($decodedData) > 50 * 1024 * 1024) { ... }
+                    // SECURITY: Check file size (limit to 10MB)
+                    if (strlen($decodedData) > 10 * 1024 * 1024) {
+                        return response()->json([
+                            'message' => 'File size exceeds the 10MB limit.',
+                            'errors' => ['attachment' => ['File size exceeds 10MB']]
+                        ], 422);
+                    }
                     
                     $extension = 'pdf';
                     
@@ -163,8 +173,8 @@ class BillController extends Controller
     public function update(Request $request, Bill $bill)
     {
         $user = auth('sanctum')->user();
-        if ($user instanceof \App\Models\Company && $bill->company_id !== $user->id) {
-            return response()->json(['message' => 'Unauthorized'], 403);
+        if (!$user instanceof \App\Models\User || $user->role !== 'admin') {
+            return response()->json(['message' => 'Unauthorized. Admin access required.'], 403);
         }
 
         $validated = $request->validate([
@@ -226,6 +236,14 @@ class BillController extends Controller
                         ], 422);
                     }
                      
+                    // SECURITY: Check file size (limit to 10MB)
+                    if (strlen($decodedData) > 10 * 1024 * 1024) {
+                        return response()->json([
+                            'message' => 'File size exceeds the 10MB limit.',
+                            'errors' => ['attachment' => ['File size exceeds 10MB']]
+                        ], 422);
+                    }
+
                     $extension = 'pdf';
                     $fileName = 'bill_' . \Illuminate\Support\Str::uuid() . '.' . $extension;
                     \Illuminate\Support\Facades\Storage::disk('public')->put('attachments/' . $fileName, $decodedData);
@@ -260,8 +278,8 @@ class BillController extends Controller
     public function destroy(Bill $bill)
     {
         $user = auth('sanctum')->user();
-        if ($user instanceof \App\Models\Company && $bill->company_id !== $user->id) {
-            return response()->json(['message' => 'Unauthorized'], 403);
+        if (!$user instanceof \App\Models\User || $user->role !== 'admin') {
+            return response()->json(['message' => 'Unauthorized. Admin access required.'], 403);
         }
 
         $bill->delete();
