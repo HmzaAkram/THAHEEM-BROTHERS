@@ -6,10 +6,12 @@ import { usePathname } from 'next/navigation';
 import { Moon, Sun, Menu, X } from 'lucide-react';
 import { useState, useEffect } from 'react';
 import { useTheme } from 'next-themes';
+import { useAuth } from '@/context/auth-context';
 
 export function PublicNavbar() {
     const pathname = usePathname();
     const { theme, setTheme } = useTheme();
+    const { user, isHydrated } = useAuth();
     const [isScrolled, setIsScrolled] = useState(false);
     const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
 
@@ -63,9 +65,15 @@ export function PublicNavbar() {
 
                 {/* Actions */}
                 <div className="hidden md:flex items-center gap-4">
-                    <Link href="/login">
-                        <Button>Login</Button>
-                    </Link>
+                    {isHydrated && user ? (
+                        <Link href={user.role === 'admin' ? '/admin/dashboard' : '/company/dashboard'}>
+                            <Button>Dashboard</Button>
+                        </Link>
+                    ) : (
+                        <Link href="/login">
+                            <Button>Login</Button>
+                        </Link>
+                    )}
                 </div>
 
                 {/* Mobile Menu Toggle */}
@@ -101,9 +109,15 @@ export function PublicNavbar() {
                         </Link>
                     ))}
                     <div className="pt-2 border-t">
-                        <Link href="/login" onClick={() => setIsMobileMenuOpen(false)}>
-                            <Button className="w-full">Login</Button>
-                        </Link>
+                        {isHydrated && user ? (
+                            <Link href={user.role === 'admin' ? '/admin/dashboard' : '/company/dashboard'} onClick={() => setIsMobileMenuOpen(false)}>
+                                <Button className="w-full">Dashboard</Button>
+                            </Link>
+                        ) : (
+                            <Link href="/login" onClick={() => setIsMobileMenuOpen(false)}>
+                                <Button className="w-full">Login</Button>
+                            </Link>
+                        )}
                     </div>
                 </div>
             )}

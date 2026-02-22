@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/context/auth-context';
 import ApiService from '@/lib/api';
@@ -14,10 +14,22 @@ export default function LoginPage() {
     const [email, setEmail] = useState('');
     const [password, setPassword] = useState('');
     const [loading, setLoading] = useState(false);
+    const [redirecting, setRedirecting] = useState(false);
     const [error, setError] = useState('');
     const router = useRouter();
 
-    const { login: authLogin } = useAuth();
+    const { login: authLogin, user, isHydrated } = useAuth();
+
+    useEffect(() => {
+        if (isHydrated && user) {
+            setRedirecting(true);
+            if (user.role === 'admin') {
+                router.push('/admin/dashboard');
+            } else {
+                router.push('/company/dashboard');
+            }
+        }
+    }, [isHydrated, user, router]);
 
     const handleLogin = async (e: React.FormEvent) => {
         e.preventDefault();
@@ -46,6 +58,14 @@ export default function LoginPage() {
         }
         setLoading(false);
     };
+
+    if (!isHydrated || redirecting) {
+        return (
+            <div className="min-h-screen bg-slate-50 dark:bg-slate-950 flex items-center justify-center p-4">
+                <Loader2 className="w-8 h-8 animate-spin text-primary" />
+            </div>
+        );
+    }
 
     return (
         <div className="min-h-screen bg-slate-50 dark:bg-slate-950 flex items-center justify-center p-4" suppressHydrationWarning>

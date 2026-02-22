@@ -126,7 +126,7 @@ export default function HomePage() {
           </div>
         </section>
 
-      
+
         {/* List of Our Trusted Clients */}
         <section className="py-24 bg-slate-50">
           <div className="container mx-auto px-4">
@@ -157,7 +157,7 @@ export default function HomePage() {
             </div>
           </div>
         </section>
-          {/* Services Overview Grid */}
+        {/* Services Overview Grid */}
         <section className="py-24 bg-background">
           <div className="container mx-auto px-4">
             <div className="text-center max-w-3xl mx-auto mb-16">
