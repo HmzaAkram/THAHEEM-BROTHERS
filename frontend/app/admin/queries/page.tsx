@@ -80,7 +80,6 @@ export default function AdminQueriesPage() {
 
     const fetchQueries = async () => {
         if (!token) return;
-
         setLoading(true);
         try {
             const response = await ApiService.get('/queries', token);
@@ -103,12 +102,12 @@ export default function AdminQueriesPage() {
     };
 
     useEffect(() => {
-        if (token) {
+        if (authHydrated && token) {
             fetchQueries();
         } else if (authHydrated && !token) {
             setLoading(false);
         }
-    }, [token, authHydrated]);
+    }, [authHydrated, token]);
 
     // Fetch individual query details (messages) when opening chat
     const openChat = async (query: Query) => {
@@ -279,8 +278,8 @@ export default function AdminQueriesPage() {
                             {selectedQuery?.messages?.map((msg) => (
                                 <div key={msg.id} className={`flex ${msg.senderType === 'admin' ? 'justify-end' : 'justify-start'}`}>
                                     <div className={`max-w-[80%] rounded-lg p-3 ${msg.senderType === 'admin'
-                                            ? 'bg-primary text-primary-foreground'
-                                            : 'bg-muted border'
+                                        ? 'bg-primary text-primary-foreground'
+                                        : 'bg-muted border'
                                         }`}>
                                         <p className="text-sm whitespace-pre-wrap">{msg.message}</p>
                                         <div className={`text-[10px] mt-1 opacity-70 ${msg.senderType === 'admin' ? 'text-right pt-2 border-t border-primary-foreground/20' : ''}`}>

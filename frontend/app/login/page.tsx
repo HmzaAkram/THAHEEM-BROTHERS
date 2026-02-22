@@ -56,7 +56,7 @@ export default function LoginPage() {
                     </div>
                     <CardTitle className="text-3xl font-black tracking-tight">Login</CardTitle>
                     <p className="text-muted-foreground text-sm font-medium">THAHEEM BROTHERS Shipping & Logistics</p>
-                </CardHeader>
+                </CardHeader >
                 <CardContent>
                     <form onSubmit={handleLogin} className="space-y-6 pt-4">
                         <div className="space-y-4">
@@ -109,7 +109,7 @@ export default function LoginPage() {
                         </p>
                     </form>
                 </CardContent>
-            </Card>
-        </div>
+            </Card >
+        </div >
     );
 }

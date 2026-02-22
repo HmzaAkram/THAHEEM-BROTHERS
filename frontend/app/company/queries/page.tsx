@@ -104,12 +104,12 @@ export default function CompanyQueriesPage() {
     };
 
     useEffect(() => {
-        if (token) {
+        if (authHydrated && token) {
             fetchQueries();
-        } else if (authHydrated && !user) {
+        } else if (authHydrated && !token) {
             setLoading(false);
         }
-    }, [token, authHydrated, user]);
+    }, [authHydrated, token]);
 
     const handleCreateQuery = async () => {
         if (!newSubject.trim() || !newInitialMessage.trim()) {
@@ -341,8 +341,8 @@ export default function CompanyQueriesPage() {
                             {selectedQuery?.messages?.map((msg) => (
                                 <div key={msg.id} className={`flex ${msg.senderType === 'company' ? 'justify-end' : 'justify-start'}`}>
                                     <div className={`max-w-[80%] rounded-lg p-3 ${msg.senderType === 'company'
-                                            ? 'bg-primary text-primary-foreground'
-                                            : 'bg-muted border'
+                                        ? 'bg-primary text-primary-foreground'
+                                        : 'bg-muted border'
                                         }`}>
                                         <p className="text-sm whitespace-pre-wrap">{msg.message}</p>
                                         <div className={`text-[10px] mt-1 opacity-70 ${msg.senderType === 'company' ? 'text-right pt-2 border-t border-primary-foreground/20' : ''}`}>

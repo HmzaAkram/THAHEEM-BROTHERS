@@ -28,9 +28,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     // Load user and token from localStorage after hydration
     const savedUser = localStorage.getItem('currentUser');
-    // Token state removed entirely from localStorage
-    if (savedUser) {
+    const savedToken = localStorage.getItem('authToken');
+    if (savedUser && savedToken) {
       setUser(JSON.parse(savedUser));
+      setToken(savedToken);
+    } else if (savedUser && !savedToken) {
+      localStorage.removeItem('currentUser');
+      setUser(null);
     }
     setIsHydrated(true);
 
@@ -48,6 +52,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const login = (userData: User, newToken?: string) => {
     setUser(userData);
     localStorage.setItem('currentUser', JSON.stringify(userData));
+    if (newToken) {
+      setToken(newToken);
+      localStorage.setItem('authToken', newToken);
+    }
   };
 
   const logout = async () => {
@@ -59,6 +67,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setUser(null);
     setToken(null);
     localStorage.removeItem('currentUser');
+    localStorage.removeItem('authToken');
   };
 
   return (
