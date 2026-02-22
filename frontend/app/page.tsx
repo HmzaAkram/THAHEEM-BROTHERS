@@ -29,7 +29,7 @@ export default function HomePage() {
 
           <div className="container mx-auto relative z-20 px-4 text-center">
             <h1 className="text-4xl md:text-6xl font-extrabold tracking-tight text-white mb-6 animate-in slide-in-from-bottom-5 duration-700">
-              Global Logistics <span className="text-primary">Partner</span>
+              Thaheem <span className="text-primary">Brothers</span>
             </h1>
             <p className="text-lg md:text-xl text-slate-200 mb-8 max-w-2xl mx-auto animate-in slide-in-from-bottom-5 duration-1000 delay-200">
               Simplifying international trade with reliable freight forwarding, customs clearance, and supply chain solutions.
