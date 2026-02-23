@@ -328,7 +328,6 @@ export default function ReportsPage() {
                       <TableHead>Date</TableHead>
                       <TableHead>Job No</TableHead>
                       <TableHead>Company</TableHead>
-                      <TableHead>Bill Ref</TableHead>
                       <TableHead className="text-right">Amount</TableHead>
                       <TableHead className="text-right">Status</TableHead>
                     </TableRow>
@@ -340,9 +339,8 @@ export default function ReportsPage() {
                       filteredBills.map((bill) => (
                         <TableRow key={bill.id}>
                           <TableCell>{formatDate(bill.date)}</TableCell>
-                          <TableCell className="font-mono font-bold">{bill.jobNumber || bill.billNo}</TableCell>
+                          <TableCell className="font-mono font-bold">{bill.jobNumber || 'N/A'}</TableCell>
                           <TableCell>{bill.companyName}</TableCell>
-                          <TableCell className="font-mono text-xs">{bill.billNo}</TableCell>
                           <TableCell className="text-right font-bold">{formatCurrency(bill.grandTotal)}</TableCell>
                           <TableCell className="text-right">
                             <span className={`px-2 py-0.5 rounded-full text-[10px] uppercase font-black border ${bill.calculatedStatus === 'Paid' ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}>
@@ -390,7 +388,7 @@ export default function ReportsPage() {
                     <TableRow>
                       <TableHead>Date</TableHead>
                       <TableHead>Type</TableHead>
-                      <TableHead>Ref / Bill No</TableHead>
+                      <TableHead>Reference / Job No</TableHead>
                       <TableHead className="text-right">Debit</TableHead>
                       <TableHead className="text-right">Credit</TableHead>
                     </TableRow>
@@ -403,7 +401,7 @@ export default function ReportsPage() {
                         <TableRow key={idx}>
                           <TableCell>{formatDate(entry.date)}</TableCell>
                           <TableCell className="text-[10px] uppercase font-black">{entry.type}</TableCell>
-                          <TableCell className="font-mono text-xs">{entry.jobNumber || entry.billNo || entry.reference || '-'}</TableCell>
+                          <TableCell className="font-mono text-xs">{entry.jobNumber || entry.reference || '-'}</TableCell>
                           <TableCell className="text-right font-bold text-red-600">
                             {entry.type === 'BILL' ? formatCurrency(entry.grandTotal) : '-'}
                           </TableCell>

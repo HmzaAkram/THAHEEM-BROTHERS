@@ -160,7 +160,7 @@ export default function AdminDashboard() {
   const recentBills = useMemo(() => {
     return bills.map(b => ({
       type: 'BILL',
-      title: `Invoice #${b.billNo} Created`,
+      title: `Job #${b.jobNumber || 'N/A'} Created`,
       subtitle: `${b.companyName} • ${formatDate(b.createdAt)}`,
       amount: Number(b.totalAmount) || 0,
       date: new Date(b.createdAt),

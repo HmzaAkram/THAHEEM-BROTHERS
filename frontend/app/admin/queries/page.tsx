@@ -72,6 +72,13 @@ export default function AdminQueriesPage() {
     const [searchTerm, setSearchTerm] = useState('');
     const [statusFilter, setStatusFilter] = useState<string>('all');
 
+    const adminQuickReplies = [
+        "Okay, I am looking into this right now.",
+        "Sorry for the mistake, the charges have been updated.",
+        "Your payment has been verified and updated.",
+        "Please provide more details regarding this issue."
+    ];
+
     // Chat / View State
     const [selectedQuery, setSelectedQuery] = useState<Query | null>(null);
     const [isChatOpen, setIsChatOpen] = useState(false);
@@ -295,7 +302,20 @@ export default function AdminQueriesPage() {
                             )}
                         </div>
 
-                        <div className="p-4 border-t bg-background mt-auto">
+                        <div className="p-4 border-t bg-background mt-auto flex flex-col gap-3">
+                            {/* Quick Replies Row */}
+                            <div className="flex gap-2 overflow-x-auto pb-1 scrollbar-hide hide-scrollbar">
+                                {adminQuickReplies.map((reply, idx) => (
+                                    <Badge
+                                        key={idx}
+                                        variant="outline"
+                                        className="cursor-pointer whitespace-nowrap hover:bg-primary hover:text-primary-foreground transition-colors"
+                                        onClick={() => setChatMessage(reply)}
+                                    >
+                                        {reply}
+                                    </Badge>
+                                ))}
+                            </div>
                             <div className="flex gap-2">
                                 <Textarea
                                     value={chatMessage}

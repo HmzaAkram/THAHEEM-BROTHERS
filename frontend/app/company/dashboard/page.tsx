@@ -103,8 +103,8 @@ export default function CompanyDashboard() {
       ...companyBills.map(b => ({
         id: b.id,
         type: 'BILL' as const,
-        title: `Job #${b.jobNumber || b.billNo}`,
-        subtitle: `Invoice: ${b.billNo} | Date: ${formatDate(b.date)}`,
+        title: `Job #${b.jobNumber || 'N/A'}`,
+        subtitle: `Date: ${formatDate(b.date)}`,
         date: b.createdAt,
         amount: b.grandTotal,
         status: b.calculatedStatus,

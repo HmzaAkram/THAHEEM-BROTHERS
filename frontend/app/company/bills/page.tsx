@@ -101,7 +101,7 @@ export default function CompanyBillsPage() {
       pdf.addImage(dataUrl, 'JPEG', 0, 0, pdfWidth, imgHeight);
 
       // 6. Download the Generated PDF
-      const filename = bill.jobNumber ? `Invoice_${bill.jobNumber}.pdf` : `Invoice_${bill.billNo}.pdf`;
+      const filename = bill.jobNumber ? `Invoice_${bill.jobNumber}.pdf` : `Invoice_NA.pdf`;
       pdf.save(filename);
 
       // Cleanup
@@ -145,9 +145,7 @@ export default function CompanyBillsPage() {
 
     // Apply Filters
     if (searchTerm) {
-      const lowerSearch = searchTerm.toLowerCase();
       filtered = filtered.filter(b =>
-        b.billNo.toLowerCase().includes(lowerSearch) ||
         b.jobNumber?.toLowerCase().includes(lowerSearch) ||
         b.gdNumber?.toLowerCase().includes(lowerSearch) ||
         b.containerNo?.toLowerCase().includes(lowerSearch)
@@ -162,7 +160,11 @@ export default function CompanyBillsPage() {
       filtered = filtered.filter(b => b.date <= endDate);
     }
 
-    return filtered.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+    return filtered.sort((a, b) => {
+      const jobA = a.jobNumber || '';
+      const jobB = b.jobNumber || '';
+      return jobA.localeCompare(jobB, undefined, { numeric: true, sensitivity: 'base' });
+    });
   }, [bills, currentCompany, searchTerm, startDate, endDate]);
 
   const stats = useMemo(() => {
@@ -242,7 +244,7 @@ export default function CompanyBillsPage() {
                     <FileText className="absolute left-3 top-2.5 h-4 w-4 text-muted-foreground" />
                     <input
                       type="text"
-                      placeholder="Search by Bill No, Job No, GD, Container..."
+                      placeholder="Search by Job No, GD, Container..."
                       className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 pl-9 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
                       value={searchTerm}
                       onChange={(e) => setSearchTerm(e.target.value)}
@@ -292,8 +294,9 @@ export default function CompanyBillsPage() {
                       <TableRow className="bg-secondary/50">
                         <TableHead>Job No</TableHead>
                         <TableHead>Date</TableHead>
-                        <TableHead>Invoice No</TableHead>
                         <TableHead>Amount</TableHead>
+                        <TableHead>Paid</TableHead>
+                        <TableHead>Balance</TableHead>
                         <TableHead>Status</TableHead>
                         <TableHead className="text-right">Actions</TableHead>
                       </TableRow>
@@ -302,16 +305,19 @@ export default function CompanyBillsPage() {
                       {companyBills.map((bill) => (
                         <TableRow key={bill.id} className="hover:bg-muted/30 transition-colors">
                           <TableCell className="font-mono text-sm font-bold text-primary">
-                            {bill.jobNumber || bill.billNo}
+                            {bill.jobNumber || 'N/A'}
                           </TableCell>
                           <TableCell className="text-sm">
                             {formatDate(bill.date)}
                           </TableCell>
-                          <TableCell className="text-sm font-mono text-muted-foreground">
-                            {bill.jobNumber}
-                          </TableCell>
                           <TableCell className="font-bold">
                             PKR {bill.grandTotal.toLocaleString()}
+                          </TableCell>
+                          <TableCell className="text-sm text-muted-foreground">
+                            PKR {(bill.paidAmount || 0).toLocaleString()}
+                          </TableCell>
+                          <TableCell className="font-bold text-primary">
+                            PKR {((bill.grandTotal || 0) - (bill.paidAmount || 0)).toLocaleString()}
                           </TableCell>
                           <TableCell>
                             <span

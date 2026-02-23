@@ -20,8 +20,9 @@ import {
 } from '@/components/ui/select';
 import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
-import { Download, Filter, Check, ChevronsUpDown, Search, DollarSign, ArrowUpCircle, ArrowDownCircle, Scale } from 'lucide-react';
+import { Download, Filter, Check, ChevronsUpDown, Search, DollarSign, ArrowUpCircle, ArrowDownCircle, Scale, ChevronDown, ChevronUp } from 'lucide-react';
 import { useRef, useState, useMemo } from 'react';
+import React from 'react';
 import { useData, LedgerEntry } from '@/context/data-context';
 import { Input } from '@/components/ui/input';
 import { formatDate, cn, formatCurrency } from '@/lib/utils';
@@ -35,7 +36,18 @@ export default function LedgerPage() {
   const [selectedCompanyId, setSelectedCompanyId] = useState<string>('all');
   const [startDate, setStartDate] = useState('');
   const [endDate, setEndDate] = useState('');
+  const [expandedRows, setExpandedRows] = useState<Set<string>>(new Set());
   const tableRef = useRef<HTMLDivElement>(null);
+
+  const toggleRow = (id: string) => {
+    const newExpanded = new Set(expandedRows);
+    if (newExpanded.has(id)) {
+      newExpanded.delete(id);
+    } else {
+      newExpanded.add(id);
+    }
+    setExpandedRows(newExpanded);
+  };
 
   const { ledgerData, openingBalance } = useMemo(() => {
     let allEntries: LedgerEntry[] = [];
@@ -177,6 +189,7 @@ export default function LedgerPage() {
                 <TableHeader>
                   <TableRow className="bg-muted/50">
                     <TableHead className="w-[120px]">Date</TableHead>
+                    <TableHead className="w-[40px]"></TableHead>
                     <TableHead className="min-w-[250px]">Description</TableHead>
                     <TableHead className="w-[150px]">Job No</TableHead>
                     <TableHead className="text-right text-destructive w-[120px]">Debit</TableHead>
@@ -210,96 +223,145 @@ export default function LedgerPage() {
                     </TableRow>
                   ) : (
                     ledgerData.map((entry) => (
-                      <TableRow key={entry.id} className="hover:bg-muted/30 group">
-                        {/* 1. Date */}
-                        <TableCell className="text-sm font-medium align-top pt-3">
-                          {new Date(entry.date).toLocaleDateString()}
-                        </TableCell>
+                      <React.Fragment key={entry.id}>
+                        <TableRow className="hover:bg-muted/30 group">
+                          {/* 1. Date */}
+                          <TableCell className="text-sm font-medium align-top pt-3">
+                            {new Date(entry.date).toLocaleDateString()}
+                          </TableCell>
 
-                        {/* 2. Description (Company Name First -> Method/Details) */}
-                        <TableCell className="align-top pt-3">
-                          <div className="flex flex-col gap-1">
-                            {/* Company Name First - Bold */}
-                            {selectedCompanyId === 'all' && (
-                              <span className="font-bold text-base text-foreground">
-                                {entry.companyName}
-                              </span>
+                          {/* Expand Button */}
+                          <TableCell className="align-top pt-3 px-0">
+                            {entry.type === 'BILL' && (
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                className="h-6 w-6 rounded-full hover:bg-primary/10 text-muted-foreground"
+                                onClick={() => toggleRow(entry.id)}
+                              >
+                                {expandedRows.has(entry.id) ? (
+                                  <ChevronUp className="h-4 w-4" />
+                                ) : (
+                                  <ChevronDown className="h-4 w-4" />
+                                )}
+                              </Button>
                             )}
+                          </TableCell>
 
-                            {/* Transaction Details */}
-                            <div className="text-sm text-muted-foreground">
-                              {entry.type === 'BILL' ? (
-                                <div className="flex flex-col">
-                                  <span className="font-medium text-foreground/80">{entry.description}</span>
-                                </div>
-                              ) : (
-                                <div className="flex flex-col gap-0.5">
-                                  <div className="flex items-center gap-2">
-                                    <span className="font-medium text-foreground/80">
-                                      {/* ADVANCE PAYMENT: If no method, it's an advance */}
-                                      {(entry as any).method ? `Payment Received (${(entry as any).method})` : 'Advance Received'}
-                                    </span>
-                                    {(entry as any).paymentRef && (
-                                      <span className="text-xs bg-secondary px-1.5 py-0.5 rounded font-mono text-foreground">
-                                        {(entry as any).paymentRef}
-                                      </span>
-                                    )}
-                                  </div>
-                                </div>
+                          {/* 2. Description (Company Name First -> Method/Details) */}
+                          <TableCell className="align-top pt-3">
+                            <div className="flex flex-col gap-1">
+                              {/* Company Name First - Bold */}
+                              {selectedCompanyId === 'all' && (
+                                <span className="font-bold text-base text-foreground">
+                                  {entry.companyName}
+                                </span>
                               )}
-                            </div>
-                          </div>
-                        </TableCell>
 
-                        {/* 3. Job / Invoice # */}
-                        <TableCell className="align-top pt-3">
-                          {(entry.jobNumber || entry.billNo) ? (
-                            <div className="flex flex-col gap-0.5">
-                              {entry.jobNumber && (
+                              {/* Transaction Details */}
+                              <div className="text-sm text-muted-foreground">
+                                {entry.type === 'BILL' ? (
+                                  <div className="flex flex-col">
+                                    <span className="font-medium text-foreground/80">{entry.description}</span>
+                                  </div>
+                                ) : (
+                                  <div className="flex flex-col gap-0.5">
+                                    <div className="flex items-center gap-2">
+                                      <span className="font-medium text-foreground/80">
+                                        {/* ADVANCE PAYMENT: If no method, it's an advance */}
+                                        {(entry as any).method ? `Payment Received (${(entry as any).method})` : 'Advance Received'}
+                                      </span>
+                                      {(entry as any).paymentRef && (
+                                        <span className="text-xs bg-secondary px-1.5 py-0.5 rounded font-mono text-foreground">
+                                          {(entry as any).paymentRef}
+                                        </span>
+                                      )}
+                                    </div>
+                                  </div>
+                                )}
+                              </div>
+                            </div>
+                          </TableCell>
+
+                          {/* 3. Job # */}
+                          <TableCell className="align-top pt-3">
+                            {entry.jobNumber ? (
+                              <div className="flex flex-col gap-0.5">
                                 <span className="font-mono text-xs font-semibold bg-primary/10 text-primary px-1.5 py-0.5 rounded w-fit">
                                   {entry.jobNumber}
                                 </span>
-                              )}
-                              {entry.billNo && (
-                                <span className="text-xs text-muted-foreground">
-                                  Invoice: {entry.billNo}
-                                </span>
-                              )}
-                            </div>
-                          ) : (
-                            <span className="text-muted-foreground/30 text-xs">-</span>
-                          )}
-                        </TableCell>
-
-                        {/* 4. Debit */}
-                        <TableCell className="text-right text-sm align-top pt-3">
-                          {entry.debit > 0 ? (
-                            <span className="text-destructive font-bold">
-                              {formatCurrency(entry.debit)}
-                            </span>
-                          ) : (
-                            <span className="text-muted-foreground/30">-</span>
-                          )}
-                        </TableCell>
-
-                        {/* 5. Credit */}
-                        <TableCell className="text-right text-sm align-top pt-3">
-                          {entry.credit > 0 ? (
-                            <span className="text-green-600 font-bold">
-                              {formatCurrency(entry.credit)}
-                            </span>
-                          ) : (
-                            <span className="text-muted-foreground/30">-</span>
-                          )}
-                        </TableCell>
-
-                        {/* 6. Balance */}
-                        {selectedCompanyId !== 'all' && (
-                          <TableCell className="text-right font-mono text-sm align-top pt-3 bg-muted/10 font-bold">
-                            {formatCurrency(entry.balance)}
+                              </div>
+                            ) : (
+                              <span className="text-muted-foreground/30 text-xs">-</span>
+                            )}
                           </TableCell>
+
+                          {/* 4. Debit */}
+                          <TableCell className="text-right text-sm align-top pt-3">
+                            {entry.debit > 0 ? (
+                              <span className="text-destructive font-bold">
+                                {formatCurrency(entry.debit)}
+                              </span>
+                            ) : (
+                              <span className="text-muted-foreground/30">-</span>
+                            )}
+                          </TableCell>
+
+                          {/* 5. Credit */}
+                          <TableCell className="text-right text-sm align-top pt-3">
+                            {entry.credit > 0 ? (
+                              <span className="text-green-600 font-bold">
+                                {formatCurrency(entry.credit)}
+                              </span>
+                            ) : (
+                              <span className="text-muted-foreground/30">-</span>
+                            )}
+                          </TableCell>
+
+                          {/* 6. Balance */}
+                          {selectedCompanyId !== 'all' && (
+                            <TableCell className="text-right font-mono text-sm align-top pt-3 bg-muted/10 font-bold">
+                              {formatCurrency(entry.balance)}
+                            </TableCell>
+                          )}
+                        </TableRow>
+
+                        {/* Expandable Sub-Row */}
+                        {entry.type === 'BILL' && expandedRows.has(entry.id) && (
+                          <TableRow className="bg-muted/5">
+                            <TableCell colSpan={selectedCompanyId !== 'all' ? 7 : 6} className="p-0 border-b">
+                              <div className="p-4 animate-in slide-in-from-top-2 fade-in duration-200">
+                                <div className="grid grid-cols-2 md:grid-cols-6 gap-4 text-xs">
+                                  <div>
+                                    <p className="text-muted-foreground font-semibold mb-1 uppercase tracking-wider">Via</p>
+                                    <p className="font-medium">{entry.via || '-'}</p>
+                                  </div>
+                                  <div>
+                                    <p className="text-muted-foreground font-semibold mb-1 uppercase tracking-wider">Weight</p>
+                                    <p className="font-medium">{entry.weight ? `${entry.weight} KG` : '-'}</p>
+                                  </div>
+                                  <div>
+                                    <p className="text-muted-foreground font-semibold mb-1 uppercase tracking-wider">Packages</p>
+                                    <p className="font-medium">{entry.packages || '-'}</p>
+                                  </div>
+                                  <div>
+                                    <p className="text-muted-foreground font-semibold mb-1 uppercase tracking-wider">IGM</p>
+                                    <p className="font-medium">{entry.igm || '-'}</p>
+                                  </div>
+                                  <div>
+                                    <p className="text-muted-foreground font-semibold mb-1 uppercase tracking-wider">GD Number</p>
+                                    <p className="font-medium">{entry.gdNumber || '-'}</p>
+                                  </div>
+                                  <div>
+                                    <p className="text-muted-foreground font-semibold mb-1 uppercase tracking-wider">Total Bill</p>
+                                    <p className="font-medium text-primary font-bold">{formatCurrency(entry.debit)}</p>
+                                  </div>
+                                </div>
+                              </div>
+                            </TableCell>
+                          </TableRow>
                         )}
-                      </TableRow>
+                      </React.Fragment>
                     ))
                   )}
                 </TableBody>

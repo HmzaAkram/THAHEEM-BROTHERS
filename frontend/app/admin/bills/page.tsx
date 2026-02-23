@@ -60,6 +60,7 @@ import { InvoiceTemplate } from '@/components/invoice-template';
 import { CompanySelect } from '@/components/company-select';
 import html2canvas from 'html2canvas';
 import { toast } from '@/components/ui/use-toast';
+import { PinDialog } from '@/components/pin-dialog';
 import Swal from 'sweetalert2';
 
 const statusStyles = {
@@ -71,7 +72,7 @@ const statusStyles = {
 import { PDFDocument } from 'pdf-lib';
 
 export default function BillsPage() {
-  const { bills, companies, addBill, updateBill, payments } = useData();
+  const { bills, companies, addBill, updateBill, deleteBill, payments } = useData();
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [isViewOpen, setIsViewOpen] = useState(false);
   const [selectedBill, setSelectedBill] = useState<Bill | null>(null);
@@ -90,6 +91,37 @@ export default function BillsPage() {
   });
 
   const [viewDataUrl, setViewDataUrl] = useState<string | null>(null);
+
+  // PIN Dialog State for Deletion
+  const [isPinDialogOpen, setIsPinDialogOpen] = useState(false);
+  const [billToDelete, setBillToDelete] = useState<Bill | null>(null);
+
+  const handleDeleteBill = async () => {
+    if (billToDelete) {
+      try {
+        await deleteBill(billToDelete.id);
+        Swal.fire({
+          title: 'Deleted!',
+          text: 'The bill has been deleted successfully.',
+          icon: 'success',
+          confirmButtonColor: '#10b981',
+          timer: 2000,
+          showConfirmButton: false
+        });
+      } catch (err) {
+        console.error("Failed to delete bill:", err);
+        Swal.fire({
+          title: 'Error',
+          text: 'Failed to delete the bill.',
+          icon: 'error',
+          confirmButtonColor: '#3b82f6'
+        });
+      } finally {
+        setIsPinDialogOpen(false);
+        setBillToDelete(null);
+      }
+    }
+  };
 
   const handleDownloadInvoice = async (bill: Bill) => {
     try {
@@ -208,27 +240,69 @@ export default function BillsPage() {
   // 1153: The hidden wrapper div no longer has p-8 padding
   // 199-249: Removed redundant useEffect hook
 
-  const BILL_ITEMS = [
-    "DUTY TAXES & ETO",
-    "CIVIL AVIATION AUTHORITY",
-    "GERRYS' DANATA PVT LTD",
-    "SHAHEEN CARGO AFU",
-    "MENZIES - RAS PVT LTD",
-    "DHL PAKISTAN PVT LTD",
-    "WEBOC TOKEN",
-    "CARPENTER CHARGES",
-    "CARTAGE",
-    "DELIVERY ORDER CHARGES",
-    "GENERAL ADMINISTRATION (MISC)",
-    "EXAMINATION CHARGES",
-    "MISC CHARGES",
-    "INVOICE NOT FOUND / FOUND SETTING",
-    "PSW CHARGES",
-    "SPEED MONEY",
-    "COURIER CHARGES",
-    "EXCISE",
-    "Others"
-  ];
+  const BILL_ITEMS_MAP: Record<string, string[]> = {
+    AIR: [
+      "DUTY TAXES & ETO",
+      "CIVIL AVIATION AUTHORITY",
+      "GERRY'S DANA PVT LTD",
+      "SHAHEEN CARGO AFU",
+      "MENZIES - RAS PVT LTD",
+      "DH PAKISTAN PVT LTD",
+      "WEBOC TOKEN",
+      "CARPENTER CHARGES",
+      "CARTAGE",
+      "DELIVERY ORDER CHARGES",
+      "GENERAL ADMINISTRATION (MISC)",
+      "EXAMINATION CHARGES",
+      "MISC CHARGES",
+      "INVOICE NOT FOUND / FOUND SETTING",
+      "PSW CHARGES",
+      "SPEED MONEY",
+      "COURIER CHARGES",
+    ],
+    SEA: [
+      "DUTY TAXES & ETO",
+      "WEBOC TOKEN",
+      "CARTAGE",
+      "DELIVERY ORDER CHARGES",
+      "SECURITY DEPOSIT",
+      "LOLO CHARGES",
+      "GENERAL ADMINISTRATION (MISC)",
+      "EXAMINATION CHARGES",
+      "MISC CHARGES",
+      "INVOICE NOT FOUND / FOUND SETTING",
+      "PSW CHARGES",
+      "SPEED MONEY",
+      "CH LAB FEES",
+      "TERMINAL CHARGES",
+      "KICT CHARGES",
+      "SAPT CHARGES",
+      "KGTL CHARGES",
+      "QICT CHARGES",
+      "KARACHI PORT TRUST",
+      "BURMA OILS MILLS LTD (BOML)",
+      "BAYWEST PVT LTD",
+      "ALHAMD INT CONT TERMINAL PVT LTD (AICT)",
+      "NATIONAL LOGESTIC CELL (NLC)",
+      "SEA BOARD LOGESTIC SMC PVT LTD",
+      "PAK SHAHEEN",
+      "DETENTION CHARGES",
+      "LABOUR CHARGES",
+      "COURIER CHARGES",
+    ],
+    EPZ: [
+      "DUTY TAXES & ETO",
+      "WEBOC TOKEN",
+      "WEIGHT SLIP",
+      "CARTAGE",
+      "GENERAL ADMINISTRATION (MISC)",
+      "MISC CHARGES",
+      "COURIER CHARGES",
+    ]
+  };
+
+  // We have a default flattened list for filtering if VIA is not selected, or we fallback.
+  const DEFAULT_ITEMS = Array.from(new Set(Object.values(BILL_ITEMS_MAP).flat()));
 
   // Form State
   const [companyId, setCompanyId] = useState('');
@@ -236,7 +310,6 @@ export default function BillsPage() {
   const [exporter, setExporter] = useState('');
   const [invoiceNo, setInvoiceNo] = useState('');
   const [invoiceDate, setInvoiceDate] = useState(new Date().toISOString().split('T')[0]);
-  const [beNumber, setBeNumber] = useState('');
   const [hawb, setHawb] = useState('');
   const [igm, setIgm] = useState('');
   const [indexNo, setIndexNo] = useState('');
@@ -249,6 +322,9 @@ export default function BillsPage() {
   const [weight, setWeight] = useState('');
   const [attachment, setAttachment] = useState<File | null>(null);
   const [note, setNote] = useState<string>('All Necessary documents enclosed.');
+
+  const currentItemsList = via && BILL_ITEMS_MAP[via] ? BILL_ITEMS_MAP[via] : DEFAULT_ITEMS;
+  const ALL_BILL_ITEMS = [...currentItemsList, 'Others'];
 
   // Table Filters State
   const [timeFilter, setTimeFilter] = useState<'overall' | 'monthly' | '3months' | '6months' | 'yearly'>('overall');
@@ -275,7 +351,6 @@ export default function BillsPage() {
     setExporter(bill.exporter || '');
     setInvoiceNo(bill.invoiceNo || '');
     setInvoiceDate(bill.invoiceDate ? bill.invoiceDate.split('T')[0] : '');
-    setBeNumber(bill.beNumber || '');
     setHawb(bill.hawb || '');
     setIgm(bill.igm || '');
     setIndexNo(String(bill.indexNo || ''));
@@ -370,7 +445,6 @@ export default function BillsPage() {
         exporter,
         invoiceNo,
         invoiceDate,
-        beNumber,
         hawb,
         igm,
         indexNo,
@@ -397,7 +471,6 @@ export default function BillsPage() {
       } else {
         result = await addBill({
           ...billData,
-          billNo: `BILL-${String(bills.length + 1).padStart(3, '0')}`,
         });
       }
 
@@ -411,7 +484,6 @@ export default function BillsPage() {
         setExporter('');
         setInvoiceNo('');
         setInvoiceDate(new Date().toISOString().split('T')[0]);
-        setBeNumber('');
         setHawb('');
         setIgm('');
         setIndexNo('');
@@ -473,14 +545,17 @@ export default function BillsPage() {
     if (searchQuery.trim()) {
       const q = searchQuery.toLowerCase();
       filtered = filtered.filter(bill =>
-        bill.billNo.toLowerCase().includes(q) ||
         bill.companyName.toLowerCase().includes(q) ||
-        bill.jobNumber.toLowerCase().includes(q) ||
-        bill.gdNumber?.toLowerCase().includes(q)
+        (bill.jobNumber?.toLowerCase().includes(q) || false) ||
+        (bill.gdNumber?.toLowerCase().includes(q) || false)
       );
     }
 
-    return filtered.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+    return filtered.sort((a, b) => {
+      const jobA = a.jobNumber || '';
+      const jobB = b.jobNumber || '';
+      return jobA.localeCompare(jobB, undefined, { numeric: true, sensitivity: 'base' });
+    });
   }, [bills, timeFilter, companyFilter, searchQuery]);
 
   // Dynamic Totals
@@ -536,9 +611,9 @@ export default function BillsPage() {
                   // For better UX, usually better to reset on 'Create New' click or reset here.
                   // Let's reset here to avoid stale data when clicking "Create New" after closing "Edit"
                   setCompanyId('');
-                  setItems([{ description: 'DUTY TAXES & ETO', notes: '', amount: 0, invoiceNo: '' }, { description: 'CIVIL AVIATION AUTHORITY', notes: '', amount: 0, invoiceNo: '' }, { description: "GERRYS' DANATA PVT LTD", notes: '', amount: 0, invoiceNo: '' }]);
+                  setItems([{ description: 'DUTY TAXES & ETO', notes: '', amount: 0, invoiceNo: '' }]);
                   // Reset other fields... (Doing full reset might be verbose here, maybe extract reset logic)
-                  setJobNumber(''); setVia(''); setWeight(''); setExporter(''); setInvoiceNo(''); setInvoiceDate(new Date().toISOString().split('T')[0]); setBeNumber(''); setHawb(''); setIgm(''); setIndexNo(''); setGdNumber(''); setServiceCharges(''); setSalesTax(''); setAdvancePayment(''); setNoOfContainers(''); setContainerNo(''); setPackages(''); setAttachment(null); setNote('All Necessary documents enclosed.');
+                  setJobNumber(''); setVia(''); setWeight(''); setExporter(''); setInvoiceNo(''); setInvoiceDate(new Date().toISOString().split('T')[0]); setHawb(''); setIgm(''); setIndexNo(''); setGdNumber(''); setServiceCharges(''); setSalesTax(''); setAdvancePayment(''); setNoOfContainers(''); setContainerNo(''); setPackages(''); setAttachment(null); setNote('All Necessary documents enclosed.');
                 }
               }}>
                 <DialogTrigger asChild>
@@ -618,8 +693,8 @@ export default function BillsPage() {
                                   <SelectItem value="SEA">
                                     <div className="flex items-center gap-2"><Anchor className="w-3.5 h-3.5" /> SEA</div>
                                   </SelectItem>
-                                  <SelectItem value="LAND">
-                                    <div className="flex items-center gap-2"><Truck className="w-3.5 h-3.5" /> LAND</div>
+                                  <SelectItem value="EPZ">
+                                    <div className="flex items-center gap-2"><Package className="w-3.5 h-3.5" /> EPZ</div>
                                   </SelectItem>
                                 </SelectContent>
                               </Select>
@@ -725,15 +800,6 @@ export default function BillsPage() {
                               />
                             </div>
                             <div className="col-span-2">
-                              <Label className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground mb-1.5 block">BE No# (Customs Reference)</Label>
-                              <Input
-                                placeholder="Example: KPAF-HC-123"
-                                className="bg-white dark:bg-slate-950 border-border/50 h-10 font-mono text-xs"
-                                value={beNumber}
-                                onChange={(e) => setBeNumber(e.target.value)}
-                              />
-                            </div>
-                            <div className="col-span-2">
                               <Label className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground mb-1.5 block">HAWB No#</Label>
                               <Input
                                 placeholder="Example: 123"
@@ -753,15 +819,6 @@ export default function BillsPage() {
                             <Package className="w-5 h-5 text-primary" />
                             <h3 className="text-xs font-bold uppercase tracking-[0.2em] text-muted-foreground/80">Billing Items</h3>
                           </div>
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            onClick={handleAddItem}
-                            className="gap-2 border-primary/20 hover:bg-primary/5 hover:border-primary/40 transition-all rounded-full px-4"
-                          >
-                            <Plus className="w-3.5 h-3.5 text-primary" />
-                            <span className="text-xs font-bold text-primary">Add Service</span>
-                          </Button>
                         </div>
 
                         <div className="space-y-4">
@@ -772,20 +829,20 @@ export default function BillsPage() {
                                 <div className="flex-1 min-w-[200px] space-y-2">
                                   <Label className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground/60">Service / Item</Label>
                                   <Select
-                                    value={BILL_ITEMS.includes(item.description) ? item.description : 'Others'}
+                                    value={ALL_BILL_ITEMS.includes(item.description) ? item.description : 'Others'}
                                     onValueChange={(value) => handleItemChange(idx, 'description', value)}
                                   >
                                     <SelectTrigger className="h-10 bg-muted/20 border-border/30">
                                       <SelectValue placeholder="Select Item" />
                                     </SelectTrigger>
                                     <SelectContent>
-                                      {BILL_ITEMS.map((option) => (
+                                      {ALL_BILL_ITEMS.map((option) => (
                                         <SelectItem key={option} value={option}>{option}</SelectItem>
                                       ))}
                                     </SelectContent>
                                   </Select>
 
-                                  {(item.description === 'Others' || !BILL_ITEMS.includes(item.description)) && (
+                                  {(item.description === 'Others' || !ALL_BILL_ITEMS.includes(item.description)) && (
                                     <div className="animate-in fade-in slide-in-from-top-1">
                                       <Input
                                         placeholder="Specify Service Name"
@@ -849,6 +906,19 @@ export default function BillsPage() {
                               </div>
                             </div>
                           ))}
+                        </div>
+
+                        {/* Add Service Button - Moved to Bottom */}
+                        <div className="flex justify-start pt-2">
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={handleAddItem}
+                            className="gap-2 border-primary/20 hover:bg-primary/5 hover:border-primary/40 transition-all rounded-lg px-4 h-10 w-full sm:w-auto shadow-sm"
+                          >
+                            <Plus className="w-4 h-4 text-primary" />
+                            <span className="text-sm font-bold text-primary">Add Another Service</span>
+                          </Button>
                         </div>
                       </div>
 
@@ -1092,9 +1162,9 @@ export default function BillsPage() {
                         <TableHead>Job No</TableHead>
                         <TableHead>Company</TableHead>
                         <TableHead>Date</TableHead>
-                        <TableHead>Bill Ref</TableHead>
                         <TableHead>Amount</TableHead>
                         <TableHead>Paid</TableHead>
+                        <TableHead>Balance</TableHead>
                         <TableHead>Status</TableHead>
                         <TableHead className="text-right">Actions</TableHead>
                       </TableRow>
@@ -1103,7 +1173,7 @@ export default function BillsPage() {
                       {filteredBills.map((item) => (
                         <TableRow key={item.id} className="hover:bg-muted/50 transition-colors">
                           <TableCell className="font-mono text-sm font-medium">
-                            {item.jobNumber || item.billNo}
+                            {item.jobNumber || 'N/A'}
                           </TableCell>
                           <TableCell>
                             {item.companyName}
@@ -1111,14 +1181,14 @@ export default function BillsPage() {
                           <TableCell className="text-sm text-muted-foreground">
                             {formatDate(item.date)}
                           </TableCell>
-                          <TableCell className="text-sm text-muted-foreground font-mono">
-                            {item.billNo}
-                          </TableCell>
                           <TableCell className="font-semibold">
                             PKR {item.grandTotal?.toLocaleString() || '0'}
                           </TableCell>
                           <TableCell className="text-sm text-muted-foreground">
                             PKR {item.paidAmount?.toLocaleString() || '0'}
+                          </TableCell>
+                          <TableCell className="font-semibold text-primary">
+                            PKR {((item.grandTotal || 0) - (item.paidAmount || 0)).toLocaleString()}
                           </TableCell>
                           <TableCell>
                             <span
@@ -1155,6 +1225,18 @@ export default function BillsPage() {
                                 title="Download PDF"
                               >
                                 <Download className="w-4 h-4" />
+                              </Button>
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                className="text-destructive hover:bg-destructive/10 hover:text-destructive transition-colors"
+                                onClick={() => {
+                                  setBillToDelete(item);
+                                  setIsPinDialogOpen(true);
+                                }}
+                                title="Delete Bill"
+                              >
+                                <Trash2 className="w-4 h-4" />
                               </Button>
                             </div>
                           </TableCell>
@@ -1244,6 +1326,17 @@ export default function BillsPage() {
           </div>
         )}
       </div>
+
+      <PinDialog
+        isOpen={isPinDialogOpen}
+        onClose={() => {
+          setIsPinDialogOpen(false);
+          setBillToDelete(null);
+        }}
+        onConfirm={handleDeleteBill}
+        actionTitle="Delete Bill"
+        description={`This will permanently delete Job No. ${billToDelete?.jobNumber || 'Unknown'}.`}
+      />
     </>
   );
 }

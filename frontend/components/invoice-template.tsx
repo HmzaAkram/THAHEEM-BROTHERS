@@ -48,7 +48,7 @@ export const InvoiceTemplate = forwardRef<HTMLDivElement, InvoiceTemplateProps>(
                     {/* Job Number Highlight */}
                     <div className="mt-1 text-right">
                         <p className="text-[10px] font-bold uppercase text-slate-400 leading-none">Job Number</p>
-                        <p className="text-xl font-mono font-black leading-tight">{bill.jobNumber || bill.billNo}</p>
+                        <p className="text-xl font-mono font-black leading-tight">{bill.jobNumber || 'N/A'}</p>
                     </div>
                     <div className="mt-2 text-right">
                         <p className="text-[10px] font-bold uppercase text-slate-400 leading-none">Date</p>
@@ -81,7 +81,7 @@ export const InvoiceTemplate = forwardRef<HTMLDivElement, InvoiceTemplateProps>(
                     <div className="grid grid-cols-3 gap-x-2 gap-y-1 text-[10px]">
                         <div>
                             <p className="text-[9px] text-slate-500 font-semibold uppercase leading-none">Job No</p>
-                            <p className="font-bold break-words leading-tight">{bill.jobNumber || bill.billNo}</p>
+                            <p className="font-bold break-words leading-tight">{bill.jobNumber || 'N/A'}</p>
                         </div>
                         <div className="col-span-2">
                             <p className="text-[9px] text-slate-500 font-semibold uppercase leading-none">Exporter</p>

@@ -31,13 +31,13 @@ export interface BillItem {
 
 export interface Bill {
   id: string;
-  billNo: string;
+  billNo?: string;
   companyId: string;
   companyName: string;
   date: string; // This will represent Arrival Date
   invoiceNo?: string;
   invoiceDate: string;
-  jobNumber: string;
+  jobNumber?: string;
   items: BillItem[];
   totalAmount: number;
   paidAmount: number;
@@ -48,7 +48,6 @@ export interface Bill {
   weight?: string | number;
   exporter?: string;
   note?: string;
-  beNumber?: string;
   packages?: string | number;
   igm?: string;
   hawb?: string;
@@ -98,6 +97,12 @@ export interface LedgerEntry {
   paymentRef?: string;
   method?: string;
   note?: string;
+  // Extra detailed bill fields for expansion
+  via?: string;
+  weight?: string;
+  packages?: string;
+  igm?: string;
+  gdNumber?: string;
 }
 
 export interface SecurityTracking {
@@ -129,9 +134,12 @@ interface DataContextType {
   deleteCompany: (id: string) => void;
   addBill: (bill: Omit<Bill, 'id' | 'createdAt' | 'paidAmount' | 'status' | 'calculatedStatus'>) => Promise<any>;
   updateBill: (id: string, bill: Partial<Bill>) => Promise<any>;
+  deleteBill: (id: string) => Promise<void>;
   addPayment: (payment: Omit<Payment, 'id' | 'createdAt'>) => Promise<any>;
+  deletePayment: (id: string) => Promise<void>;
   addSecurity: (security: Omit<SecurityTracking, 'id' | 'createdAt' | 'status'>) => Promise<any>;
   updateSecurity: (id: string, data: Partial<SecurityTracking>) => void;
+  deleteSecurity: (id: string) => Promise<void>;
   securities: SecurityTracking[];
   getCompanyLedger: (companyId: string) => LedgerEntry[];
   getCompanyBalance: (companyId: string) => number;
@@ -245,7 +253,17 @@ export function DataProvider({ children }: { children: ReactNode }) {
     const token = localStorage.getItem('auth_token');
     const result = await ApiService.delete(`/companies/${id}`, token);
     if (result.ok) {
-      setCompanies(prev => prev.filter(company => company.id !== id));
+      setCompanies(prev => prev.filter(c => c.id !== id));
+      refreshData();
+    }
+  };
+
+  const deleteBill = async (id: string) => {
+    const token = localStorage.getItem('auth_token');
+    const result = await ApiService.delete(`/bills/${id}`, token);
+    if (result.ok) {
+      setBills(prev => prev.filter(b => b.id !== id));
+      refreshData();
     }
   };
 
@@ -305,6 +323,15 @@ export function DataProvider({ children }: { children: ReactNode }) {
     }
   };
 
+  const deletePayment = async (id: string) => {
+    const token = localStorage.getItem('auth_token');
+    const result = await ApiService.delete(`/payments/${id}`, token);
+    if (result.ok) {
+      setPayments(prev => prev.filter(p => p.id !== id));
+      refreshData();
+    }
+  };
+
   const addSecurity = async (securityData: Omit<SecurityTracking, 'id' | 'createdAt' | 'status'>) => {
     const token = localStorage.getItem('auth_token');
     const result = await ApiService.post('/securities', securityData, token);
@@ -322,6 +349,14 @@ export function DataProvider({ children }: { children: ReactNode }) {
     }
   };
 
+  const deleteSecurity = async (id: string) => {
+    const token = localStorage.getItem('auth_token');
+    const result = await ApiService.delete(`/securities/${id}`, token);
+    if (result.ok) {
+      setSecurities(prev => prev.filter(s => s.id !== id));
+    }
+  };
+
   const getCompanyLedger = (companyId: string): LedgerEntry[] => {
     // BUG FIX: Use numeric equality to prevent type confusion
     const companyBills = bills.filter(b => Number(b.companyId) === Number(companyId)).flatMap(b => {
@@ -331,7 +366,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
       entries.push({
         id: b.id + '_debit',
         date: b.date,
-        description: `Invoice #${b.billNo}`,
+        description: `Job #${b.jobNumber || 'N/A'}`,
         debit: b.grandTotal,
         credit: 0,
         balance: 0,
@@ -340,8 +375,12 @@ export function DataProvider({ children }: { children: ReactNode }) {
         referenceId: b.id,
         type: 'BILL' as const,
         timestamp: new Date(b.date).getTime(),
-        billNo: b.billNo,
-        jobNumber: b.jobNumber
+        jobNumber: b.jobNumber,
+        via: b.via,
+        weight: b.weight,
+        packages: b.packages,
+        igm: b.igm,
+        gdNumber: b.gdNumber,
       });
 
       // 2. Add Credit Entry if Advance was paid
@@ -349,7 +388,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
         entries.push({
           id: b.id + '_advance',
           date: b.date,
-          description: `Advance Payment - Bill #${b.billNo}`,
+          description: `Advance Payment - Job #${b.jobNumber || 'N/A'}`,
           debit: 0,
           credit: b.advancePayment,
           balance: 0,
@@ -358,7 +397,6 @@ export function DataProvider({ children }: { children: ReactNode }) {
           referenceId: b.id,
           type: 'PAYMENT' as const,
           timestamp: new Date(b.date).getTime() + 1, // Slightly after bill
-          billNo: b.billNo,
           jobNumber: b.jobNumber
         });
       }
@@ -383,7 +421,6 @@ export function DataProvider({ children }: { children: ReactNode }) {
         timestamp: new Date(p.date).getTime(),
         method: p.method,
         paymentRef: p.reference,
-        billNo: linkedBill?.billNo,
         jobNumber: linkedBill?.jobNumber
       };
     });
@@ -422,9 +459,12 @@ export function DataProvider({ children }: { children: ReactNode }) {
         deleteCompany,
         addBill,
         updateBill,
+        deleteBill,
         addPayment,
+        deletePayment,
         addSecurity,
         updateSecurity,
+        deleteSecurity,
         securities,
         getCompanyLedger,
         getCompanyBalance,

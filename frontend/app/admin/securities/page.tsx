@@ -56,6 +56,7 @@ import { useData, SecurityTracking } from '@/context/data-context';
 import { Badge } from '@/components/ui/badge';
 import { formatDate, formatCurrency } from '@/lib/utils';
 import { CompanySelect } from '@/components/company-select';
+import { PinDialog } from '@/components/pin-dialog';
 import Swal from 'sweetalert2';
 
 
@@ -74,6 +75,37 @@ export default function SecuritiesPage() {
     const [loading, setLoading] = useState(false);
     const [searchTerm, setSearchTerm] = useState('');
     const [statusFilter, setStatusFilter] = useState<'all' | 'pending' | 'received'>('all');
+
+    // PIN Dialog State
+    const [isPinDialogOpen, setIsPinDialogOpen] = useState(false);
+    const [pinActionSecurity, setPinActionSecurity] = useState<SecurityTracking | null>(null);
+
+    const handleConfirmPinAction = async () => {
+        if (pinActionSecurity) {
+            try {
+                const result = await updateSecurity(pinActionSecurity.id, { isRefundReceived: true, status: 'Completed' });
+                Swal.fire({
+                    title: 'Success!',
+                    text: 'Security refund marked as received.',
+                    icon: 'success',
+                    confirmButtonColor: '#10b981',
+                    timer: 2000,
+                    showConfirmButton: false
+                });
+            } catch (err) {
+                console.error("Failed to update security:", err);
+                Swal.fire({
+                    title: 'Error',
+                    text: 'Failed to update security record.',
+                    icon: 'error',
+                    confirmButtonColor: '#3b82f6'
+                });
+            } finally {
+                setIsPinDialogOpen(false);
+                setPinActionSecurity(null);
+            }
+        }
+    };
 
     // Form State
     const [companyId, setCompanyId] = useState('');
@@ -537,25 +569,8 @@ export default function SecuritiesPage() {
                                                                 });
 
                                                                 if (confirmResult.isConfirmed) {
-                                                                    try {
-                                                                        const result = await updateSecurity(security.id, { isRefundReceived: true, status: 'Completed' });
-                                                                        Swal.fire({
-                                                                            title: 'Success!',
-                                                                            text: 'Security refund marked as received.',
-                                                                            icon: 'success',
-                                                                            confirmButtonColor: '#10b981',
-                                                                            timer: 2000,
-                                                                            showConfirmButton: false
-                                                                        });
-                                                                    } catch (err) {
-                                                                        console.error("Failed to update security:", err);
-                                                                        Swal.fire({
-                                                                            title: 'Error',
-                                                                            text: 'Failed to update security record.',
-                                                                            icon: 'error',
-                                                                            confirmButtonColor: '#3b82f6'
-                                                                        });
-                                                                    }
+                                                                    setPinActionSecurity(security);
+                                                                    setIsPinDialogOpen(true);
                                                                 }
                                                             }}
                                                             disabled={security.isRefundReceived}
@@ -781,6 +796,17 @@ export default function SecuritiesPage() {
                     )}
                 </DialogContent>
             </Dialog>
+
+            <PinDialog
+                isOpen={isPinDialogOpen}
+                onClose={() => {
+                    setIsPinDialogOpen(false);
+                    setPinActionSecurity(null);
+                }}
+                onConfirm={handleConfirmPinAction}
+                actionTitle="Mark Security as Received"
+                description={`This will mark the security refund for GD No. ${pinActionSecurity?.gdNumber} as received.`}
+            />
         </DashboardLayout>
     );
 }

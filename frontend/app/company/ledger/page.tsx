@@ -13,12 +13,12 @@ import {
 } from '@/components/ui/table';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Download, Search, Calendar } from 'lucide-react';
+import { Download, Search, Calendar, ChevronDown, ChevronUp } from 'lucide-react';
 import { jsPDF } from 'jspdf';
 import { toPng } from 'html-to-image';
 
 import { Badge } from '@/components/ui/badge';
-import { useMemo, useState, useRef } from 'react';
+import React, { useMemo, useState, useRef } from 'react';
 import { useData } from '@/context/data-context';
 import { useAuth } from '@/context/auth-context';
 import { formatDate } from '@/lib/utils';
@@ -32,6 +32,17 @@ export default function CompanyLedgerPage() {
   const [searchTerm, setSearchTerm] = useState('');
   const [startDate, setStartDate] = useState('');
   const [endDate, setEndDate] = useState('');
+  const [expandedRows, setExpandedRows] = useState<Set<string>>(new Set());
+
+  const toggleRow = (id: string) => {
+    const newExpanded = new Set(expandedRows);
+    if (newExpanded.has(id)) {
+      newExpanded.delete(id);
+    } else {
+      newExpanded.add(id);
+    }
+    setExpandedRows(newExpanded);
+  };
 
   const currentCompany = useMemo(() => {
     if (user?.role === 'company' && user.id) {
@@ -161,6 +172,7 @@ export default function CompanyLedgerPage() {
                 <TableHeader>
                   <TableRow>
                     <TableHead>Date</TableHead>
+                    <TableHead className="w-[40px]"></TableHead>
                     <TableHead>Description</TableHead>
                     <TableHead>Job No</TableHead>
                     <TableHead className="text-right">Debit</TableHead>
@@ -177,38 +189,92 @@ export default function CompanyLedgerPage() {
                     </TableRow>
                   ) : (
                     ledgerEntries.map((entry) => (
-                      <TableRow key={entry.id}>
-                        <TableCell className="text-sm text-muted-foreground">
-                          {formatDate(entry.date)}
-                        </TableCell>
-                        <TableCell className="text-sm">
-                          {entry.description}
-                        </TableCell>
-                        <TableCell className="font-mono text-sm">
-                          {entry.jobNumber || entry.billNo || '-'}
-                        </TableCell>
-                        <TableCell className="text-right text-sm">
-                          {entry.debit > 0 ? (
-                            <span className="text-red-600 font-semibold">
-                              PKR {entry.debit.toLocaleString()}
-                            </span>
-                          ) : (
-                            <span className="text-muted-foreground">-</span>
-                          )}
-                        </TableCell>
-                        <TableCell className="text-right text-sm">
-                          {entry.credit > 0 ? (
-                            <span className="text-green-600 font-semibold">
-                              PKR {entry.credit.toLocaleString()}
-                            </span>
-                          ) : (
-                            <span className="text-muted-foreground">-</span>
-                          )}
-                        </TableCell>
-                        <TableCell className="text-right font-semibold text-sm">
-                          PKR {entry.balance.toLocaleString()}
-                        </TableCell>
-                      </TableRow>
+                      <React.Fragment key={entry.id}>
+                        <TableRow className="hover:bg-muted/30 group">
+                          <TableCell className="text-sm text-muted-foreground align-top pt-3">
+                            {formatDate(entry.date)}
+                          </TableCell>
+                          <TableCell className="align-top pt-3 px-0">
+                            {entry.type === 'BILL' && (
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                className="h-6 w-6 rounded-full hover:bg-primary/10 text-muted-foreground"
+                                onClick={() => toggleRow(entry.id)}
+                              >
+                                {expandedRows.has(entry.id) ? (
+                                  <ChevronUp className="h-4 w-4" />
+                                ) : (
+                                  <ChevronDown className="h-4 w-4" />
+                                )}
+                              </Button>
+                            )}
+                          </TableCell>
+                          <TableCell className="text-sm align-top pt-3">
+                            {entry.description}
+                          </TableCell>
+                          <TableCell className="font-mono text-sm align-top pt-3">
+                            {entry.jobNumber || '-'}
+                          </TableCell>
+                          <TableCell className="text-right text-sm align-top pt-3">
+                            {entry.debit > 0 ? (
+                              <span className="text-red-600 font-semibold">
+                                PKR {entry.debit.toLocaleString()}
+                              </span>
+                            ) : (
+                              <span className="text-muted-foreground">-</span>
+                            )}
+                          </TableCell>
+                          <TableCell className="text-right text-sm align-top pt-3">
+                            {entry.credit > 0 ? (
+                              <span className="text-green-600 font-semibold">
+                                PKR {entry.credit.toLocaleString()}
+                              </span>
+                            ) : (
+                              <span className="text-muted-foreground">-</span>
+                            )}
+                          </TableCell>
+                          <TableCell className="text-right font-semibold text-sm align-top pt-3 bg-muted/10 font-bold">
+                            PKR {entry.balance.toLocaleString()}
+                          </TableCell>
+                        </TableRow>
+
+                        {/* Expandable Sub-Row */}
+                        {entry.type === 'BILL' && expandedRows.has(entry.id) && (
+                          <TableRow className="bg-muted/5">
+                            <TableCell colSpan={7} className="p-0 border-b">
+                              <div className="p-4 animate-in slide-in-from-top-2 fade-in duration-200">
+                                <div className="grid grid-cols-2 md:grid-cols-6 gap-4 text-xs">
+                                  <div>
+                                    <p className="text-muted-foreground font-semibold mb-1 uppercase tracking-wider">Via</p>
+                                    <p className="font-medium">{entry.via || '-'}</p>
+                                  </div>
+                                  <div>
+                                    <p className="text-muted-foreground font-semibold mb-1 uppercase tracking-wider">Weight</p>
+                                    <p className="font-medium">{entry.weight ? `${entry.weight} KG` : '-'}</p>
+                                  </div>
+                                  <div>
+                                    <p className="text-muted-foreground font-semibold mb-1 uppercase tracking-wider">Packages</p>
+                                    <p className="font-medium">{entry.packages || '-'}</p>
+                                  </div>
+                                  <div>
+                                    <p className="text-muted-foreground font-semibold mb-1 uppercase tracking-wider">IGM</p>
+                                    <p className="font-medium">{entry.igm || '-'}</p>
+                                  </div>
+                                  <div>
+                                    <p className="text-muted-foreground font-semibold mb-1 uppercase tracking-wider">GD Number</p>
+                                    <p className="font-medium">{entry.gdNumber || '-'}</p>
+                                  </div>
+                                  <div>
+                                    <p className="text-muted-foreground font-semibold mb-1 uppercase tracking-wider">Total Bill</p>
+                                    <p className="font-medium text-primary font-bold">PKR {entry.debit.toLocaleString()}</p>
+                                  </div>
+                                </div>
+                              </div>
+                            </TableCell>
+                          </TableRow>
+                        )}
+                      </React.Fragment>
                     ))
                   )}
                 </TableBody>

@@ -34,19 +34,52 @@ import { formatDate, formatCurrency } from '@/lib/utils';
 import { CompanySelect } from '@/components/company-select';
 import { GenericSearchSelect } from '@/components/search-select';
 import { MultiSearchSelect } from '@/components/multi-search-select';
+import { PinDialog } from '@/components/pin-dialog';
+import { Trash2 } from 'lucide-react';
 import Swal from 'sweetalert2';
 
 export default function PaymentsPage() {
-  const { payments, companies, addPayment, bills } = useData();
+  const { payments, companies, addPayment, deletePayment, bills } = useData();
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [loading, setLoading] = useState(false);
+
+  // PIN Dialog State for Deletion
+  const [isPinDialogOpen, setIsPinDialogOpen] = useState(false);
+  const [paymentToDelete, setPaymentToDelete] = useState<Payment | null>(null);
+
+  const handleDeletePayment = async () => {
+    if (paymentToDelete) {
+      try {
+        await deletePayment(paymentToDelete.id);
+        Swal.fire({
+          title: 'Deleted!',
+          text: 'The payment has been deleted successfully.',
+          icon: 'success',
+          confirmButtonColor: '#10b981',
+          timer: 2000,
+          showConfirmButton: false
+        });
+      } catch (err) {
+        console.error("Failed to delete payment:", err);
+        Swal.fire({
+          title: 'Error',
+          text: 'Failed to delete the payment.',
+          icon: 'error',
+          confirmButtonColor: '#3b82f6'
+        });
+      } finally {
+        setIsPinDialogOpen(false);
+        setPaymentToDelete(null);
+      }
+    }
+  };
 
   // Form State
   const [companyId, setCompanyId] = useState('');
   const [date, setDate] = useState(new Date().toISOString().split('T')[0]);
-  const [amount, setAmount] = useState(''); // Global amount or single
-  const [adjustment, setAdjustment] = useState(''); // Global adjustment or single
   const [method, setMethod] = useState('Bank Transfer');
+  const [paymentMode, setPaymentMode] = useState<'specific' | 'lumpsum'>('specific');
+  const [lumpsumAmount, setLumpsumAmount] = useState('');
   const [selectedBillIds, setSelectedBillIds] = useState<string[]>([]);
   const [billPayments, setBillPayments] = useState<Record<string, { amount: string, adjustment: string }>>({});
 
@@ -62,10 +95,30 @@ export default function PaymentsPage() {
   const [description, setDescription] = useState('');
 
   const handleSubmit = async () => {
-    if (!companyId || !date || selectedBillIds.length === 0) {
+    if (!companyId || !date) {
       Swal.fire({
         title: 'Missing Information',
-        text: 'Please select a company, date, and at least one bill.',
+        text: 'Please select a company and date.',
+        icon: 'warning',
+        confirmButtonColor: '#3b82f6'
+      });
+      return;
+    }
+
+    if (paymentMode === 'specific' && selectedBillIds.length === 0) {
+      Swal.fire({
+        title: 'Missing Bills',
+        text: 'Please select at least one bill to pay.',
+        icon: 'warning',
+        confirmButtonColor: '#3b82f6'
+      });
+      return;
+    }
+
+    if (paymentMode === 'lumpsum' && (!lumpsumAmount || Number(lumpsumAmount) <= 0)) {
+      Swal.fire({
+        title: 'Invalid Amount',
+        text: 'Please enter a valid lumpsum amount.',
         icon: 'warning',
         confirmButtonColor: '#3b82f6'
       });
@@ -73,16 +126,18 @@ export default function PaymentsPage() {
     }
 
     // Validate that each selected bill has a valid amount
-    for (const id of selectedBillIds) {
-      const p = billPayments[id];
-      if (!p || !p.amount || Number(p.amount) <= 0) {
-        Swal.fire({
-          title: 'Invalid Amount',
-          text: 'Please enter a valid amount for all selected bills.',
-          icon: 'warning',
-          confirmButtonColor: '#3b82f6'
-        });
-        return;
+    if (paymentMode === 'specific') {
+      for (const id of selectedBillIds) {
+        const p = billPayments[id];
+        if (!p || !p.amount || Number(p.amount) <= 0) {
+          Swal.fire({
+            title: 'Invalid Amount',
+            text: 'Please enter a valid amount for all selected bills.',
+            icon: 'warning',
+            confirmButtonColor: '#3b82f6'
+          });
+          return;
+        }
       }
     }
 
@@ -91,38 +146,110 @@ export default function PaymentsPage() {
       let successCount = 0;
       let errorCount = 0;
 
-      for (const id of selectedBillIds) {
-        const p = billPayments[id];
+      // Construct reference based on method
+      let finalReference = '';
+      if (method === 'Bank Transfer') finalReference = `TRF: ${trackingId}`;
+      else if (method === 'Cheque') finalReference = `CHQ: ${chequeNo}`;
+      else if (method === 'Pay Order') finalReference = `PO: ${payOrderNo}`;
+      else if (method === 'Advance') finalReference = `ADV: ${description}`;
+      else finalReference = 'Cash';
 
-        // Construct reference based on method
-        let finalReference = '';
-        if (method === 'Bank Transfer') finalReference = `TRF: ${trackingId}`;
-        else if (method === 'Cheque') finalReference = `CHQ: ${chequeNo}`;
-        else if (method === 'Pay Order') finalReference = `PO: ${payOrderNo}`;
-        else if (method === 'Advance') finalReference = `ADV: ${description}`;
-        else finalReference = 'Cash';
+      const companyName = companies.find(c => String(c.id) === String(companyId))?.name || 'Unknown';
 
-        const paymentData: Omit<Payment, 'id' | 'createdAt'> = {
-          companyId,
-          companyName: companies.find(c => String(c.id) === String(companyId))?.name || 'Unknown',
-          date,
-          amount: Number(p.amount),
-          adjustment: Number(p.adjustment || 0),
-          method,
-          billId: id,
-          trackingId: method === 'Bank Transfer' ? trackingId : undefined,
-          chequeNo: method === 'Cheque' ? chequeNo : undefined,
-          payOrderNo: method === 'Pay Order' ? payOrderNo : undefined,
-          description: description,
-          reference: finalReference
-        };
+      if (paymentMode === 'specific') {
+        for (const id of selectedBillIds) {
+          const p = billPayments[id];
 
-        const result = await addPayment(paymentData);
-        if (result.ok) {
-          successCount++;
-        } else {
-          errorCount++;
-          console.error(`Failed to record payment for bill ${id}:`, result.message);
+          const paymentData: Omit<Payment, 'id' | 'createdAt'> = {
+            companyId,
+            companyName,
+            date,
+            amount: Number(p.amount),
+            adjustment: Number(p.adjustment || 0),
+            method,
+            billId: id,
+            trackingId: method === 'Bank Transfer' ? trackingId : undefined,
+            chequeNo: method === 'Cheque' ? chequeNo : undefined,
+            payOrderNo: method === 'Pay Order' ? payOrderNo : undefined,
+            description: description,
+            reference: finalReference
+          };
+
+          const result = await addPayment(paymentData);
+          if (result.ok) {
+            successCount++;
+          } else {
+            errorCount++;
+            console.error(`Failed to record payment for bill ${id}:`, result.message);
+          }
+        }
+      } else {
+        // Lumpsum Auto-allocation logic
+        let remainingLumpsum = Number(lumpsumAmount);
+
+        // Filter and sort unpaid bills by date (oldest first)
+        const unpaidBills = bills.filter(b =>
+          String(b.companyId) === String(companyId) &&
+          (b.status !== 'Paid' && b.calculatedStatus !== 'Paid')
+        ).sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+
+        for (const bill of unpaidBills) {
+          if (remainingLumpsum <= 0) break;
+
+          const dueAmount = (bill.grandTotal || bill.totalAmount || 0) - (bill.paidAmount || 0);
+          if (dueAmount <= 0) continue;
+
+          const amountToPay = Math.min(dueAmount, remainingLumpsum);
+
+          const paymentData: Omit<Payment, 'id' | 'createdAt'> = {
+            companyId,
+            companyName,
+            date,
+            amount: amountToPay,
+            adjustment: 0, // In lumpsum mode, no manual adjustments for speed
+            method,
+            billId: bill.id,
+            trackingId: method === 'Bank Transfer' ? trackingId : undefined,
+            chequeNo: method === 'Cheque' ? chequeNo : undefined,
+            payOrderNo: method === 'Pay Order' ? payOrderNo : undefined,
+            description: description || 'Auto-allocated Lumpsum Payment',
+            reference: finalReference
+          };
+
+          const result = await addPayment(paymentData);
+          if (result.ok) {
+            successCount++;
+            remainingLumpsum -= amountToPay;
+          } else {
+            errorCount++;
+            console.error(`Failed to record auto-payment for bill ${bill.id}:`, result.message);
+          }
+        }
+
+        // Apply remaining surplus as an Advance
+        if (remainingLumpsum > 0) {
+          const genericPaymentData: Omit<Payment, 'id' | 'createdAt'> = {
+            companyId,
+            companyName,
+            date,
+            amount: remainingLumpsum,
+            adjustment: 0,
+            method,
+            // Intentionally omitting billId to act as advance
+            trackingId: method === 'Bank Transfer' ? trackingId : undefined,
+            chequeNo: method === 'Cheque' ? chequeNo : undefined,
+            payOrderNo: method === 'Pay Order' ? payOrderNo : undefined,
+            description: description || 'Remaining Lumpsum Advance',
+            reference: finalReference
+          };
+
+          const genericResult = await addPayment(genericPaymentData);
+          if (genericResult.ok) {
+            successCount++;
+          } else {
+            errorCount++;
+            console.error(`Failed to record surplus advance payment:`, genericResult.message);
+          }
         }
       }
 
@@ -139,10 +266,10 @@ export default function PaymentsPage() {
         setIsDialogOpen(false);
         // Reset state
         setCompanyId('');
-        setAmount('');
-        setAdjustment('');
+        setLumpsumAmount('');
         setSelectedBillIds([]);
         setBillPayments({});
+        setPaymentMode('specific');
         setTrackingId('');
         setChequeNo('');
         setPayOrderNo('');
@@ -181,7 +308,7 @@ export default function PaymentsPage() {
   const billOptions = useMemo(() => {
     return companyBills.map(b => ({
       id: b.id,
-      label: `JOB: ${b.jobNumber || b.billNo} (Due: ${formatCurrency((b.grandTotal || b.totalAmount) - b.paidAmount)})`
+      label: `JOB: ${b.jobNumber || 'N/A'} (Due: ${formatCurrency((b.grandTotal || b.totalAmount) - b.paidAmount)})`
     }));
   }, [companyBills]);
 
@@ -271,75 +398,106 @@ export default function PaymentsPage() {
                 </div>
 
                 <div>
-                  <Label>Link to Invoice(s) / Job(s) (Required)</Label>
-                  <MultiSearchSelect
-                    options={billOptions}
-                    selectedIds={selectedBillIds}
-                    onValueChange={(ids) => {
-                      setSelectedBillIds(ids);
-                      // Initialize payment data for new IDs
-                      const newBillPayments = { ...billPayments };
-                      ids.forEach(id => {
-                        if (!newBillPayments[id]) {
-                          const bill = bills.find(b => b.id === id);
-                          const due = ((bill?.grandTotal || bill?.totalAmount) || 0) - (bill?.paidAmount || 0);
-                          newBillPayments[id] = { amount: String(due), adjustment: '0' };
-                        }
-                      });
-                      setBillPayments(newBillPayments);
-                    }}
-                    placeholder={companyId ? "Select Invoice(s) to pay..." : "Select company first"}
-                    emptyText={companyId ? "No pending bills found" : "Select company first"}
-                    className="mt-1"
-                  />
+                  <Label>Payment Strategy</Label>
+                  <Select value={paymentMode} onValueChange={(val: any) => setPaymentMode(val)}>
+                    <SelectTrigger className="mt-1">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="specific">Pay Specific Bills</SelectItem>
+                      <SelectItem value="lumpsum">Lumpsum Auto-Allocate</SelectItem>
+                    </SelectContent>
+                  </Select>
                 </div>
 
-                {/* Per-Bill Payment Inputs */}
-                {selectedBillIds.length > 0 && (
-                  <div className="space-y-4 max-h-[300px] overflow-y-auto pr-2 bg-slate-50 dark:bg-slate-900/40 p-3 rounded-lg border border-dashed border-green-200 dark:border-green-900/50">
-                    <p className="text-[10px] font-bold uppercase tracking-widest text-green-600 dark:text-green-500">Payment Allocation</p>
-                    {selectedBillIds.map(id => {
-                      const bill = bills.find(b => b.id === id);
-                      return (
-                        <div key={id} className="space-y-2 pb-3 border-b border-muted last:border-0 last:pb-0">
-                          <div className="flex justify-between items-center">
-                            <span className="text-xs font-bold text-foreground truncate max-w-[150px]">
-                              {bill?.jobNumber || bill?.billNo}
-                            </span>
-                            <span className="text-[10px] text-muted-foreground">
-                              Due: {formatCurrency(((bill?.grandTotal || bill?.totalAmount) || 0) - (bill?.paidAmount || 0))}
-                            </span>
-                          </div>
-                          <div className="grid grid-cols-2 gap-3">
-                            <div>
-                              <Label className="text-[10px]">Amount Paid</Label>
-                              <Input
-                                type="number"
-                                size={2}
-                                className="h-8 text-xs font-mono font-bold"
-                                value={billPayments[id]?.amount || ''}
-                                onChange={(e) => setBillPayments(prev => ({
-                                  ...prev,
-                                  [id]: { ...prev[id], amount: e.target.value }
-                                }))}
-                              />
+                {paymentMode === 'specific' ? (
+                  <>
+                    <div>
+                      <Label>Link to Invoice(s) / Job(s) (Required)</Label>
+                      <MultiSearchSelect
+                        options={billOptions}
+                        selectedIds={selectedBillIds}
+                        onValueChange={(ids) => {
+                          setSelectedBillIds(ids);
+                          // Initialize payment data for new IDs
+                          const newBillPayments = { ...billPayments };
+                          ids.forEach(id => {
+                            if (!newBillPayments[id]) {
+                              const bill = bills.find(b => b.id === id);
+                              const due = ((bill?.grandTotal || bill?.totalAmount) || 0) - (bill?.paidAmount || 0);
+                              newBillPayments[id] = { amount: String(due), adjustment: '0' };
+                            }
+                          });
+                          setBillPayments(newBillPayments);
+                        }}
+                        placeholder={companyId ? "Select Invoice(s) to pay..." : "Select company first"}
+                        emptyText={companyId ? "No pending bills found" : "Select company first"}
+                        className="mt-1"
+                      />
+                    </div>
+
+                    {/* Per-Bill Payment Inputs */}
+                    {selectedBillIds.length > 0 && (
+                      <div className="space-y-4 max-h-[300px] overflow-y-auto pr-2 bg-slate-50 dark:bg-slate-900/40 p-3 rounded-lg border border-dashed border-green-200 dark:border-green-900/50">
+                        <p className="text-[10px] font-bold uppercase tracking-widest text-green-600 dark:text-green-500">Payment Allocation</p>
+                        {selectedBillIds.map(id => {
+                          const bill = bills.find(b => b.id === id);
+                          return (
+                            <div key={id} className="space-y-2 pb-3 border-b border-muted last:border-0 last:pb-0">
+                              <div className="flex justify-between items-center">
+                                <span className="text-xs font-bold text-foreground truncate max-w-[150px]">
+                                  {bill?.jobNumber || 'N/A'}
+                                </span>
+                                <span className="text-[10px] text-muted-foreground">
+                                  Due: {formatCurrency(((bill?.grandTotal || bill?.totalAmount) || 0) - (bill?.paidAmount || 0))}
+                                </span>
+                              </div>
+                              <div className="grid grid-cols-2 gap-3">
+                                <div>
+                                  <Label className="text-[10px]">Amount Paid</Label>
+                                  <Input
+                                    type="number"
+                                    size={2}
+                                    className="h-8 text-xs font-mono font-bold"
+                                    value={billPayments[id]?.amount || ''}
+                                    onChange={(e) => setBillPayments(prev => ({
+                                      ...prev,
+                                      [id]: { ...prev[id], amount: e.target.value }
+                                    }))}
+                                  />
+                                </div>
+                                <div>
+                                  <Label className="text-[10px]">Adjustment</Label>
+                                  <Input
+                                    type="number"
+                                    className="h-8 text-xs font-mono"
+                                    value={billPayments[id]?.adjustment || ''}
+                                    onChange={(e) => setBillPayments(prev => ({
+                                      ...prev,
+                                      [id]: { ...prev[id], adjustment: e.target.value }
+                                    }))}
+                                  />
+                                </div>
+                              </div>
                             </div>
-                            <div>
-                              <Label className="text-[10px]">Adjustment</Label>
-                              <Input
-                                type="number"
-                                className="h-8 text-xs font-mono"
-                                value={billPayments[id]?.adjustment || ''}
-                                onChange={(e) => setBillPayments(prev => ({
-                                  ...prev,
-                                  [id]: { ...prev[id], adjustment: e.target.value }
-                                }))}
-                              />
-                            </div>
-                          </div>
-                        </div>
-                      );
-                    })}
+                          );
+                        })}
+                      </div>
+                    )}
+                  </>
+                ) : (
+                  <div>
+                    <Label>Lumpsum Amount (PKR)</Label>
+                    <Input
+                      type="number"
+                      placeholder="Example: 5000000"
+                      className="mt-1 h-10 font-mono text-lg font-bold text-green-600"
+                      value={lumpsumAmount}
+                      onChange={(e) => setLumpsumAmount(e.target.value)}
+                    />
+                    <p className="text-[11px] text-muted-foreground mt-2 bg-muted/30 p-2 rounded-lg leading-relaxed">
+                      This amount will be automatically distributed to the oldest unpaid invoices first. Any surplus will be kept as an advance payment toward the company.
+                    </p>
                   </div>
                 )}
 
@@ -503,6 +661,7 @@ export default function PaymentsPage() {
                       <TableHead className="text-right">Cash Paid</TableHead>
                       <TableHead className="text-right font-black text-primary">Total Paid</TableHead>
                       <TableHead className="text-right font-black">Bill Total</TableHead>
+                      <TableHead className="text-right">Actions</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
@@ -518,7 +677,7 @@ export default function PaymentsPage() {
                             {payment.companyName}
                           </TableCell>
                           <TableCell className="text-sm font-mono text-muted-foreground">
-                            {linkedBill?.jobNumber || linkedBill?.billNo || '-'}
+                            {linkedBill?.jobNumber || '-'}
                           </TableCell>
                           <TableCell className="text-sm">
                             {payment.method}
@@ -544,6 +703,20 @@ export default function PaymentsPage() {
                           </TableCell>
                           <TableCell className="text-right font-black text-primary bg-muted/20 whitespace-nowrap">
                             {linkedBill ? formatCurrency(linkedBill.grandTotal || 0) : '-'}
+                          </TableCell>
+                          <TableCell className="text-right">
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="text-destructive hover:bg-destructive/10 hover:text-destructive transition-colors"
+                              onClick={() => {
+                                setPaymentToDelete(payment);
+                                setIsPinDialogOpen(true);
+                              }}
+                              title="Delete Payment"
+                            >
+                              <Trash2 className="w-4 h-4" />
+                            </Button>
                           </TableCell>
                         </TableRow>
                       );
@@ -578,6 +751,17 @@ export default function PaymentsPage() {
           </CardContent>
         </Card>
       </div>
+
+      <PinDialog
+        isOpen={isPinDialogOpen}
+        onClose={() => {
+          setIsPinDialogOpen(false);
+          setPaymentToDelete(null);
+        }}
+        onConfirm={handleDeletePayment}
+        actionTitle="Delete Payment"
+        description={`This will permanently delete the payment of ${formatCurrency(paymentToDelete?.amount || 0)}.`}
+      />
     </DashboardLayout>
   );
 }

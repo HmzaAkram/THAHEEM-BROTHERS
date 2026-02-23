@@ -24,6 +24,13 @@ import {
 } from '@/components/ui/dialog';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardHeader } from '@/components/ui/card';
+import {
+    Select,
+    SelectContent,
+    SelectItem,
+    SelectTrigger,
+    SelectValue,
+} from "@/components/ui/select";
 import { Plus, MessageSquare, Loader2, Search } from 'lucide-react';
 import { useToast } from '@/components/ui/use-toast';
 import { format } from 'date-fns';
@@ -54,8 +61,44 @@ export default function CompanyQueriesPage() {
     // Create Query State
     const [isCreateOpen, setIsCreateOpen] = useState(false);
     const [isSubmitting, setIsSubmitting] = useState(false);
+    const [selectedTemplate, setSelectedTemplate] = useState('');
     const [newSubject, setNewSubject] = useState('');
     const [newInitialMessage, setNewInitialMessage] = useState('');
+
+    const queryTemplates = [
+        {
+            label: "Service charges not added",
+            subject: "Missing Service Charges",
+            message: "Hello team, please note that the service charges seem to be missing or incorrect for our recent jobs. Kindly check and update our ledger. Thank you."
+        },
+        {
+            label: "Issue with Job Number",
+            subject: "Correction Required for Job Number",
+            message: "Hello, there is a discrepancy with a Job Number mapped to our account. Please investigate and correct the bill details."
+        },
+        {
+            label: "Payment not updated in ledger",
+            subject: "Payment Not Reflected in Ledger",
+            message: "Hi, we recently made a payment that does not seem to be updated in our ledger yet. Please verify the transaction and update our balance."
+        },
+        {
+            label: "Other Issue",
+            subject: "",
+            message: ""
+        }
+    ];
+
+    const handleTemplateChange = (val: string) => {
+        setSelectedTemplate(val);
+        const template = queryTemplates.find(t => t.label === val);
+        if (template && val !== "Other Issue") {
+            setNewSubject(template.subject);
+            setNewInitialMessage(template.message);
+        } else if (val === "Other Issue") {
+            setNewSubject('');
+            setNewInitialMessage('');
+        }
+    };
 
     // Chat / View State
     const [selectedQuery, setSelectedQuery] = useState<Query | null>(null);
@@ -136,6 +179,7 @@ export default function CompanyQueriesPage() {
                     description: 'Query submitted successfully',
                 });
                 setIsCreateOpen(false);
+                setSelectedTemplate('');
                 setNewSubject('');
                 setNewInitialMessage('');
                 fetchQueries();
@@ -295,6 +339,19 @@ export default function CompanyQueriesPage() {
                             </DialogDescription>
                         </DialogHeader>
                         <div className="space-y-4 py-4">
+                            <div className="space-y-2">
+                                <label className="text-sm font-medium">Quick Template</label>
+                                <Select value={selectedTemplate} onValueChange={handleTemplateChange}>
+                                    <SelectTrigger>
+                                        <SelectValue placeholder="Select a common issue or choose 'Other'" />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                        {queryTemplates.map(t => (
+                                            <SelectItem key={t.label} value={t.label}>{t.label}</SelectItem>
+                                        ))}
+                                    </SelectContent>
+                                </Select>
+                            </div>
                             <div className="space-y-2">
                                 <label htmlFor="subject" className="text-sm font-medium">Subject</label>
                                 <Input

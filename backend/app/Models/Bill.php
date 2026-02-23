@@ -20,7 +20,6 @@ class Bill extends Model
         'exporter',
         'invoice_no',
         'invoice_date',
-        'be_number',
         'hawb',
         'igm',
         'index_no',

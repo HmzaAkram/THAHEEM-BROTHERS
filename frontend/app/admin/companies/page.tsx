@@ -33,6 +33,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
+import { PinDialog } from '@/components/pin-dialog';
 import Swal from 'sweetalert2';
 
 export default function CompaniesPage() {
@@ -58,6 +59,18 @@ export default function CompaniesPage() {
     username: '',
     password: '',
   });
+
+  // PIN Dialog State
+  const [isPinDialogOpen, setIsPinDialogOpen] = useState(false);
+  const [deleteTargetId, setDeleteTargetId] = useState<string | null>(null);
+
+  const confirmDelete = () => {
+    if (deleteTargetId) {
+      deleteCompany(deleteTargetId);
+      setDeleteTargetId(null);
+      setIsPinDialogOpen(false);
+    }
+  };
 
   const filteredCompanies = useMemo(() => {
     let filtered = [...companies];
@@ -368,6 +381,8 @@ export default function CompaniesPage() {
                       <TableHead>Company Name</TableHead>
                       <TableHead>Email / Login</TableHead>
                       <TableHead>Phone</TableHead>
+                      <TableHead>Amount</TableHead>
+                      <TableHead>Paid</TableHead>
                       <TableHead>Balance</TableHead>
                       <TableHead>Status</TableHead>
                       <TableHead className="text-right">Actions</TableHead>
@@ -395,6 +410,15 @@ export default function CompaniesPage() {
                               {company.email}
                             </TableCell>
                             <TableCell>{company.phone}</TableCell>
+                            <TableCell className="font-semibold">
+                              {formatCurrency((bills.filter(b => b.companyId === company.id).reduce((s, b) => s + (Number(b.grandTotal) || 0), 0)))}
+                            </TableCell>
+                            <TableCell className="text-muted-foreground text-sm">
+                              {formatCurrency(
+                                bills.filter(b => b.companyId === company.id).reduce((s, b) => s + (Number(b.advancePayment) || 0), 0) +
+                                payments.filter(p => p.companyId === company.id).reduce((s, p) => s + (Number(p.amount) || 0) + (Number(p.adjustment) || 0), 0)
+                              )}
+                            </TableCell>
                             <TableCell className={`font-bold ${balance > 0 ? 'text-red-600' : 'text-green-600'}`}>
                               {formatCurrency(balance)}
                             </TableCell>
@@ -443,7 +467,8 @@ export default function CompaniesPage() {
                                       confirmButtonText: 'Yes, delete it!'
                                     });
                                     if (result.isConfirmed) {
-                                      deleteCompany(company.id);
+                                      setDeleteTargetId(company.id);
+                                      setIsPinDialogOpen(true);
                                     }
                                   }}
                                   title="Delete Company"
@@ -493,6 +518,17 @@ export default function CompaniesPage() {
           </CardContent>
         </Card>
       </div>
+
+      <PinDialog
+        isOpen={isPinDialogOpen}
+        onClose={() => {
+          setIsPinDialogOpen(false);
+          setDeleteTargetId(null);
+        }}
+        onConfirm={confirmDelete}
+        actionTitle="Delete Company"
+        description="Are you sure you want to delete this company? This will also remove associated bills and payments permanently."
+      />
     </DashboardLayout>
   );
 }
