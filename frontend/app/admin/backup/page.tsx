@@ -15,7 +15,7 @@ import {
     History,
     FileText
 } from 'lucide-react';
-import { useState } from 'react';
+import { useState, useRef } from 'react';
 import { useAuth } from '@/context/auth-context';
 import { useData } from '@/context/data-context';
 import jsPDF from 'jspdf';
@@ -23,6 +23,11 @@ import autoTable from 'jspdf-autotable';
 import { formatDate, formatCurrency } from '@/lib/utils';
 import { Company, Bill, Payment } from '@/context/data-context';
 import Swal from 'sweetalert2';
+import JSZip from 'jszip';
+import { saveAs } from 'file-saver';
+import { toJpeg } from 'html-to-image';
+import { InvoiceTemplate } from '@/components/invoice-template';
+import { FileArchive } from 'lucide-react';
 
 export default function BackupPage() {
     const { user } = useAuth();
@@ -30,7 +35,13 @@ export default function BackupPage() {
     const [exportLoading, setExportLoading] = useState(false);
     const [importLoading, setImportLoading] = useState(false);
     const [pdfLoading, setPdfLoading] = useState(false);
+    const [zipLoading, setZipLoading] = useState(false);
+    const [zipProgressText, setZipProgressText] = useState('');
     const [selectedFile, setSelectedFile] = useState<File | null>(null);
+
+    // State to mount the invoice template dynamically for capturing
+    const [renderingBill, setRenderingBill] = useState<Bill | null>(null);
+    const invoiceRef = useRef<HTMLDivElement>(null);
 
     const handleExport = async () => {
         setExportLoading(true);
@@ -270,6 +281,170 @@ export default function BackupPage() {
         }
     };
 
+    const handleZipExport = async () => {
+        setZipLoading(true);
+        setZipProgressText('Initializing Backup...');
+
+        try {
+            const zip = new JSZip();
+
+            // Iterate over companies
+            for (let i = 0; i < companies.length; i++) {
+                const company = companies[i];
+                setZipProgressText(`Processing Company: ${company.name} (${i + 1}/${companies.length})`);
+
+                const companyFolder = zip.folder(`${company.name}_${company.identifier}`);
+                if (!companyFolder) continue;
+
+                // 1. GENERATE LEDGER PDF
+                const ledgerDoc = new jsPDF();
+                ledgerDoc.setFontSize(18);
+                ledgerDoc.text(`General Ledger: ${company.name}`, 14, 20);
+
+                const companyLedger = getCompanyLedger(company.id);
+                const ledgerRows = companyLedger.map(l => [
+                    formatDate(l.date),
+                    l.description,
+                    l.jobNumber || l.billNo || '-',
+                    l.debit > 0 ? formatCurrency(l.debit) : '-',
+                    l.credit > 0 ? formatCurrency(l.credit) : '-',
+                    formatCurrency(l.balance)
+                ]);
+
+                autoTable(ledgerDoc, {
+                    startY: 30,
+                    head: [['Date', 'Description', 'Job/Bill No', 'Debit', 'Credit', 'Balance']],
+                    body: ledgerRows.length > 0 ? ledgerRows : [['-', 'No transactions', '-', '-', '-', '-']],
+                    theme: 'grid',
+                    headStyles: { fillColor: [44, 62, 80] },
+                    styles: { fontSize: 8 }
+                });
+
+                companyFolder.file('Ledger.pdf', ledgerDoc.output('blob'));
+
+                // 2. GENERATE PAYMENT HISTORY PDF
+                const paymentDoc = new jsPDF();
+                paymentDoc.setFontSize(18);
+                paymentDoc.text(`Payment History: ${company.name}`, 14, 20);
+
+                const companyPayments = payments.filter(p => p.companyId === company.id);
+                // Sort by date desc
+                companyPayments.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+
+                const paymentRows = companyPayments.map(p => {
+                    const linkedBill = p.billId ? bills.find(b => b.id.toString() === p.billId.toString()) : null;
+                    return [
+                        formatDate(p.date),
+                        formatCurrency(p.amount),
+                        p.paymentMethod,
+                        p.reference || linkedBill?.jobNumber || 'Advance Payment',
+                        p.notes || '-'
+                    ];
+                });
+
+                autoTable(paymentDoc, {
+                    startY: 30,
+                    head: [['Date', 'Amount', 'Method', 'Reference/Job', 'Notes']],
+                    body: paymentRows.length > 0 ? paymentRows : [['-', 'No payments', '-', '-', '-']],
+                    theme: 'grid',
+                    headStyles: { fillColor: [46, 204, 113] },
+                    styles: { fontSize: 10 }
+                });
+
+                companyFolder.file('Payment_History.pdf', paymentDoc.output('blob'));
+
+                // 3. GENERATE BILLS INVOICES & ATTACHMENTS
+                const billsFolder = companyFolder.folder('Bills');
+                const companyBills = bills.filter(b => b.companyId === company.id);
+
+                if (billsFolder && companyBills.length > 0) {
+                    for (let j = 0; j < companyBills.length; j++) {
+                        const bill = companyBills[j];
+                        setZipProgressText(`Processing Company: ${company.name} (${i + 1}/${companies.length}) - Job ${j + 1}/${companyBills.length}`);
+
+                        // Create a sub-folder for each Job Number
+                        const jobFolderName = bill.jobNumber
+                            ? bill.jobNumber.replace(/[/\\?%*:|"<>\s]/g, '_')
+                            : `Invoice_${bill.id}`;
+                        const jobFolder = billsFolder.folder(jobFolderName);
+                        if (!jobFolder) continue;
+
+                        // Set current bill to render the InvoiceTemplate
+                        setRenderingBill(bill);
+                        // Wait for template to render + images/fonts to fully load
+                        await new Promise(r => setTimeout(r, 1200));
+
+                        if (invoiceRef.current) {
+                            try {
+                                const dataUrl = await toJpeg(invoiceRef.current, {
+                                    cacheBust: true,
+                                    quality: 0.95,
+                                    pixelRatio: 1.5,
+                                    backgroundColor: '#ffffff',
+                                });
+
+                                const invoiceDoc = new jsPDF('p', 'mm', 'a4');
+                                const pdfWidth = 210;
+                                const imgProps = invoiceDoc.getImageProperties(dataUrl);
+                                const imgHeight = (imgProps.height * pdfWidth) / imgProps.width;
+
+                                invoiceDoc.addImage(dataUrl, 'JPEG', 0, 0, pdfWidth, imgHeight);
+                                // Save the invoice PDF inside the job-number folder
+                                jobFolder.file(`Invoice_${jobFolderName}.pdf`, invoiceDoc.output('blob'));
+
+                                // Process attachments — also inside the same job-number folder
+                                if (bill.items && Array.isArray(bill.items)) {
+                                    let attIndex = 1;
+                                    for (const item of bill.items) {
+                                        if (item.attachmentUrl) {
+                                            try {
+                                                const token = localStorage.getItem('auth_token');
+                                                const attachUrl = item.attachmentUrl.startsWith('http')
+                                                    ? item.attachmentUrl
+                                                    : `${process.env.NEXT_PUBLIC_API_URL?.replace('/api', '')}/storage/${item.attachmentUrl}`;
+
+                                                const attRes = await fetch(attachUrl, {
+                                                    headers: { 'Authorization': `Bearer ${token}` }
+                                                });
+                                                if (attRes.ok) {
+                                                    const attBlob = await attRes.blob();
+                                                    const ext = item.attachmentUrl.split('.').pop() || 'jpg';
+                                                    const descClean = (item.description || `Attachment_${attIndex}`).replace(/[/\\?%*:|"<>\s]/g, '_');
+                                                    jobFolder.file(`${descClean}.${ext}`, attBlob);
+                                                    attIndex++;
+                                                }
+                                            } catch (attErr) {
+                                                console.error('Failed to fetch attachment', attErr);
+                                            }
+                                        }
+                                    }
+                                }
+
+                            } catch (renderErr) {
+                                console.error('Failed to render invoice for bill', bill.id, renderErr);
+                            }
+                        }
+                    }
+                    setRenderingBill(null);
+                }
+            }
+
+            setZipProgressText('Packaging ZIP file... This may take a minute.');
+
+            const zipBlob = await zip.generateAsync({ type: 'blob' });
+            saveAs(zipBlob, `Thaheem_Brothers_Backup_${new Date().toISOString().split('T')[0]}.zip`);
+
+            Swal.fire({ title: 'Success!', text: 'ZIP Backup generated successfully!', icon: 'success', confirmButtonColor: '#10b981' });
+
+        } catch (error) {
+            console.error(error);
+            Swal.fire({ title: 'Error', text: 'Failed to generate ZIP backup.', icon: 'error', confirmButtonColor: '#3b82f6' });
+            setRenderingBill(null);
+        } finally {
+            setZipLoading(false);
+            setZipProgressText('');
+        }
+    };
 
     return (
         <DashboardLayout>
@@ -287,7 +462,7 @@ export default function BackupPage() {
                     </div>
                 </div>
 
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
                     {/* SQL Export */}
                     <Card className="shadow-xl border-primary/5 bg-white/50 dark:bg-slate-900/50 backdrop-blur-sm ring-1 ring-black/5">
                         <CardHeader className="pb-4">
@@ -340,6 +515,36 @@ export default function BackupPage() {
                                     Download PDF
                                 </Button>
                                 <p className="text-xs text-muted-foreground">Includes Ledgers & Stats.</p>
+                            </div>
+                        </CardContent>
+                    </Card>
+
+                    {/* ZIP Export */}
+                    <Card className="shadow-xl border-primary/5 bg-white/50 dark:bg-slate-900/50 backdrop-blur-sm ring-1 ring-black/5">
+                        <CardHeader className="pb-4">
+                            <div className="flex items-center gap-3 mb-2">
+                                <div className="p-3 bg-amber-100 dark:bg-amber-900/30 rounded-2xl text-amber-600 shadow-sm transition-transform hover:scale-110">
+                                    <FileArchive className="w-6 h-6" />
+                                </div>
+                                <div>
+                                    <CardTitle className="text-xl font-bold">ZIP Backup</CardTitle>
+                                    <CardDescription>All Companies & Invoices.</CardDescription>
+                                </div>
+                            </div>
+                        </CardHeader>
+                        <CardContent className="space-y-6">
+                            <div className="rounded-2xl border-2 border-dashed border-amber-200 dark:border-amber-800 p-6 flex flex-col items-center justify-center text-center space-y-4 bg-amber-50/20 dark:bg-amber-900/5 hover:bg-amber-50/40 transition-colors group h-48">
+                                <Button
+                                    onClick={handleZipExport}
+                                    disabled={zipLoading || exportLoading || pdfLoading}
+                                    className="w-full h-12 gap-2 font-black shadow-lg shadow-amber-500/20 bg-amber-600 hover:bg-amber-700 text-white border-0"
+                                >
+                                    {zipLoading ? <Loader2 className="w-5 h-5 animate-spin" /> : <Download className="w-5 h-5" />}
+                                    Download ZIP
+                                </Button>
+                                <p className="text-xs text-muted-foreground">
+                                    {zipLoading ? zipProgressText || 'Compressing...' : 'Includes individual PDF files.'}
+                                </p>
                             </div>
                         </CardContent>
                     </Card>
@@ -408,6 +613,22 @@ export default function BackupPage() {
                         </div>
                     </CardContent>
                 </Card>
+
+                {/* Hidden container to render invoices to PDF */}
+                {renderingBill && (
+                    <div style={{
+                        position: 'fixed',
+                        top: 0,
+                        left: '-9999px',
+                        opacity: 0,
+                        pointerEvents: 'none',
+                        zIndex: -9999,
+                    }}>
+                        <div ref={invoiceRef} className="bg-white" style={{ width: '800px', padding: '24px' }}>
+                            <InvoiceTemplate bill={renderingBill} />
+                        </div>
+                    </div>
+                )}
             </div>
         </DashboardLayout>
     );
