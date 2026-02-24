@@ -11,7 +11,7 @@ import { Building, Phone as PhoneIcon, MapPin, Hash, User as UserIcon, Loader2, 
 import { toast } from 'sonner';
 import ApiService from '@/lib/api';
 import { jsPDF } from 'jspdf';
-import { toJpeg } from 'html-to-image';
+import autoTable from 'jspdf-autotable';
 
 export default function AccountSummaryPage() {
   const { user, isHydrated: authHydrated } = useAuth();
@@ -43,17 +43,106 @@ export default function AccountSummaryPage() {
 
 
   const handleDownload = async () => {
-    if (!summaryRef.current) return;
     setDownloadLoading(true);
     try {
-      const dataUrl = await toJpeg(summaryRef.current, { cacheBust: true, quality: 0.95, style: { background: 'white', padding: '20px' } });
       const pdf = new jsPDF('p', 'mm', 'a4');
-      const imgProps = pdf.getImageProperties(dataUrl);
-      const pdfWidth = pdf.internal.pageSize.getWidth();
-      const pdfHeight = (imgProps.height * pdfWidth) / imgProps.width;
+      const pageWidth = pdf.internal.pageSize.getWidth();
 
-      pdf.addImage(dataUrl, 'JPEG', 0, 0, pdfWidth, pdfHeight);
-      pdf.save(`Account_Summary_${currentCompany?.name.replace(/\s+/g, '_')}.pdf`);
+      // Add Logo
+      const img = new Image();
+      img.src = '/logo.PNG'; // Ensure this matches the correct path
+
+      await new Promise((resolve) => {
+        img.onload = resolve;
+        img.onerror = resolve; // Continue even if logo fails
+      });
+
+      if (img.width > 0) {
+        const maxLogoHeight = 20;
+        const maxLogoWidth = 60;
+        let logoWidth = img.width;
+        let logoHeight = img.height;
+
+        const ratio = Math.min(maxLogoWidth / logoWidth, maxLogoHeight / logoHeight);
+        logoWidth *= ratio;
+        logoHeight *= ratio;
+
+        pdf.addImage(img, 'PNG', (pageWidth - logoWidth) / 2, 10, logoWidth, logoHeight);
+      }
+
+      pdf.setFontSize(16);
+      pdf.setFont("helvetica", "bold");
+      pdf.text("Account Statement", pageWidth / 2, 38, { align: "center" });
+
+      pdf.setFontSize(10);
+      pdf.setFont("helvetica", "normal");
+
+      pdf.text(`Company: ${currentCompany.name}`, 14, 48);
+      pdf.text(`Email: ${currentCompany.email || 'N/A'}`, 14, 54);
+      pdf.text(`Phone: ${currentCompany.phone || 'N/A'}`, 14, 60);
+      pdf.text(`Generated: ${new Date().toLocaleDateString()}`, 14, 66);
+
+      let body = ledger.map((entry) => [
+        formatDate(entry.date),
+        entry.description,
+        entry.debit > 0 ? entry.debit.toLocaleString() : '-',
+        entry.credit > 0 ? entry.credit.toLocaleString() : '-',
+        entry.balance.toLocaleString()
+      ]);
+
+      if (body.length === 0) {
+        body.push(['-', 'No records found', '-', '-', '-']);
+      }
+
+      autoTable(pdf, {
+        startY: 74,
+        head: [['Date', 'Description', 'Debit', 'Credit', 'Balance']],
+        body: body,
+        theme: 'grid',
+        headStyles: { fillColor: [44, 62, 80], textColor: [255, 255, 255], fontStyle: 'bold' },
+        styles: { fontSize: 8, cellPadding: 2 },
+        columnStyles: {
+          0: { cellWidth: 20 },
+          2: { halign: 'right' },
+          3: { halign: 'right' },
+          4: { halign: 'right', fontStyle: 'bold' }
+        },
+        didParseCell: function (data) {
+          if (data.section === 'body') {
+            if (data.column.index === 4) {
+              const valStr = data.cell.text[0] || '';
+              const numStr = valStr.replace(/[^0-9.-]/g, '');
+              const numVal = parseFloat(numStr);
+              if (!isNaN(numVal)) {
+                if (numVal > 0) {
+                  data.cell.styles.textColor = [220, 38, 38];
+                } else if (numVal <= 0) {
+                  data.cell.styles.textColor = [0, 128, 0];
+                }
+              }
+            }
+          }
+        }
+      });
+
+      // Add Summary Totals at the bottom
+      const finalY = (pdf as any).lastAutoTable.finalY || 74;
+
+      pdf.setFontSize(11);
+      pdf.setFont("helvetica", "bold");
+      pdf.text("Summary Totals", 14, finalY + 10);
+
+      pdf.setFontSize(10);
+      pdf.setFont("helvetica", "normal");
+
+      pdf.text(`Total Debit:   PKR ${summary.totalDebit.toLocaleString()}`, 14, finalY + 18);
+      pdf.text(`Total Credit:  PKR ${summary.totalCredit.toLocaleString()}`, 14, finalY + 24);
+
+      pdf.setFont("helvetica", "bold");
+      pdf.text(`Balance:       PKR ${summary.balance.toLocaleString()}`, 14, finalY + 30);
+
+      pdf.save(`Account_Statement_${currentCompany.name.replace(/[/\\?%*:|"<>\s]/g, '_')}_${new Date().toISOString().split('T')[0]}.pdf`);
+      toast.success("Statement downloaded successfully");
     } catch (err) {
       console.error('Failed to export PDF', err);
       toast.error("Failed to generate PDF.");

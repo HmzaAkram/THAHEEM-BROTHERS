@@ -55,6 +55,7 @@ import { useData, BillItem, Bill } from '@/context/data-context';
 import { formatDate, formatCurrency } from '@/lib/utils';
 import JSZip from 'jszip';
 import { jsPDF } from 'jspdf';
+import autoTable from 'jspdf-autotable';
 import { toJpeg } from 'html-to-image';
 import { InvoiceTemplate } from '@/components/invoice-template';
 import { CompanySelect } from '@/components/company-select';
@@ -569,16 +570,119 @@ export default function BillsPage() {
   }, [filteredBills]);
 
   const handleExportPDF = async () => {
-    if (!tableRef.current) return;
-
     try {
-      const dataUrl = await toJpeg(tableRef.current, { cacheBust: true, quality: 0.95, style: { background: 'white', padding: '20px' } });
       const pdf = new jsPDF('p', 'mm', 'a4');
-      const imgProps = pdf.getImageProperties(dataUrl);
-      const pdfWidth = pdf.internal.pageSize.getWidth();
-      const pdfHeight = (imgProps.height * pdfWidth) / imgProps.width;
+      const pageWidth = pdf.internal.pageSize.getWidth();
 
-      pdf.addImage(dataUrl, 'JPEG', 0, 0, pdfWidth, pdfHeight);
+      // Add Logo
+      const img = new Image();
+      img.src = '/logo.PNG'; // Ensure this matches the correct path
+
+      await new Promise((resolve) => {
+        img.onload = resolve;
+        img.onerror = resolve; // Continue even if logo fails
+      });
+
+      if (img.width > 0) {
+        // Calculate dimensions to maintain aspect ratio
+        const maxLogoHeight = 20;
+        const maxLogoWidth = 60;
+        let logoWidth = img.width;
+        let logoHeight = img.height;
+
+        const ratio = Math.min(maxLogoWidth / logoWidth, maxLogoHeight / logoHeight);
+        logoWidth *= ratio;
+        logoHeight *= ratio;
+
+        // Center the logo
+        pdf.addImage(img, 'PNG', (pageWidth - logoWidth) / 2, 10, logoWidth, logoHeight);
+      }
+
+      // Add Title
+      pdf.setFontSize(16);
+      pdf.setFont("helvetica", "bold");
+      pdf.text("Bills List Report", pageWidth / 2, 38, { align: "center" });
+
+      // Add Filter Info
+      pdf.setFontSize(10);
+      pdf.setFont("helvetica", "normal");
+
+      let filterText = 'All Companies';
+      if (companyFilter !== 'all') {
+        const comp = companies.find(c => String(c.id) === companyFilter);
+        if (comp) filterText = comp.name;
+      }
+      pdf.text(`Company: ${filterText}`, 14, 48);
+
+      let timeFilterText = "All Time";
+      switch (timeFilter) {
+        case 'monthly': timeFilterText = "This Month"; break;
+        case '3months': timeFilterText = "Last 3 Months"; break;
+        case '6months': timeFilterText = "Last 6 Months"; break;
+        case 'yearly': timeFilterText = "This Year"; break;
+      }
+      pdf.text(`Period: ${timeFilterText}`, 14, 54);
+
+      let body = filteredBills.map(bill => [
+        formatDate(bill.date),
+        bill.jobNumber || 'N/A',
+        bill.companyName,
+        formatCurrency(bill.grandTotal),
+        formatCurrency(bill.paidAmount),
+        formatCurrency(bill.grandTotal - bill.paidAmount),
+        bill.calculatedStatus
+      ]);
+
+      if (body.length === 0) {
+        body.push(['-', 'No records found', '-', '-', '-', '-', '-']);
+      }
+
+      autoTable(pdf, {
+        startY: 62,
+        head: [['Date', 'Job No', 'Company', 'Billed', 'Paid', 'Balance', 'Status']],
+        body: body,
+        theme: 'grid',
+        headStyles: { fillColor: [44, 62, 80], textColor: [255, 255, 255], fontStyle: 'bold' },
+        styles: { fontSize: 8, cellPadding: 2 },
+        columnStyles: {
+          3: { halign: 'right' },
+          4: { halign: 'right' },
+          5: { halign: 'right' },
+          6: { halign: 'right', fontStyle: 'bold' }
+        },
+        didParseCell: function (data) {
+          if (data.section === 'body') {
+            // Color coding based on status text natively on column index 6
+            if (data.column.index === 6) {
+              const text = data.cell.text[0] || '';
+              if (text === 'Paid') {
+                data.cell.styles.textColor = [0, 128, 0]; // Green
+              } else if (text === 'Unpaid') {
+                data.cell.styles.textColor = [220, 38, 38]; // Red
+              } else if (text === 'Partial') {
+                data.cell.styles.textColor = [202, 138, 4]; // Yellow
+              }
+            }
+          }
+        }
+      });
+
+      // Add Summary Totals at the bottom
+      const finalY = (pdf as any).lastAutoTable.finalY || 62;
+
+      pdf.setFontSize(11);
+      pdf.setFont("helvetica", "bold");
+      pdf.text("Summary Totals", 14, finalY + 10);
+
+      pdf.setFontSize(10);
+      pdf.setFont("helvetica", "normal");
+
+      pdf.text(`Total Billed: ${formatCurrency(tableTotals.billed)}`, 14, finalY + 18);
+      pdf.text(`Total Paid: ${formatCurrency(tableTotals.paid)}`, 14, finalY + 24);
+
+      pdf.setFont("helvetica", "bold");
+      pdf.text(`Total Balance: ${formatCurrency(tableTotals.balance)}`, 14, finalY + 30);
+
       pdf.save(`Bills_Report_${new Date().toISOString().split('T')[0]}.pdf`);
     } catch (err) {
       console.error('Failed to export PDF', err);

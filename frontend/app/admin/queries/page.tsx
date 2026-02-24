@@ -273,11 +273,14 @@ export default function AdminQueriesPage() {
                 <Dialog open={isChatOpen} onOpenChange={setIsChatOpen}>
                     <DialogContent className="max-w-2xl h-[80vh] flex flex-col p-0 gap-0">
                         <DialogHeader className="p-6 pb-2 border-b">
-                            <DialogTitle>
-                                {selectedQuery?.subject}
-                            </DialogTitle>
+                            <div className="flex items-center gap-2">
+                                <DialogTitle>
+                                    {selectedQuery?.subject}
+                                </DialogTitle>
+                                <Badge variant="outline" className="capitalize">{selectedQuery?.status}</Badge>
+                            </div>
                             <DialogDescription>
-                                {selectedQuery?.company.name} ({selectedQuery?.company.identifier}) - <Badge variant="outline" className="ml-1">{selectedQuery?.status}</Badge>
+                                {selectedQuery?.company.name} ({selectedQuery?.company.identifier})
                             </DialogDescription>
                         </DialogHeader>
 

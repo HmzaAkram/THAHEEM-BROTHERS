@@ -20,7 +20,7 @@ import { Download, DollarSign, FileText, TrendingUp, Phone, Mail, MapPin, Loader
 import { useMemo, useRef, useState } from 'react';
 import { Label } from '@/components/ui/label';
 import { jsPDF } from 'jspdf';
-import { toPng } from 'html-to-image';
+import autoTable from 'jspdf-autotable';
 import { toast } from 'sonner';
 import {
   Table,
@@ -142,19 +142,106 @@ export default function CompanyDashboard() {
   }, [ledger]);
 
   const handleDownloadStatement = async () => {
-    if (!ledgerRef.current) return;
     setDownloadLoading(true);
 
     try {
-      // Ensure the hidden element is visible for capture (it's off-screen but needs to be rendered)
-      const dataUrl = await toPng(ledgerRef.current, { cacheBust: true, style: { background: 'white', padding: '20px' } });
       const pdf = new jsPDF('p', 'mm', 'a4');
-      const imgProps = pdf.getImageProperties(dataUrl);
-      const pdfWidth = pdf.internal.pageSize.getWidth();
-      const pdfHeight = (imgProps.height * pdfWidth) / imgProps.width;
+      const pageWidth = pdf.internal.pageSize.getWidth();
 
-      pdf.addImage(dataUrl, 'PNG', 0, 0, pdfWidth, pdfHeight);
-      pdf.save(`Account_Statement_${currentCompany.name}_${new Date().toISOString().split('T')[0]}.pdf`);
+      // Add Logo
+      const img = new Image();
+      img.src = '/logo.PNG'; // Ensure this matches the correct path
+
+      await new Promise((resolve) => {
+        img.onload = resolve;
+        img.onerror = resolve; // Continue even if logo fails
+      });
+
+      if (img.width > 0) {
+        const maxLogoHeight = 20;
+        const maxLogoWidth = 60;
+        let logoWidth = img.width;
+        let logoHeight = img.height;
+
+        const ratio = Math.min(maxLogoWidth / logoWidth, maxLogoHeight / logoHeight);
+        logoWidth *= ratio;
+        logoHeight *= ratio;
+
+        pdf.addImage(img, 'PNG', (pageWidth - logoWidth) / 2, 10, logoWidth, logoHeight);
+      }
+
+      pdf.setFontSize(16);
+      pdf.setFont("helvetica", "bold");
+      pdf.text("Account Statement", pageWidth / 2, 38, { align: "center" });
+
+      pdf.setFontSize(10);
+      pdf.setFont("helvetica", "normal");
+
+      pdf.text(`Company: ${currentCompany.name}`, 14, 48);
+      pdf.text(`Email: ${currentCompany.email || 'N/A'}`, 14, 54);
+      pdf.text(`Phone: ${currentCompany.phone || 'N/A'}`, 14, 60);
+      pdf.text(`Generated: ${new Date().toLocaleDateString()}`, 14, 66);
+
+      let body = ledger.map((entry) => [
+        formatDate(entry.date),
+        entry.description,
+        entry.debit > 0 ? entry.debit.toLocaleString() : '-',
+        entry.credit > 0 ? entry.credit.toLocaleString() : '-',
+        entry.balance.toLocaleString()
+      ]);
+
+      if (body.length === 0) {
+        body.push(['-', 'No records found', '-', '-', '-']);
+      }
+
+      autoTable(pdf, {
+        startY: 74,
+        head: [['Date', 'Description', 'Debit', 'Credit', 'Balance']],
+        body: body,
+        theme: 'grid',
+        headStyles: { fillColor: [44, 62, 80], textColor: [255, 255, 255], fontStyle: 'bold' },
+        styles: { fontSize: 8, cellPadding: 2 },
+        columnStyles: {
+          0: { cellWidth: 20 },
+          2: { halign: 'right' },
+          3: { halign: 'right' },
+          4: { halign: 'right', fontStyle: 'bold' }
+        },
+        didParseCell: function (data) {
+          if (data.section === 'body') {
+            if (data.column.index === 4) {
+              const valStr = data.cell.text[0] || '';
+              const numStr = valStr.replace(/[^0-9.-]/g, '');
+              const numVal = parseFloat(numStr);
+              if (!isNaN(numVal)) {
+                if (numVal > 0) {
+                  data.cell.styles.textColor = [220, 38, 38];
+                } else if (numVal <= 0) {
+                  data.cell.styles.textColor = [0, 128, 0];
+                }
+              }
+            }
+          }
+        }
+      });
+
+      // Add Summary Totals at the bottom
+      const finalY = (pdf as any).lastAutoTable.finalY || 74;
+
+      pdf.setFontSize(11);
+      pdf.setFont("helvetica", "bold");
+      pdf.text("Summary Totals", 14, finalY + 10);
+
+      pdf.setFontSize(10);
+      pdf.setFont("helvetica", "normal");
+
+      pdf.text(`Total Debit:   PKR ${summary.totalDebit.toLocaleString()}`, 14, finalY + 18);
+      pdf.text(`Total Credit:  PKR ${summary.totalCredit.toLocaleString()}`, 14, finalY + 24);
+
+      pdf.setFont("helvetica", "bold");
+      pdf.text(`Balance:       PKR ${summary.balance.toLocaleString()}`, 14, finalY + 30);
+
+      pdf.save(`Account_Statement_${currentCompany.name.replace(/[/\\?%*:|"<>\s]/g, '_')}_${new Date().toISOString().split('T')[0]}.pdf`);
       toast.success('Statement downloaded successfully');
     } catch (err) {
       console.error('Failed to export PDF', err);
@@ -394,53 +481,6 @@ export default function CompanyDashboard() {
         </div>
       </div>
 
-      {/* Hidden Ledger Table for PDF Generation */}
-      <div style={{ position: 'absolute', top: '-10000px', left: 0, width: '210mm' }}>
-        <div ref={ledgerRef} className="bg-white p-8">
-          <div className="mb-6">
-            <h1 className="text-2xl font-bold">{currentCompany.name} - Account Statement</h1>
-            <p className="text-sm text-gray-500">Generated on {new Date().toLocaleDateString()}</p>
-          </div>
-
-          <div className="grid grid-cols-3 gap-4 mb-6 border p-4 rounded-lg bg-gray-50">
-            <div>
-              <p className="text-xs font-bold text-gray-500 uppercase">Total Debit</p>
-              <p className="text-lg font-bold">PKR {summary.totalDebit.toLocaleString()}</p>
-            </div>
-            <div>
-              <p className="text-xs font-bold text-gray-500 uppercase">Total Credit</p>
-              <p className="text-lg font-bold">PKR {summary.totalCredit.toLocaleString()}</p>
-            </div>
-            <div>
-              <p className="text-xs font-bold text-gray-500 uppercase">Outstanding Balance</p>
-              <p className="text-lg font-bold text-primary">PKR {summary.balance.toLocaleString()}</p>
-            </div>
-          </div>
-
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Date</TableHead>
-                <TableHead>Description</TableHead>
-                <TableHead className="text-right">Debit</TableHead>
-                <TableHead className="text-right">Credit</TableHead>
-                <TableHead className="text-right">Balance</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {ledger.map((entry) => (
-                <TableRow key={entry.id}>
-                  <TableCell>{formatDate(entry.date)}</TableCell>
-                  <TableCell>{entry.description}</TableCell>
-                  <TableCell className="text-right">{entry.debit > 0 ? entry.debit.toLocaleString() : '-'}</TableCell>
-                  <TableCell className="text-right">{entry.credit > 0 ? entry.credit.toLocaleString() : '-'}</TableCell>
-                  <TableCell className="text-right font-bold">{entry.balance.toLocaleString()}</TableCell>
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
-        </div>
-      </div>
     </DashboardLayout >
   );
 }

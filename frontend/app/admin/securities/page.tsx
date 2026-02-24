@@ -406,7 +406,7 @@ export default function SecuritiesPage() {
                                                     checked={isDocumentSubmitted}
                                                     onCheckedChange={(checked) => setIsDocumentSubmitted(!!checked)}
                                                 />
-                                                <Label htmlFor="docSubmitted" className="text-sm font-bold cursor-pointer">Document Submitted or Not</Label>
+                                                <Label htmlFor="docSubmitted" className="text-sm font-bold cursor-pointer">Document Submitted</Label>
                                             </div>
                                             <div className="flex items-center space-x-3 p-3 rounded-xl bg-white dark:bg-slate-950 border border-border/40">
                                                 <Checkbox
@@ -758,12 +758,12 @@ export default function SecuritiesPage() {
                                             {selectedSecurity.isDocumentSubmitted ? (
                                                 <>
                                                     <CheckCircle2 className="w-4 h-4 text-emerald-600" />
-                                                    <span className="font-bold text-emerald-600">Yes</span>
+                                                    <span className="font-bold text-emerald-600">Received</span>
                                                 </>
                                             ) : (
                                                 <>
                                                     <Clock className="w-4 h-4 text-amber-600" />
-                                                    <span className="font-bold text-amber-600">No</span>
+                                                    <span className="font-bold text-amber-600">Not Received</span>
                                                 </>
                                             )}
                                         </div>

@@ -35,7 +35,7 @@ import { useData } from '@/context/data-context';
 import { useMemo, useState, useRef } from 'react';
 import { formatDate, formatCurrency } from '@/lib/utils';
 import { jsPDF } from 'jspdf';
-import { toJpeg } from 'html-to-image';
+import autoTable from 'jspdf-autotable';
 
 export default function ReportsPage() {
   const { companies, bills, payments } = useData();
@@ -153,16 +153,143 @@ export default function ReportsPage() {
   }, [companies, bills, payments, dateFrom, dateTo, reportType, selectedCompanyId]);
 
   const handleExport = async () => {
-    if (!reportRef.current) return;
-
     try {
-      const dataUrl = await toJpeg(reportRef.current, { cacheBust: true, quality: 0.95, style: { background: 'white', padding: '20px' } });
       const pdf = new jsPDF('p', 'mm', 'a4');
-      const imgProps = pdf.getImageProperties(dataUrl);
-      const pdfWidth = pdf.internal.pageSize.getWidth();
-      const pdfHeight = (imgProps.height * pdfWidth) / imgProps.width;
+      const pageWidth = pdf.internal.pageSize.getWidth();
 
-      pdf.addImage(dataUrl, 'JPEG', 0, 0, pdfWidth, pdfHeight);
+      // Add Logo
+      const img = new Image();
+      img.src = '/logo.PNG';
+
+      await new Promise((resolve) => {
+        img.onload = resolve;
+        img.onerror = resolve; // Continue even if logo fails
+      });
+
+      if (img.width > 0) {
+        const maxLogoHeight = 20;
+        const maxLogoWidth = 60;
+        let logoWidth = img.width;
+        let logoHeight = img.height;
+        const ratio = Math.min(maxLogoWidth / logoWidth, maxLogoHeight / logoHeight);
+        logoWidth *= ratio;
+        logoHeight *= ratio;
+
+        pdf.addImage(img, 'PNG', (pageWidth - logoWidth) / 2, 10, logoWidth, logoHeight);
+      }
+
+      // Add Title
+      pdf.setFontSize(16);
+      pdf.setFont("helvetica", "bold");
+
+      let reportTitle = "Report";
+      if (reportType === 'outstanding') reportTitle = 'Outstanding Balance Report';
+      if (reportType === 'bills') reportTitle = 'Bills Report';
+      if (reportType === 'payments') reportTitle = 'Payments Report';
+      if (reportType === 'company') reportTitle = 'Company Ledger Report';
+
+      pdf.text(reportTitle, pageWidth / 2, 38, { align: "center" });
+
+      // Add Filter Info
+      pdf.setFontSize(10);
+      pdf.setFont("helvetica", "normal");
+
+      if (reportType === 'company') {
+        const companyNameStr = selectedCompanyId !== 'all' ? companies.find(c => c.id === selectedCompanyId)?.name || 'All Companies' : 'All Companies';
+        pdf.text(`Company: ${companyNameStr}`, 14, 48);
+      }
+
+      pdf.text(`Period: ${formatDate(dateFrom)} to ${formatDate(dateTo)}`, 14, reportType === 'company' ? 54 : 48);
+
+      let yPos = reportType === 'company' ? 62 : 56;
+      let head = [];
+      let body = [];
+      let customStyles = {};
+
+      if (reportType === 'outstanding') {
+        head = [['Company', 'Outstanding', '# Bills', 'Last Due', 'Days Overdue', 'Status']];
+        body = outstandingData.map(item => [
+          item.company,
+          formatCurrency(item.outstanding),
+          item.billsCount.toString(),
+          formatDate(item.lastDueDate),
+          item.daysOverdue > 0 ? `${item.daysOverdue} days` : 'Current',
+          item.outstanding > 300000 ? 'High Risk' : item.outstanding > 100000 ? 'Medium' : 'Low Risk'
+        ]);
+        customStyles = {
+          1: { halign: 'right' },
+          2: { halign: 'right' },
+          3: { halign: 'right' },
+          4: { halign: 'right' },
+          5: { halign: 'right', fontStyle: 'bold' }
+        };
+      } else if (reportType === 'bills') {
+        head = [['Date', 'Job No', 'Company', 'Amount', 'Status']];
+        body = filteredBills.map(bill => [
+          formatDate(bill.date),
+          bill.jobNumber || 'N/A',
+          bill.companyName,
+          formatCurrency(bill.grandTotal),
+          bill.calculatedStatus
+        ]);
+        customStyles = {
+          3: { halign: 'right', fontStyle: 'bold' },
+          4: { halign: 'right', fontStyle: 'bold' }
+        };
+      } else if (reportType === 'payments') {
+        head = [['Date', 'Reference', 'Company', 'Method', 'Amount']];
+        body = filteredPayments.map(payment => [
+          formatDate(payment.date),
+          payment.reference || 'N/A',
+          payment.companyName,
+          payment.method,
+          formatCurrency(Number(payment.amount) + (Number(payment.adjustment) || 0))
+        ]);
+        customStyles = {
+          4: { halign: 'right', fontStyle: 'bold', textColor: [0, 128, 0] }
+        };
+      } else if (reportType === 'company') {
+        head = [['Date', 'Type', 'Ref/Job No', 'Debit', 'Credit']];
+        body = companyLedger.map((entry: any) => [
+          formatDate(entry.date),
+          entry.type,
+          entry.jobNumber || entry.reference || '-',
+          entry.type === 'BILL' ? formatCurrency(entry.grandTotal) : '-',
+          entry.type === 'PAYMENT' ? formatCurrency(Number(entry.amount) + (Number(entry.adjustment) || 0)) : '-'
+        ]);
+        customStyles = {
+          3: { halign: 'right', fontStyle: 'bold', textColor: [220, 38, 38] },
+          4: { halign: 'right', fontStyle: 'bold', textColor: [0, 128, 0] }
+        };
+      }
+
+      if (body.length === 0) {
+        body.push(head[0].map(() => '-'));
+        body[0][1] = 'No records found';
+      }
+
+      autoTable(pdf, {
+        startY: yPos,
+        head: head,
+        body: body,
+        theme: 'grid',
+        headStyles: { fillColor: [44, 62, 80], textColor: [255, 255, 255], fontStyle: 'bold' },
+        styles: { fontSize: 8, cellPadding: 2 },
+        columnStyles: customStyles,
+        didParseCell: function (data) {
+          if (data.section === 'body') {
+            // Color coding based on status text
+            const text = data.cell.text[0] || '';
+            if (text === 'Paid' || text === 'Current' || text === 'Low Risk') {
+              data.cell.styles.textColor = [0, 128, 0]; // Green
+            } else if (text === 'Unpaid' || text === 'High Risk' || text.includes('days')) {
+              data.cell.styles.textColor = [220, 38, 38]; // Red
+            } else if (text === 'Partial' || text === 'Medium') {
+              data.cell.styles.textColor = [202, 138, 4]; // Yellow
+            }
+          }
+        }
+      });
 
       const reportName = reportType.charAt(0).toUpperCase() + reportType.slice(1);
       const dateStr = new Date().toISOString().split('T')[0];

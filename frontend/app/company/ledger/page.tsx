@@ -15,13 +15,14 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Download, Search, Calendar, ChevronDown, ChevronUp } from 'lucide-react';
 import { jsPDF } from 'jspdf';
+import autoTable from 'jspdf-autotable';
 import { toPng } from 'html-to-image';
 
 import { Badge } from '@/components/ui/badge';
 import React, { useMemo, useState, useRef } from 'react';
 import { useData } from '@/context/data-context';
 import { useAuth } from '@/context/auth-context';
-import { formatDate } from '@/lib/utils';
+import { formatDate, formatCurrency } from '@/lib/utils';
 
 export default function CompanyLedgerPage() {
   const { user, isHydrated: authHydrated } = useAuth();
@@ -84,17 +85,118 @@ export default function CompanyLedgerPage() {
   }, [ledgerEntries]);
 
   const handleExportPDF = async () => {
-    if (!tableRef.current) return;
-
     try {
-      const dataUrl = await toPng(tableRef.current, { cacheBust: true, style: { background: 'white', padding: '20px' } });
       const pdf = new jsPDF('p', 'mm', 'a4');
-      const imgProps = pdf.getImageProperties(dataUrl);
-      const pdfWidth = pdf.internal.pageSize.getWidth();
-      const pdfHeight = (imgProps.height * pdfWidth) / imgProps.width;
+      const pageWidth = pdf.internal.pageSize.getWidth();
 
-      pdf.addImage(dataUrl, 'PNG', 0, 0, pdfWidth, pdfHeight);
-      pdf.save(`Ledger_${currentCompany?.name || 'Report'}_${new Date().toISOString().split('T')[0]}.pdf`);
+      // Add Logo
+      const img = new Image();
+      img.src = '/logo.PNG'; // Ensure this matches the correct path
+
+      await new Promise((resolve) => {
+        img.onload = resolve;
+        img.onerror = resolve; // Continue even if logo fails
+      });
+
+      if (img.width > 0) {
+        // Calculate dimensions to maintain aspect ratio
+        const maxLogoHeight = 20;
+        const maxLogoWidth = 60;
+        let logoWidth = img.width;
+        let logoHeight = img.height;
+
+        const ratio = Math.min(maxLogoWidth / logoWidth, maxLogoHeight / logoHeight);
+        logoWidth *= ratio;
+        logoHeight *= ratio;
+
+        // Center the logo
+        pdf.addImage(img, 'PNG', (pageWidth - logoWidth) / 2, 10, logoWidth, logoHeight);
+      }
+
+      // Add Title
+      pdf.setFontSize(16);
+      pdf.setFont("helvetica", "bold");
+      pdf.text("Company Ledger", pageWidth / 2, 38, { align: "center" });
+
+      // Add Filter Info
+      pdf.setFontSize(10);
+      pdf.setFont("helvetica", "normal");
+
+      pdf.text(`Company: ${currentCompany?.name || 'Report'}`, 14, 48);
+
+      if (startDate || endDate) {
+        pdf.text(`Period: ${startDate ? formatDate(startDate) : 'Beginning'} to ${endDate ? formatDate(endDate) : 'Present'}`, 14, 54);
+      }
+
+      let body = ledgerEntries.map(entry => {
+        let desc = entry.description;
+        if (entry.type === 'PAYMENT') {
+          desc = (entry as any).method ? `Payment Received (${(entry as any).method})` : 'Advance Received';
+          if ((entry as any).paymentRef) desc += ` - Ref: ${(entry as any).paymentRef}`;
+        }
+        return [
+          formatDate(entry.date),
+          desc,
+          entry.jobNumber || '-',
+          entry.weight ? `${entry.weight} KG` : '-',
+          entry.debit > 0 ? formatCurrency(entry.debit) : '-',
+          entry.credit > 0 ? formatCurrency(entry.credit) : '-',
+          formatCurrency(entry.balance)
+        ];
+      });
+
+      if (body.length === 0) {
+        body.push(['-', 'No records found', '-', '-', '-', '-', '-']);
+      }
+
+      autoTable(pdf, {
+        startY: (startDate || endDate) ? 62 : 56,
+        head: [['Date', 'Description', 'Job No', 'Weight', 'Debit', 'Credit', 'Balance']],
+        body: body,
+        theme: 'grid',
+        headStyles: { fillColor: [44, 62, 80], textColor: [255, 255, 255], fontStyle: 'bold' },
+        styles: { fontSize: 8, cellPadding: 2 },
+        columnStyles: {
+          0: { cellWidth: 20 },
+          4: { halign: 'right' },
+          5: { halign: 'right' },
+          6: { halign: 'right', fontStyle: 'bold' }
+        },
+        didParseCell: function (data) {
+          if (data.section === 'body') {
+            if (data.column.index === 6) {
+              const valStr = data.cell.text[0] || '';
+              const numStr = valStr.replace(/[^0-9.-]/g, '');
+              const numVal = parseFloat(numStr);
+              if (!isNaN(numVal)) {
+                if (numVal > 0) {
+                  data.cell.styles.textColor = [220, 38, 38]; // Red for outstanding balance
+                } else if (numVal <= 0) {
+                  data.cell.styles.textColor = [0, 128, 0]; // Green for zero or credit balance
+                }
+              }
+            }
+          }
+        }
+      });
+
+      // Add Summary Totals at the bottom
+      const finalY = (pdf as any).lastAutoTable.finalY || 62;
+
+      pdf.setFontSize(11);
+      pdf.setFont("helvetica", "bold");
+      pdf.text("Account Summary", 14, finalY + 10);
+
+      pdf.setFontSize(10);
+      pdf.setFont("helvetica", "normal");
+
+      pdf.text(`Total Charged:  ${formatCurrency(stats.totalCharged)}`, 14, finalY + 18);
+      pdf.text(`Total Paid:     ${formatCurrency(stats.totalPaid)}`, 14, finalY + 24);
+
+      pdf.setFont("helvetica", "bold");
+      pdf.text(`Final Balance:  ${formatCurrency(stats.currentBalance)}`, 14, finalY + 30);
+
+      pdf.save(`Ledger_${currentCompany?.name.replace(/[/\\?%*:|"<>\s]/g, '_') || 'Report'}_${new Date().toISOString().split('T')[0]}.pdf`);
     } catch (err) {
       console.error('Failed to export PDF', err);
     }

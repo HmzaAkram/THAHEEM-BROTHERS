@@ -60,16 +60,26 @@ import {
   Shield,
   Eye,
   CheckCircle2,
-  Clock
+  Clock,
+  Loader2
 } from 'lucide-react';
 import { useMemo, useState, useRef } from 'react';
 import { formatDate, formatCurrency } from '@/lib/utils';
 import { jsPDF } from 'jspdf';
 import { toJpeg } from 'html-to-image';
+import JSZip from 'jszip';
+import { saveAs } from 'file-saver';
+import autoTable from 'jspdf-autotable';
+import Swal from 'sweetalert2';
+import { InvoiceTemplate } from '@/components/invoice-template';
 
 export default function AdminDashboard() {
-  const { bills, payments, companies, securities } = useData();
+  const { bills, payments, companies, securities, getCompanyLedger } = useData();
   const [filterType, setFilterType] = useState('overall');
+  const [exportLoading, setExportLoading] = useState(false);
+  const [zipProgressText, setZipProgressText] = useState('');
+  const [renderingBill, setRenderingBill] = useState<any>(null);
+  const invoiceRef = useRef<HTMLDivElement>(null);
   const reportRef = useRef<HTMLDivElement>(null);
   const [securityFilter, setSecurityFilter] = useState<'all' | 'pending' | 'received'>('all');
   const [selectedSecurity, setSelectedSecurity] = useState<any>(null);
@@ -241,41 +251,223 @@ export default function AdminDashboard() {
   }, [filterType]);
 
   const handleExport = async () => {
-    if (!reportRef.current) return;
+    setExportLoading(true);
+    setZipProgressText('Initializing Backup...');
 
     try {
-      // 1. Show the print header temporarily for the capture
-      const header = reportRef.current.querySelector('.print-header');
-      const footer = reportRef.current.querySelector('.print-only'); // if any
-      if (header) header.classList.remove('hidden');
-      if (footer) footer.classList.remove('hidden');
+      const zip = new JSZip();
 
-      // 2. Capture the element as JPEG
-      // We use a slight delay or specify quality for better results
-      const dataUrl = await toJpeg(reportRef.current, {
-        quality: 0.95,
-        backgroundColor: '#f8fafc',
-        style: {
-          padding: '20px',
-        }
+      // Load logo once for PDFs
+      const img = new Image();
+      img.src = '/logo.PNG';
+      await new Promise((resolve) => {
+        img.onload = resolve;
+        img.onerror = resolve;
       });
+      let logoWidth = 0, logoHeight = 0;
+      if (img.width > 0) {
+        const maxLogoHeight = 20, maxLogoWidth = 60;
+        logoWidth = img.width;
+        logoHeight = img.height;
+        const ratio = Math.min(maxLogoWidth / logoWidth, maxLogoHeight / logoHeight);
+        logoWidth *= ratio;
+        logoHeight *= ratio;
+      }
 
-      // 3. Reset visibility
-      if (header) header.classList.add('hidden');
-      if (footer) footer.classList.add('hidden');
+      // Iterate over companies
+      for (let i = 0; i < companies.length; i++) {
+        const company = companies[i];
+        setZipProgressText(`Processing Company: ${company.name} (${i + 1}/${companies.length})`);
 
-      // 4. Create jsPDF
-      const pdf = new jsPDF('p', 'mm', 'a4');
-      const imgProps = pdf.getImageProperties(dataUrl);
-      const pdfWidth = pdf.internal.pageSize.getWidth();
-      const pdfHeight = (imgProps.height * pdfWidth) / imgProps.width;
+        const companyFolder = zip.folder(`${company.name}_${company.identifier}`);
+        if (!companyFolder) continue;
 
-      pdf.addImage(dataUrl, 'JPEG', 0, 0, pdfWidth, pdfHeight);
+        // 1. GENERATE LEDGER PDF
+        const ledgerDoc = new jsPDF('p', 'mm', 'a4');
+        const pageWidth = ledgerDoc.internal.pageSize.getWidth();
 
-      const dateStr = new Date().toISOString().split('T')[0];
-      pdf.save(`Business_Report_${dateStr}.pdf`);
+        if (logoWidth > 0) {
+          ledgerDoc.addImage(img, 'PNG', (pageWidth - logoWidth) / 2, 10, logoWidth, logoHeight);
+        }
+
+        ledgerDoc.setFontSize(16);
+        ledgerDoc.setFont("helvetica", "bold");
+        ledgerDoc.text("General Ledger", pageWidth / 2, 38, { align: "center" });
+
+        ledgerDoc.setFontSize(10);
+        ledgerDoc.setFont("helvetica", "normal");
+        ledgerDoc.text(`Company: ${company.name}`, 14, 48);
+
+        const companyLedger = getCompanyLedger(company.id);
+        const ledgerRows = companyLedger.map(l => {
+          let desc = l.description;
+          if (l.type === 'PAYMENT') {
+            desc = (l as any).method ? `Payment Received (${(l as any).method})` : 'Advance Received';
+            if ((l as any).paymentRef) desc += ` - Ref: ${(l as any).paymentRef}`;
+          }
+          return [
+            formatDate(l.date),
+            desc,
+            l.jobNumber || l.billNo || '-',
+            l.weight ? `${l.weight} KG` : '-',
+            l.debit > 0 ? formatCurrency(l.debit) : '-',
+            l.credit > 0 ? formatCurrency(l.credit) : '-',
+            formatCurrency(l.balance)
+          ];
+        });
+
+        autoTable(ledgerDoc, {
+          startY: 54,
+          head: [['Date', 'Description', 'Job/Bill No', 'Weight', 'Debit', 'Credit', 'Balance']],
+          body: ledgerRows.length > 0 ? ledgerRows : [['-', 'No transactions', '-', '-', '-', '-', '-']],
+          theme: 'grid',
+          headStyles: { fillColor: [44, 62, 80], textColor: [255, 255, 255], fontStyle: 'bold' },
+          styles: { fontSize: 8, cellPadding: 2 },
+          columnStyles: {
+            0: { cellWidth: 20 },
+            4: { halign: 'right' },
+            5: { halign: 'right' },
+            6: { halign: 'right', fontStyle: 'bold' }
+          },
+          didParseCell: function (data) {
+            if (data.section === 'body') {
+              if (data.column.index === 6) {
+                const valStr = data.cell.text[0] || '';
+                const numStr = valStr.replace(/[^0-9.-]/g, '');
+                const numVal = parseFloat(numStr);
+                if (!isNaN(numVal)) {
+                  if (numVal > 0) {
+                    data.cell.styles.textColor = [220, 38, 38]; // Red for outstanding balance
+                  } else if (numVal <= 0) {
+                    data.cell.styles.textColor = [0, 128, 0]; // Green for zero or credit balance
+                  }
+                }
+              }
+            }
+          }
+        });
+
+        companyFolder.file('Ledger.pdf', ledgerDoc.output('blob'));
+
+        // 2. GENERATE PAYMENT HISTORY PDF
+        const paymentDoc = new jsPDF();
+        paymentDoc.setFontSize(18);
+        paymentDoc.text(`Payment History: ${company.name}`, 14, 20);
+
+        const companyPayments = payments.filter(p => p.companyId === company.id);
+        // Sort by date desc
+        companyPayments.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+
+        const paymentRows = companyPayments.map(p => {
+          const linkedBill = p.billId ? bills.find(b => b.id.toString() === p.billId.toString()) : null;
+          return [
+            formatDate(p.date),
+            formatCurrency(p.amount),
+            p.paymentMethod,
+            p.reference || linkedBill?.jobNumber || 'Advance Payment',
+            p.notes || '-'
+          ];
+        });
+
+        autoTable(paymentDoc, {
+          startY: 30,
+          head: [['Date', 'Amount', 'Method', 'Reference/Job', 'Notes']],
+          body: paymentRows.length > 0 ? paymentRows : [['-', 'No payments', '-', '-', '-']],
+          theme: 'grid',
+          headStyles: { fillColor: [46, 204, 113] },
+          styles: { fontSize: 10 }
+        });
+
+        companyFolder.file('Payment_History.pdf', paymentDoc.output('blob'));
+
+        // 3. GENERATE BILLS INVOICES & ATTACHMENTS
+        const billsFolder = companyFolder.folder('Bills');
+        const companyBills = bills.filter(b => b.companyId === company.id);
+
+        if (billsFolder && companyBills.length > 0) {
+          for (let j = 0; j < companyBills.length; j++) {
+            const bill = companyBills[j];
+            setZipProgressText(`Processing Company: ${company.name} (${i + 1}/${companies.length}) - Job ${j + 1}/${companyBills.length}`);
+
+            // Create a sub-folder for each Job Number
+            const jobFolderName = bill.jobNumber
+              ? bill.jobNumber.replace(/[/\\?%*:|"<>\s]/g, '_')
+              : `Invoice_${bill.id}`;
+            const jobFolder = billsFolder.folder(jobFolderName);
+            if (!jobFolder) continue;
+
+            // Set current bill to render the InvoiceTemplate
+            setRenderingBill(bill);
+            // Wait for template to render + images/fonts to fully load
+            await new Promise(r => setTimeout(r, 1200));
+
+            if (invoiceRef.current) {
+              try {
+                const dataUrl = await toJpeg(invoiceRef.current, {
+                  cacheBust: true,
+                  quality: 0.95,
+                  pixelRatio: 1.5,
+                  backgroundColor: '#ffffff',
+                });
+
+                const invoiceDoc = new jsPDF('p', 'mm', 'a4');
+                const pdfWidth = 210;
+                const imgProps = invoiceDoc.getImageProperties(dataUrl);
+                const imgHeight = (imgProps.height * pdfWidth) / imgProps.width;
+
+                invoiceDoc.addImage(dataUrl, 'JPEG', 0, 0, pdfWidth, imgHeight);
+                // Save the invoice PDF inside the job-number folder
+                jobFolder.file(`Invoice_${jobFolderName}.pdf`, invoiceDoc.output('blob'));
+
+                // Process attachments — also inside the same job-number folder
+                if (bill.attachment) {
+                  try {
+                    const filename = bill.attachment.split('/').pop();
+                    if (filename) {
+                      const token = localStorage.getItem('auth_token');
+                      const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000/api/v1';
+                      const attachUrl = `${apiUrl}/bills/attachment/${filename}`;
+
+                      const attRes = await fetch(attachUrl, {
+                        headers: { 'Authorization': `Bearer ${token}` }
+                      });
+
+                      if (attRes.ok) {
+                        const attBlob = await attRes.blob();
+                        const ext = filename.split('.').pop() || 'pdf';
+                        jobFolder.file(`Attachment_${bill.jobNumber || bill.id}.${ext}`, attBlob);
+                      } else {
+                        console.warn(`Failed to fetch attachment from ${attachUrl}: ${attRes.status}`);
+                      }
+                    }
+                  } catch (attErr) {
+                    console.error('Failed to fetch attachment', attErr);
+                  }
+                }
+
+              } catch (renderErr) {
+                console.error('Failed to render invoice for bill', bill.id, renderErr);
+              }
+            }
+          }
+          setRenderingBill(null);
+        }
+      }
+
+      setZipProgressText('Packaging ZIP file... This may take a minute.');
+
+      const zipBlob = await zip.generateAsync({ type: 'blob' });
+      saveAs(zipBlob, `Thaheem_Brothers_Backup_${new Date().toISOString().split('T')[0]}.zip`);
+
+      Swal.fire({ title: 'Success!', text: 'ZIP Backup generated successfully!', icon: 'success', confirmButtonColor: '#10b981' });
+
     } catch (error) {
-      console.error('Export failed:', error);
+      console.error(error);
+      Swal.fire({ title: 'Error', text: 'Failed to generate ZIP backup.', icon: 'error', confirmButtonColor: '#3b82f6' });
+      setRenderingBill(null);
+    } finally {
+      setExportLoading(false);
+      setZipProgressText('');
     }
   };
 
@@ -312,11 +504,15 @@ export default function AdminDashboard() {
               </Select>
 
               <Button
-                className="gap-2 shadow-md bg-primary hover:bg-blue-600 transition-all hover:scale-105 active:scale-95 w-full sm:w-auto order-1 sm:order-2"
+                className="gap-2 shadow-md bg-primary hover:bg-blue-600 transition-all hover:scale-105 active:scale-95 w-full sm:w-auto order-1 sm:order-2 disabled:opacity-50 min-w-[150px]"
                 onClick={handleExport}
+                disabled={exportLoading}
               >
-                <Download className="w-4 h-4" />
-                Export Report
+                {exportLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Download className="w-4 h-4" />}
+                <div className="flex flex-col items-start gap-0">
+                  <span>{exportLoading ? 'Exporting...' : 'Export ZIP'}</span>
+                  {exportLoading && zipProgressText && <span className="text-[10px] font-normal leading-tight opacity-90 max-w-[120px] truncate">{zipProgressText}</span>}
+                </div>
               </Button>
             </div>
           </div>
@@ -953,6 +1149,23 @@ export default function AdminDashboard() {
           </div>
         </div>
       </div>
+
+      {/* Hidden container to render invoices to PDF */}
+      {renderingBill && (
+        <div style={{
+          position: 'fixed',
+          top: 0,
+          left: '-9999px',
+          opacity: 0,
+          pointerEvents: 'none',
+          zIndex: -9999,
+        }}>
+          <div ref={invoiceRef} className="bg-white" style={{ width: '800px', padding: '24px' }}>
+            <InvoiceTemplate bill={renderingBill} />
+          </div>
+        </div>
+      )}
+
     </DashboardLayout >
   );
 }
