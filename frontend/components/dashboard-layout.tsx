@@ -28,9 +28,9 @@ export function DashboardLayout({ children, role }: DashboardLayoutProps) {
     );
   }
 
-  const handleLogout = () => {
-    logout();
-    router.push('/login');
+  const handleLogout = async () => {
+    await logout();
+    window.location.href = '/login';
   };
 
   return (

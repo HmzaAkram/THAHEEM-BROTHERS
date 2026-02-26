@@ -214,7 +214,7 @@ export default function BillsPage() {
         const filename = bill.attachment.split('/').pop();
         if (!filename) throw new Error("Invalid attachment path");
 
-        const token = localStorage.getItem('auth_token');
+        const token = localStorage.getItem('authToken');
         console.log('[handleViewBill] Fetching attachment:', filename);
 
         const response = await fetch(`http://localhost:8000/api/v1/bills/attachment/${filename}`, {

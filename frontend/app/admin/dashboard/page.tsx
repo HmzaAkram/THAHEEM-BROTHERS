@@ -424,7 +424,7 @@ export default function AdminDashboard() {
                   try {
                     const filename = bill.attachment.split('/').pop();
                     if (filename) {
-                      const token = localStorage.getItem('auth_token');
+                      const token = localStorage.getItem('authToken');
                       const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000/api/v1';
                       const attachUrl = `${apiUrl}/bills/attachment/${filename}`;
 

@@ -41,8 +41,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const handleUnauthorized = () => {
       setUser(null);
       setToken(null);
-      localStorage.removeItem('currentUser');
-      // Optionally could hit the logout endpoint here too, but frontend clear is usually enough
+      localStorage.clear();
+      sessionStorage.clear();
+      window.location.href = '/login';
     };
 
     window.addEventListener('auth:unauthorized', handleUnauthorized);
@@ -66,8 +67,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
     setUser(null);
     setToken(null);
-    localStorage.removeItem('currentUser');
-    localStorage.removeItem('authToken');
+    localStorage.clear();
+    sessionStorage.clear();
   };
 
   return (

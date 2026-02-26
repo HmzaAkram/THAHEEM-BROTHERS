@@ -175,7 +175,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
     if (!isAuthenticated) return;
 
     try {
-      const token = localStorage.getItem('auth_token');
+      const token = localStorage.getItem('authToken');
 
       // BUG FIX: Use Promise.allSettled instead of Promise.all
       // This prevents one API failure from breaking all data fetching
@@ -233,7 +233,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
   }, [isAuthenticated, isAuthHydrated, refreshData]);
 
   const addCompany = async (companyData: Omit<Company, 'id' | 'createdAt'>) => {
-    const token = localStorage.getItem('auth_token');
+    const token = localStorage.getItem('authToken');
     const result = await ApiService.post('/companies', companyData, token);
     if (result.ok) {
       setCompanies(prev => [...prev, (result as any).data]);
@@ -245,7 +245,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
   };
 
   const updateCompany = async (id: string, data: Partial<Company>) => {
-    const token = localStorage.getItem('auth_token');
+    const token = localStorage.getItem('authToken');
     const result = await ApiService.put(`/companies/${id}`, data, token);
     if (result.ok && result.data) {
       setCompanies(prev => prev.map(c => c.id === id ? result.data : c));
@@ -253,7 +253,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
   };
 
   const deleteCompany = async (id: string) => {
-    const token = localStorage.getItem('auth_token');
+    const token = localStorage.getItem('authToken');
     const result = await ApiService.delete(`/companies/${id}`, token);
     if (result.ok) {
       setCompanies(prev => prev.filter(c => c.id !== id));
@@ -262,7 +262,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
   };
 
   const deleteBill = async (id: string) => {
-    const token = localStorage.getItem('auth_token');
+    const token = localStorage.getItem('authToken');
     const result = await ApiService.delete(`/bills/${id}`, token);
     if (result.ok) {
       setBills(prev => prev.filter(b => b.id !== id));
@@ -271,7 +271,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
   };
 
   const addBill = async (billData: Omit<Bill, 'id' | 'createdAt' | 'paidAmount' | 'status' | 'calculatedStatus'>) => {
-    const token = localStorage.getItem('auth_token');
+    const token = localStorage.getItem('authToken');
     const result = await ApiService.post('/bills', billData, token);
     if (result.ok && result.data) {
       setBills(prev => [...prev, result.data]);
@@ -280,7 +280,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
   };
 
   const updateBill = async (id: string, billData: Partial<Bill>) => {
-    const token = localStorage.getItem('auth_token');
+    const token = localStorage.getItem('authToken');
     const result = await ApiService.put(`/bills/${id}`, billData, token);
     if (result.ok && result.data) {
       setBills(prev => prev.map(b => b.id === id ? result.data : b));
@@ -289,7 +289,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
   };
 
   const addPayment = async (paymentData: Omit<Payment, 'id' | 'createdAt'>) => {
-    const token = localStorage.getItem('auth_token');
+    const token = localStorage.getItem('authToken');
 
     // BUG FIX: Optimistic update with rollback to prevent race conditions
     const tempId = `temp_${Date.now()}_${Math.random()}`;
@@ -327,7 +327,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
   };
 
   const updatePayment = async (id: string, paymentData: Partial<Payment>) => {
-    const token = localStorage.getItem('auth_token');
+    const token = localStorage.getItem('authToken');
     const result = await ApiService.put(`/payments/${id}`, paymentData, token);
     if (result.ok && result.data) {
       setPayments(prev => prev.map(p => p.id === id ? result.data : p));
@@ -343,7 +343,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
   };
 
   const deletePayment = async (id: string) => {
-    const token = localStorage.getItem('auth_token');
+    const token = localStorage.getItem('authToken');
     const result = await ApiService.delete(`/payments/${id}`, token);
     if (result.ok) {
       setPayments(prev => prev.filter(p => p.id !== id));
@@ -352,7 +352,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
   };
 
   const addSecurity = async (securityData: Omit<SecurityTracking, 'id' | 'createdAt' | 'status'>) => {
-    const token = localStorage.getItem('auth_token');
+    const token = localStorage.getItem('authToken');
     const result = await ApiService.post('/securities', securityData, token);
     if (result.ok && result.data) {
       setSecurities(prev => [...prev, result.data]);
@@ -361,7 +361,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
   };
 
   const updateSecurity = async (id: string, data: Partial<SecurityTracking>) => {
-    const token = localStorage.getItem('auth_token');
+    const token = localStorage.getItem('authToken');
     const result = await ApiService.put(`/securities/${id}`, data, token);
     if (result.ok && result.data) {
       setSecurities(prev => prev.map(s => s.id === id ? result.data : s));
@@ -369,7 +369,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
   };
 
   const deleteSecurity = async (id: string) => {
-    const token = localStorage.getItem('auth_token');
+    const token = localStorage.getItem('authToken');
     const result = await ApiService.delete(`/securities/${id}`, token);
     if (result.ok) {
       setSecurities(prev => prev.filter(s => s.id !== id));
