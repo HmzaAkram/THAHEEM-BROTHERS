@@ -27,6 +27,8 @@ class SecurityTracking extends Model
         'receiver_name',
         'receiver_contact',
         'status',
+        'paid_by',
+        'cheque_name',
     ];
 
     protected $casts = [

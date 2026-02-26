@@ -32,6 +32,7 @@ class Bill extends Model
         'advance_payment',
         'grand_total',
         'attachment',
+        'attachments',
         'status',
         'note',
     ];
@@ -45,6 +46,7 @@ class Bill extends Model
         'advance_payment' => 'float',
         'grand_total' => 'float',
         'no_of_containers' => 'integer',
+        'attachments' => 'array',
     ];
 
     protected $appends = ['paid_amount', 'calculated_status'];
@@ -62,6 +64,11 @@ class Bill extends Model
 
     public function getCalculatedStatusAttribute()
     {
+        // If status was manually set to one of the final states, respect the override
+        if (in_array($this->status, ['Paid', 'Unpaid', 'Partial'])) {
+            return $this->status;
+        }
+
         $paid = $this->getPaidAmountAttribute();
         if ($paid <= 0) return 'Unpaid';
         if ($paid >= $this->grand_total) return 'Paid';

@@ -156,6 +156,43 @@ class ApiService {
         }
     }
 
+    static async patch(endpoint: string, body: any, token?: string | null): Promise<ApiResponse> {
+        try {
+            const hasFiles = this.containsFiles(body);
+            const snakeBody = this.camelToSnake(body);
+
+            let requestBody: BodyInit;
+            const headers = this.getHeaders(token);
+
+            if (hasFiles) {
+                const formData = new FormData();
+                this.buildFormData(formData, snakeBody);
+                formData.append('_method', 'PATCH');
+                requestBody = formData;
+                delete headers['Content-Type'];
+                const response = await fetch(`${API_BASE_URL}${endpoint}`, {
+                    method: 'POST',
+                    headers,
+                    body: requestBody,
+                });
+                return await this.handleResponse(response);
+            } else {
+                headers['Content-Type'] = 'application/json';
+                requestBody = JSON.stringify(snakeBody);
+                const response = await fetch(`${API_BASE_URL}${endpoint}`, {
+                    method: 'PATCH',
+                    headers,
+                    body: requestBody,
+                });
+                return await this.handleResponse(response);
+            }
+        } catch (error) {
+            console.error('Fetch error:', error);
+            return { ok: false, message: 'Connection failed. Please check your network or server.' };
+        }
+    }
+
+
     // ─────────────────────────────────────────────────────────────────────
     // File detection and FormData building
     // ─────────────────────────────────────────────────────────────────────

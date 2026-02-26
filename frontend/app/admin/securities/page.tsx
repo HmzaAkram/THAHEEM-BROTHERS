@@ -122,6 +122,8 @@ export default function SecuritiesPage() {
     const [payOrderNo, setPayOrderNo] = useState('');
     const [receiverName, setReceiverName] = useState('');
     const [receiverContact, setReceiverContact] = useState('');
+    const [paidBy, setPaidBy] = useState('');
+    const [chequeName, setChequeName] = useState('');
 
     // Fix Hydration Error: Set default dates on client-side only
     useEffect(() => {
@@ -174,6 +176,8 @@ export default function SecuritiesPage() {
                 refundDueDate: refundDueDate || calculateRefundDueDate(new Date().toISOString(), Number(refundDays)),
                 isRefundReceived: false,
                 payOrderNo: payOrderNo || null,
+                paidBy: paidBy || null,
+                chequeName: chequeName || null,
                 receiverName: receiverName || null,
                 receiverContact: receiverContact || null,
                 status: 'Pending',
@@ -199,6 +203,8 @@ export default function SecuritiesPage() {
                 setIsRefundReceived(false);
                 setReceivedAmountDate('');
                 setPayOrderNo('');
+                setPaidBy('');
+                setChequeName('');
                 setReceiverName('');
                 setReceiverContact('');
             } else {
@@ -446,17 +452,61 @@ export default function SecuritiesPage() {
                                                             onChange={(e) => setReceivedAmountDate(e.target.value)}
                                                         />
                                                     </div>
-                                                    <div className="space-y-2">
-                                                        <Label className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground/60">PayOrder / Cheque No</Label>
-                                                        <Input
-                                                            placeholder="Example: 12345678"
-                                                            className="h-11 bg-white dark:bg-slate-950 border-border/40 rounded-xl font-mono"
-                                                            value={payOrderNo}
-                                                            onChange={(e) => setPayOrderNo(e.target.value)}
-                                                        />
-                                                    </div>
                                                 </div>
                                             )}
+                                        </div>
+                                    </div>
+
+                                    {/* Section 5: Payment Source Details */}
+                                    <div className="space-y-4">
+                                        <h3 className="text-xs font-bold uppercase tracking-[0.2em] text-primary/60 flex items-center gap-2">
+                                            <FileText className="w-4 h-4" />
+                                            Payment Source Details
+                                        </h3>
+                                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 bg-slate-50 dark:bg-white/5 p-6 rounded-2xl border border-border/50">
+                                            <div className="space-y-2">
+                                                <Label className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground/60">Payment Made By</Label>
+                                                <div className="relative">
+                                                    <Input
+                                                        placeholder="Example: Thaheem Brothers, Company, Transporter"
+                                                        className="h-11 bg-white dark:bg-slate-950 border-border/40 rounded-xl font-mono"
+                                                        value={paidBy}
+                                                        onChange={(e) => setPaidBy(e.target.value)}
+                                                        list="paid-by-options"
+                                                    />
+                                                    <datalist id="paid-by-options">
+                                                        <option value="Thaheem Brothers" />
+                                                        <option value="Company" />
+                                                        <option value="Transporter" />
+                                                    </datalist>
+                                                </div>
+                                            </div>
+                                            <div className="space-y-2">
+                                                <Label className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground/60">Cheque Issued To (Name)</Label>
+                                                <div className="relative">
+                                                    <Input
+                                                        placeholder="Example: Company, Admin, Transporter"
+                                                        className="h-11 bg-white dark:bg-slate-950 border-border/40 rounded-xl font-mono"
+                                                        value={chequeName}
+                                                        onChange={(e) => setChequeName(e.target.value)}
+                                                        list="cheque-name-options"
+                                                    />
+                                                    <datalist id="cheque-name-options">
+                                                        <option value="Company" />
+                                                        <option value="Admin" />
+                                                        <option value="Transporter" />
+                                                    </datalist>
+                                                </div>
+                                            </div>
+                                            <div className="space-y-2">
+                                                <Label className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground/60">Pay Order Number</Label>
+                                                <Input
+                                                    placeholder="Example: PO-12345678"
+                                                    className="h-11 bg-white dark:bg-slate-950 border-border/40 rounded-xl font-mono"
+                                                    value={payOrderNo}
+                                                    onChange={(e) => setPayOrderNo(e.target.value)}
+                                                />
+                                            </div>
                                         </div>
                                     </div>
 
@@ -755,7 +805,15 @@ export default function SecuritiesPage() {
                                     </div>
                                     <div>
                                         <p className="text-xs text-muted-foreground font-semibold mb-1">Pay Order Number</p>
-                                        <p className="font-mono font-bold text-foreground">{selectedSecurity.payOrderNo}</p>
+                                        <p className="font-mono font-bold text-foreground">{selectedSecurity.payOrderNo || 'N/A'}</p>
+                                    </div>
+                                    <div>
+                                        <p className="text-xs text-muted-foreground font-semibold mb-1">Payment Made By</p>
+                                        <p className="font-bold text-foreground">{selectedSecurity.paidBy || 'N/A'}</p>
+                                    </div>
+                                    <div>
+                                        <p className="text-xs text-muted-foreground font-semibold mb-1">Cheque Issued To</p>
+                                        <p className="font-bold text-foreground">{selectedSecurity.chequeName || 'N/A'}</p>
                                     </div>
                                 </div>
                             </div>

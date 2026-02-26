@@ -39,6 +39,8 @@ class SecurityController extends Controller
             'is_refund_received' => 'boolean',
             'received_amount_date' => 'nullable|date',
             'pay_order_no' => 'nullable|string',
+            'paid_by' => 'nullable|string',
+            'cheque_name' => 'nullable|string',
         ]);
 
         $validated['total_amount'] = $validated['no_of_containers'] * $validated['amount_per_container'];

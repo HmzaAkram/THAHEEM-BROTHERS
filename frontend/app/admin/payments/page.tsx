@@ -27,7 +27,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { Plus, Download, Filter, Search, DollarSign, TrendingUp, CreditCard, Pencil } from 'lucide-react';
+import { Plus, Download, Filter, Search, DollarSign, TrendingUp, CreditCard, Pencil, FileText, Scale } from 'lucide-react';
 import { useState, useMemo } from 'react';
 import { useData, Payment } from '@/context/data-context';
 import { formatDate, formatCurrency } from '@/lib/utils';
@@ -411,14 +411,45 @@ export default function PaymentsPage() {
     return filtered.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
   }, [payments, timeFilter, companyFilter, searchQuery]);
 
-  // Dynamic Totals for Payments
+  // Dynamic Totals for Payments and associated Bills
   const tableTotals = useMemo(() => {
-    return filteredPayments.reduce((acc, p) => {
-      acc.collected += Number(p.amount) || 0;
-      acc.adjustment += Number(p.adjustment) || 0;
-      return acc;
-    }, { collected: 0, adjustment: 0 });
-  }, [filteredPayments]);
+    let collected = 0;
+    let adjustment = 0;
+
+    filteredPayments.forEach(p => {
+      collected += Number(p.amount) || 0;
+      adjustment += Number(p.adjustment) || 0;
+    });
+
+    let relevantBills = [...bills];
+    let relevantPayments = [...payments];
+
+    // Company Filter
+    if (companyFilter !== 'all') {
+      relevantBills = relevantBills.filter(b => String(b.companyId) === companyFilter);
+      relevantPayments = relevantPayments.filter(p => String(p.companyId) === companyFilter);
+    }
+
+    // Time Filter
+    if (timeFilter !== 'overall') {
+      const now = new Date();
+      let startDate = new Date();
+      if (timeFilter === 'monthly') startDate = new Date(now.getFullYear(), now.getMonth(), 1);
+      else if (timeFilter === '3months') startDate.setDate(now.getDate() - 90);
+      else if (timeFilter === '6months') startDate.setDate(now.getDate() - 180);
+      else if (timeFilter === 'yearly') startDate = new Date(now.getFullYear(), 0, 1);
+
+      relevantBills = relevantBills.filter(b => new Date(b.date) >= startDate);
+      relevantPayments = relevantPayments.filter(p => new Date(p.date) >= startDate);
+    }
+
+    const totalBill = relevantBills.reduce((sum, b) => sum + (Number(b.grandTotal) || 0), 0);
+    const paid = relevantBills.reduce((sum, b) => sum + (Number(b.advancePayment) || 0), 0) +
+      relevantPayments.reduce((sum, p) => sum + (Number(p.amount) || 0) + (Number(p.adjustment) || 0), 0);
+    const totalBalance = totalBill - paid;
+
+    return { collected, adjustment, totalBill, totalBalance };
+  }, [filteredPayments, bills, payments, companyFilter, timeFilter]);
 
   return (
     <DashboardLayout>
@@ -828,8 +859,8 @@ export default function PaymentsPage() {
             )}
 
             {/* Filtering Summary / Totals */}
-            <div className="mt-8 grid grid-cols-1 md:grid-cols-2 gap-4 border-t pt-8">
-              <div className="bg-muted/30 p-4 rounded-2xl border border-border/50 flex items-center justify-between">
+            <div className="mt-8 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 border-t pt-8">
+              <div className="bg-muted/30 p-4 rounded-2xl border border-border/50 flex items-center justify-between hover:bg-muted/50 transition-colors">
                 <div className="space-y-1">
                   <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Filtered Collections</p>
                   <p className="text-xl font-black text-green-600 dark:text-green-400 font-mono">{formatCurrency(tableTotals.collected)}</p>
@@ -838,13 +869,33 @@ export default function PaymentsPage() {
                   <DollarSign className="w-5 h-5 text-green-600 dark:text-green-400" />
                 </div>
               </div>
-              <div className="bg-muted/30 p-4 rounded-2xl border border-border/50 flex items-center justify-between">
+              <div className="bg-muted/30 p-4 rounded-2xl border border-border/50 flex items-center justify-between hover:bg-muted/50 transition-colors">
                 <div className="space-y-1">
                   <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Filtered Adjustments</p>
                   <p className="text-xl font-black text-amber-600 dark:text-amber-400 font-mono">{formatCurrency(tableTotals.adjustment)}</p>
                 </div>
                 <div className="w-10 h-10 rounded-full bg-amber-500/10 flex items-center justify-center">
                   <CreditCard className="w-5 h-5 text-amber-600 dark:text-amber-400" />
+                </div>
+              </div>
+              <div className="bg-muted/30 p-4 rounded-2xl border border-border/50 flex items-center justify-between hover:bg-muted/50 transition-colors">
+                <div className="space-y-1">
+                  <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Filtered Total Bill</p>
+                  <p className="text-xl font-black text-blue-600 dark:text-blue-400 font-mono">{formatCurrency(tableTotals.totalBill)}</p>
+                </div>
+                <div className="w-10 h-10 rounded-full bg-blue-500/10 flex items-center justify-center">
+                  <FileText className="w-5 h-5 text-blue-600 dark:text-blue-400" />
+                </div>
+              </div>
+              <div className="bg-muted/30 p-4 rounded-2xl border border-border/50 flex items-center justify-between hover:bg-muted/50 transition-colors">
+                <div className="space-y-1">
+                  <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Filtered Balance</p>
+                  <p className={`text-xl font-black font-mono ${tableTotals.totalBalance > 0 ? 'text-rose-600 dark:text-rose-400' : 'text-slate-600 dark:text-slate-400'}`}>
+                    {formatCurrency(tableTotals.totalBalance)}
+                  </p>
+                </div>
+                <div className={`w-10 h-10 rounded-full flex items-center justify-center ${tableTotals.totalBalance > 0 ? 'bg-rose-500/10' : 'bg-slate-500/10'}`}>
+                  <Scale className={`w-5 h-5 ${tableTotals.totalBalance > 0 ? 'text-rose-600 dark:text-rose-400' : 'text-slate-600 dark:text-slate-400'}`} />
                 </div>
               </div>
             </div>

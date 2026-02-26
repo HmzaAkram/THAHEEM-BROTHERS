@@ -34,6 +34,11 @@ class BillController extends Controller
             if ($bill->attachment) {
                 $bill->attachment = $this->ensureAbsoluteUrl($bill->attachment);
             }
+            if ($bill->attachments) {
+                $bill->attachments = array_map(function($path) {
+                    return $this->ensureAbsoluteUrl($path);
+                }, $bill->attachments);
+            }
         });
 
         return response()->json($bills);
@@ -71,6 +76,8 @@ class BillController extends Controller
             'grand_total' => 'required|numeric',
             'status' => 'nullable|string',
             'attachment' => 'nullable|string',
+            'attachments' => 'nullable|array',
+            'attachments.*' => 'nullable|string',
             'note' => 'nullable|string',
             'items' => 'required|array',
             'items.*.description' => 'required|string',
@@ -80,55 +87,41 @@ class BillController extends Controller
         ]);
 
         return DB::transaction(function () use ($validated, $request) {
-            $billData = collect($validated)->except(['items', 'attachment'])->toArray();
+            $billData = collect($validated)->except(['items', 'attachment', 'attachments'])->toArray();
             
             // SECURITY FIX: Proper file upload validation
+            // Keeping original attachment logic for backwards compatibility mapping
             if ($request->filled('attachment')) {
                 $attachmentData = $request->input('attachment');
                 if (str_starts_with($attachmentData, 'data:')) {
-                    // Parse MIME type from base64 string
-                    $mimeTypePart = explode(':', substr($attachmentData, 0, strpos($attachmentData, ';')))[1];
-                    $format = explode('/', $mimeTypePart)[1];
-                    $image = str_replace(' ', '+', explode(',', $attachmentData)[1]);
-                    
-                    // Decode and validate MIME type
-                    $decodedData = base64_decode($image);
-                    $finfo = new \finfo(FILEINFO_MIME_TYPE);
-                    $actualMimeType = $finfo->buffer($decodedData);
-                    
-                    // SECURITY: Only allow PDF files
-                    $allowedMimes = [
-                        'application/pdf' => 'pdf',
-                    ];
-                    
-                    if (!isset($allowedMimes[$actualMimeType])) {
-                        return response()->json([
-                            'message' => 'Invalid file type. Only PDF files are allowed.',
-                            'errors' => ['attachment' => ['Only PDF files are supported']]
-                        ], 422);
-                    }
-                    
-                    // SECURITY: Check file size (limit to 10MB)
-                    if (strlen($decodedData) > 10 * 1024 * 1024) {
-                        return response()->json([
-                            'message' => 'File size exceeds the 10MB limit.',
-                            'errors' => ['attachment' => ['File size exceeds 10MB']]
-                        ], 422);
-                    }
-                    
-                    $extension = 'pdf';
-                    
-                    // SECURITY: Use UUID for unpredictable filenames
-                    $fileName = 'bill_' . \Illuminate\Support\Str::uuid() . '.' . $extension;
-                    
-                    // Store in public storage (accessible via URL)
-                    \Illuminate\Support\Facades\Storage::disk('public')->put('attachments/' . $fileName, $decodedData);
-                    $url = \Illuminate\Support\Facades\Storage::url('attachments/' . $fileName);
-                    $billData['attachment'] = str_starts_with($url, 'http') ? $url : config('app.url') . $url;
+                    $url = $this->processBase64Attachment($attachmentData);
+                    if ($url instanceof \Illuminate\Http\JsonResponse) return $url;
+                    $billData['attachment'] = $url;
                 } else {
                     $billData['attachment'] = $attachmentData;
                 }
             }
+            
+            // Multiple Attachments logic
+            $attachmentsArr = [];
+            if ($request->filled('attachments') && is_array($request->input('attachments'))) {
+                 foreach ($request->input('attachments') as $attachmentData) {
+                      if (str_starts_with($attachmentData, 'data:')) {
+                           $url = $this->processBase64Attachment($attachmentData);
+                           if ($url instanceof \Illuminate\Http\JsonResponse) return $url;
+                           $attachmentsArr[] = $url;
+                      } else {
+                           $attachmentsArr[] = $attachmentData;
+                      }
+                 }
+            }
+            
+            // If the old attachment was uploaded but not new ones, populate the new ones list
+            if (isset($billData['attachment']) && empty($attachmentsArr)) {
+                 $attachmentsArr[] = $billData['attachment'];
+            }
+            
+            $billData['attachments'] = empty($attachmentsArr) ? null : $attachmentsArr;
 
             $bill = Bill::create($billData);
 
@@ -141,6 +134,11 @@ class BillController extends Controller
             // Ensure return absolute URL for attachment if it exists
             if ($bill->attachment) {
                 $bill->attachment = $this->ensureAbsoluteUrl($bill->attachment);
+            }
+            if ($bill->attachments) {
+                $bill->attachments = array_map(function($path) {
+                    return $this->ensureAbsoluteUrl($path);
+                }, $bill->attachments);
             }
 
             return response()->json($bill, 201);
@@ -157,6 +155,11 @@ class BillController extends Controller
         if ($bill->attachment) {
             $bill->attachment = $this->ensureAbsoluteUrl($bill->attachment);
         }
+        if ($bill->attachments) {
+            $bill->attachments = array_map(function($path) {
+                return $this->ensureAbsoluteUrl($path);
+            }, $bill->attachments);
+        }
 
         return response()->json($bill->load(['items', 'company']));
     }
@@ -167,6 +170,38 @@ class BillController extends Controller
             return $path;
         }
         return config('app.url') . $path;
+    }
+
+    private function processBase64Attachment($attachmentData)
+    {
+        $mimeTypePart = explode(':', substr($attachmentData, 0, strpos($attachmentData, ';')))[1];
+        $image = str_replace(' ', '+', explode(',', $attachmentData)[1]);
+        $decodedData = base64_decode($image);
+        $finfo = new \finfo(FILEINFO_MIME_TYPE);
+        $actualMimeType = $finfo->buffer($decodedData);
+         
+        $allowedMimes = ['application/pdf' => 'pdf'];
+         
+        if (!isset($allowedMimes[$actualMimeType])) {
+             return response()->json([
+                'message' => 'Invalid file type. Only PDF files are allowed.',
+                'errors' => ['attachment' => ['Only PDF files are supported']]
+            ], 422);
+        }
+         
+        // SECURITY: Check file size (limit to 10MB)
+        if (strlen($decodedData) > 10 * 1024 * 1024) {
+            return response()->json([
+                'message' => 'File size exceeds the 10MB limit.',
+                'errors' => ['attachment' => ['File size exceeds 10MB']]
+            ], 422);
+        }
+
+        $extension = 'pdf';
+        $fileName = 'bill_' . \Illuminate\Support\Str::uuid() . '.' . $extension;
+        \Illuminate\Support\Facades\Storage::disk('public')->put('attachments/' . $fileName, $decodedData);
+        $url = \Illuminate\Support\Facades\Storage::url('attachments/' . $fileName);
+        return str_starts_with($url, 'http') ? $url : config('app.url') . $url;
     }
 
     public function update(Request $request, Bill $bill)
@@ -201,6 +236,8 @@ class BillController extends Controller
             'grand_total' => 'required|numeric',
             'status' => 'nullable|string',
             'attachment' => 'nullable|string', // Can be null (no change) or base64 (new file)
+            'attachments' => 'nullable|array',
+            'attachments.*' => 'nullable|string',
             'note' => 'nullable|string',
             'items' => 'required|array',
             'items.*.description' => 'required|string',
@@ -210,48 +247,31 @@ class BillController extends Controller
         ]);
 
         return DB::transaction(function () use ($validated, $request, $bill) {
-            $billData = collect($validated)->except(['items', 'attachment'])->toArray();
+            $billData = collect($validated)->except(['items', 'attachment', 'attachments'])->toArray();
 
-            // Handle Attachment Update
+            // Handle Attachment Update (Legacy)
             if ($request->filled('attachment')) {
                  $attachmentData = $request->input('attachment');
-                 
-                 // If it's a new base64 string, process it
                  if (str_starts_with($attachmentData, 'data:')) {
-                    // Start of Base64 processing (Similiar to store method)
-                    $mimeTypePart = explode(':', substr($attachmentData, 0, strpos($attachmentData, ';')))[1];
-                    $image = str_replace(' ', '+', explode(',', $attachmentData)[1]);
-                    $decodedData = base64_decode($image);
-                    $finfo = new \finfo(FILEINFO_MIME_TYPE);
-                    $actualMimeType = $finfo->buffer($decodedData);
-                     
-                    $allowedMimes = ['application/pdf' => 'pdf'];
-                     
-                    if (!isset($allowedMimes[$actualMimeType])) {
-                         return response()->json([
-                            'message' => 'Invalid file type. Only PDF files are allowed.',
-                            'errors' => ['attachment' => ['Only PDF files are supported']]
-                        ], 422);
-                    }
-                     
-                    // SECURITY: Check file size (limit to 10MB)
-                    if (strlen($decodedData) > 10 * 1024 * 1024) {
-                        return response()->json([
-                            'message' => 'File size exceeds the 10MB limit.',
-                            'errors' => ['attachment' => ['File size exceeds 10MB']]
-                        ], 422);
-                    }
-
-                    $extension = 'pdf';
-                    $fileName = 'bill_' . \Illuminate\Support\Str::uuid() . '.' . $extension;
-                    \Illuminate\Support\Facades\Storage::disk('public')->put('attachments/' . $fileName, $decodedData);
-                    $url = \Illuminate\Support\Facades\Storage::url('attachments/' . $fileName);
-                    $billData['attachment'] = str_starts_with($url, 'http') ? $url : config('app.url') . $url;
+                     $url = $this->processBase64Attachment($attachmentData);
+                     if ($url instanceof \Illuminate\Http\JsonResponse) return $url;
+                     $billData['attachment'] = $url;
                  } 
-                 // If it's not base64, we assume it's the existing URL or path, so we don't update the field
-                 // OR if explicitly null passed (cleared), but frontend sends null in that case? 
-                 // For now, if it's existing URL string, we just ignore updating it to keep current value 
-                 // unless we want to allow 'clearing' it, which isn't in requirements yet.
+            }
+            
+            // Multiple Attachments logic
+            $attachmentsArr = [];
+            if ($request->has('attachments') && is_array($request->input('attachments'))) {
+                 foreach ($request->input('attachments') as $attachmentData) {
+                      if (str_starts_with($attachmentData, 'data:')) {
+                           $url = $this->processBase64Attachment($attachmentData);
+                           if ($url instanceof \Illuminate\Http\JsonResponse) return $url;
+                           $attachmentsArr[] = $url;
+                      } else {
+                           $attachmentsArr[] = $attachmentData;
+                      }
+                 }
+                 $billData['attachments'] = empty($attachmentsArr) ? null : $attachmentsArr;
             }
 
             $bill->update($billData);
@@ -267,6 +287,11 @@ class BillController extends Controller
             
             if ($bill->attachment) {
                 $bill->attachment = $this->ensureAbsoluteUrl($bill->attachment);
+            }
+            if ($bill->attachments) {
+                $bill->attachments = array_map(function($path) {
+                    return $this->ensureAbsoluteUrl($path);
+                }, $bill->attachments);
             }
 
             return response()->json($bill);
@@ -304,5 +329,20 @@ class BillController extends Controller
             ->header('Access-Control-Allow-Origin', '*')
             ->header('Access-Control-Allow-Methods', 'GET')
             ->header('Access-Control-Allow-Headers', 'Content-Type, X-Requested-With');
+    }
+
+    public function updateStatus(Request $request, Bill $bill)
+    {
+        $user = auth('sanctum')->user();
+        if (!$user instanceof \App\Models\User || $user->role !== 'admin') {
+            return response()->json(['message' => 'Unauthorized. Admin access required.'], 403);
+        }
+
+        $validated = $request->validate([
+            'status' => 'required|in:Paid,Unpaid,Partial', // Or whatever statuses you allow
+        ]);
+
+        $bill->update(['status' => $validated['status']]);
+        return response()->json($bill);
     }
 }

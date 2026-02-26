@@ -45,6 +45,7 @@ export interface Bill {
   status: BillStatus;
   calculatedStatus: BillStatus;
   attachment?: string;
+  attachments?: string[];
   via?: string;
   weight?: string | number;
   exporter?: string;
@@ -121,6 +122,8 @@ export interface SecurityTracking {
   isRefundReceived: boolean;
   receivedAmountDate?: string | null;
   payOrderNo?: string | null;
+  paidBy?: string | null;
+  chequeName?: string | null;
   receiverName?: string | null;
   receiverContact?: string | null;
   status: 'Pending' | 'Completed';
@@ -136,6 +139,7 @@ interface DataContextType {
   deleteCompany: (id: string) => void;
   addBill: (bill: Omit<Bill, 'id' | 'createdAt' | 'paidAmount' | 'status' | 'calculatedStatus'>) => Promise<any>;
   updateBill: (id: string, bill: Partial<Bill>) => Promise<any>;
+  updateBillStatus: (id: string, status: string) => Promise<any>;
   deleteBill: (id: string) => Promise<void>;
   addPayment: (payment: Omit<Payment, 'id' | 'createdAt'>) => Promise<any>;
   updatePayment: (id: string, payment: Partial<Payment>) => Promise<any>;
@@ -284,6 +288,15 @@ export function DataProvider({ children }: { children: ReactNode }) {
     const result = await ApiService.put(`/bills/${id}`, billData, token);
     if (result.ok && result.data) {
       setBills(prev => prev.map(b => b.id === id ? result.data : b));
+    }
+    return result;
+  };
+
+  const updateBillStatus = async (id: string, status: string) => {
+    const token = localStorage.getItem('authToken');
+    const result = await ApiService.patch(`/bills/${id}/status`, { status }, token);
+    if (result.ok && result.data) {
+      setBills(prev => prev.map(b => b.id === id ? { ...b, status: result.data.status } : b));
     }
     return result;
   };
@@ -506,6 +519,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
         deleteCompany,
         addBill,
         updateBill,
+        updateBillStatus,
         deleteBill,
         addPayment,
         updatePayment,

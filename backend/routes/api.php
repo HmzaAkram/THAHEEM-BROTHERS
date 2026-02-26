@@ -20,6 +20,7 @@ Route::prefix('v1')->middleware('auth.token')->group(function () {
 
     Route::apiResource('companies', CompanyController::class);
     Route::get('/bills/attachment/{filename}', [BillController::class, 'getAttachment']);
+    Route::patch('/bills/{bill}/status', [BillController::class, 'updateStatus']);
     Route::apiResource('bills', BillController::class);
     Route::apiResource('payments', PaymentController::class);
     Route::apiResource('securities', SecurityController::class);

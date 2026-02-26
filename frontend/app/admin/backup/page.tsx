@@ -264,9 +264,51 @@ export default function BackupPage() {
                 companyFolder.file('Ledger.pdf', ledgerDoc.output('blob'));
 
                 // 2. GENERATE PAYMENT HISTORY PDF
-                const paymentDoc = new jsPDF();
-                paymentDoc.setFontSize(18);
-                paymentDoc.text(`Payment History: ${company.name}`, 14, 20);
+                const paymentDoc = new jsPDF('p', 'mm', 'a4');
+                const pPageWidth = paymentDoc.internal.pageSize.getWidth();
+
+                if (logoWidth > 0) {
+                    const maxLogoHeight = 16;
+                    const maxLogoWidth = 16;
+                    let newLogoWidth = logoWidth;
+                    let newLogoHeight = logoHeight;
+                    const ratio = Math.min(maxLogoWidth / newLogoWidth, maxLogoHeight / newLogoHeight);
+                    newLogoWidth *= ratio;
+                    newLogoHeight *= ratio;
+                    paymentDoc.addImage(img, 'PNG', 14, 10, newLogoWidth, newLogoHeight);
+                }
+
+                paymentDoc.setTextColor(15, 23, 42);
+                paymentDoc.setFontSize(14);
+                paymentDoc.setFont("helvetica", "bold");
+                paymentDoc.text("THAHEEM BROTHERS", 34, 14);
+
+                paymentDoc.setTextColor(100, 116, 139);
+                paymentDoc.setFontSize(8);
+                paymentDoc.setFont("helvetica", "normal");
+                paymentDoc.text("Suite 23, 2nd Floor, R.K. Square Ext, Shahrah-e-Liaquat, Karachi", 34, 19);
+                paymentDoc.text("+92 21 32421347 | +92 300 2791780 | import.khi@hotmail.com", 34, 23);
+
+                paymentDoc.setDrawColor(226, 232, 240);
+                paymentDoc.setLineWidth(0.5);
+                paymentDoc.line(14, 28, pPageWidth - 14, 28);
+
+                paymentDoc.setTextColor(15, 23, 42);
+                paymentDoc.setFontSize(16);
+                paymentDoc.setFont("helvetica", "bold");
+                paymentDoc.text("PAYMENT HISTORY OVERVIEW", pPageWidth - 14, 18, { align: "right" });
+
+                let yPosPayment = 36;
+                paymentDoc.setFontSize(10);
+                paymentDoc.setFont("helvetica", "bold");
+                paymentDoc.text(`Client: ${company.name}`, 14, yPosPayment);
+
+                paymentDoc.setFontSize(9);
+                paymentDoc.setFont("helvetica", "normal");
+                paymentDoc.setTextColor(100, 116, 139);
+                paymentDoc.text(`Period: All Time`, 14, yPosPayment + 5);
+                paymentDoc.text(`Date Printed: ${formatDate(new Date().toISOString())}`, pPageWidth - 14, yPosPayment, { align: "right" });
+                yPosPayment += 12;
 
                 const companyPayments = payments.filter(p => p.companyId === company.id);
                 // Sort by date desc
@@ -274,25 +316,137 @@ export default function BackupPage() {
 
                 const paymentRows = companyPayments.map(p => {
                     const linkedBill = p.billId ? bills.find(b => b.id.toString() === p.billId.toString()) : null;
+                    const cashPaid = Number(p.amount) || 0;
+                    const adjustment = Number(p.adjustment) || 0;
+                    const totalPaid = cashPaid + adjustment;
+                    const billTotal = linkedBill ? Number(linkedBill.grandTotal) : 0;
+
                     return [
                         formatDate(p.date),
-                        formatCurrency(p.amount),
-                        p.paymentMethod,
-                        p.reference || linkedBill?.jobNumber || 'Advance Payment',
-                        p.notes || '-'
+                        company.name,
+                        linkedBill?.jobNumber || 'N/A',
+                        p.paymentMethod || '-',
+                        p.reference || (linkedBill ? 'Payment' : 'Advance'),
+                        adjustment > 0 ? formatCurrency(adjustment) : '-',
+                        cashPaid > 0 ? formatCurrency(cashPaid) : '-',
+                        formatCurrency(totalPaid),
+                        billTotal > 0 ? formatCurrency(billTotal) : '-'
                     ];
                 });
 
                 autoTable(paymentDoc, {
-                    startY: 30,
-                    head: [['Date', 'Amount', 'Method', 'Reference/Job', 'Notes']],
-                    body: paymentRows.length > 0 ? paymentRows : [['-', 'No payments', '-', '-', '-']],
+                    startY: yPosPayment,
+                    head: [['Date', 'Company', 'Job No', 'Method', 'Ref/Adv', 'Adj.', 'Cash Paid', 'Total Paid', 'Bill Total']],
+                    body: paymentRows.length > 0 ? paymentRows : [['-', 'No payments', '-', '-', '-', '-', '-', '-', '-']],
                     theme: 'grid',
-                    headStyles: { fillColor: [46, 204, 113] },
-                    styles: { fontSize: 10 }
+                    headStyles: { fillColor: [44, 62, 80], textColor: [255, 255, 255], fontStyle: 'bold' },
+                    styles: { fontSize: 7, cellPadding: 1.5 },
+                    columnStyles: {
+                        5: { halign: 'right' },
+                        6: { halign: 'right' },
+                        7: { halign: 'right', fontStyle: 'bold', textColor: [0, 128, 0] },
+                        8: { halign: 'right', fontStyle: 'bold', textColor: [220, 38, 38] }
+                    }
                 });
 
                 companyFolder.file('Payment_History.pdf', paymentDoc.output('blob'));
+
+                // 2.5 GENERATE REPORT PDF
+                const reportDoc = new jsPDF('p', 'mm', 'a4');
+                const rPageWidth = reportDoc.internal.pageSize.getWidth();
+
+                if (logoWidth > 0) {
+                    const maxLogoHeight = 16;
+                    const maxLogoWidth = 16;
+                    let newLogoWidth = logoWidth;
+                    let newLogoHeight = logoHeight;
+                    const ratio = Math.min(maxLogoWidth / newLogoWidth, maxLogoHeight / newLogoHeight);
+                    newLogoWidth *= ratio;
+                    newLogoHeight *= ratio;
+                    reportDoc.addImage(img, 'PNG', 14, 10, newLogoWidth, newLogoHeight);
+                }
+
+                reportDoc.setTextColor(15, 23, 42);
+                reportDoc.setFontSize(14);
+                reportDoc.setFont("helvetica", "bold");
+                reportDoc.text("THAHEEM BROTHERS", 34, 14);
+
+                reportDoc.setTextColor(100, 116, 139);
+                reportDoc.setFontSize(8);
+                reportDoc.setFont("helvetica", "normal");
+                reportDoc.text("Suite 23, 2nd Floor, R.K. Square Ext, Shahrah-e-Liaquat, Karachi", 34, 19);
+                reportDoc.text("+92 21 32421347 | +92 300 2791780 | import.khi@hotmail.com", 34, 23);
+
+                reportDoc.setDrawColor(226, 232, 240);
+                reportDoc.setLineWidth(0.5);
+                reportDoc.line(14, 28, rPageWidth - 14, 28);
+
+                reportDoc.setTextColor(15, 23, 42);
+                reportDoc.setFontSize(16);
+                reportDoc.setFont("helvetica", "bold");
+                reportDoc.text("REPORT", rPageWidth - 14, 18, { align: "right" });
+
+                let yPosReport = 36;
+                reportDoc.setFontSize(10);
+                reportDoc.setFont("helvetica", "bold");
+                reportDoc.text(`Client: ${company.name}`, 14, yPosReport);
+
+                reportDoc.setFontSize(9);
+                reportDoc.setFont("helvetica", "normal");
+                reportDoc.setTextColor(100, 116, 139);
+                reportDoc.text(`Period: All Time`, 14, yPosReport + 5);
+                reportDoc.text(`Date Printed: ${formatDate(new Date().toISOString())}`, rPageWidth - 14, yPosReport, { align: "right" });
+                yPosReport += 12;
+
+                const cBills = bills.filter(b => String(b.companyId) === String(company.id));
+                const cPayments = payments.filter(p => String(p.companyId) === String(company.id));
+                const cBilled = cBills.reduce((sum, b) => sum + (Number(b.grandTotal) || 0), 0);
+                const cPaid = cBills.reduce((sum, b) => sum + (Number(b.advancePayment) || 0), 0) + cPayments.reduce((sum, p) => sum + (Number(p.amount) || 0) + (Number(p.adjustment) || 0), 0);
+                const cOutstanding = cBilled - cPaid;
+
+                const cUnpaidBills = cBills.filter(b => b.status !== 'Paid').sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+                let cDaysOverdue = 0;
+                let cLastDue = '-';
+                if (cUnpaidBills.length > 0) {
+                    const today = new Date();
+                    const dueDate = new Date(cUnpaidBills[0].date);
+                    dueDate.setDate(dueDate.getDate() + 30);
+                    if (today > dueDate) {
+                        cDaysOverdue = Math.floor((today.getTime() - dueDate.getTime()) / (1000 * 3600 * 24));
+                    }
+                    cLastDue = formatDate(cUnpaidBills[0].date);
+                }
+
+                const reportRows = [[
+                    company.name,
+                    cBills.length.toString(),
+                    cLastDue,
+                    cDaysOverdue > 0 ? `${cDaysOverdue} days` : 'Current',
+                    formatCurrency(cBilled),
+                    formatCurrency(cPaid),
+                    formatCurrency(cOutstanding),
+                    cOutstanding > 300000 ? 'High Risk' : cOutstanding > 100000 ? 'Medium' : 'Low Risk'
+                ]];
+
+                autoTable(reportDoc, {
+                    startY: yPosReport,
+                    head: [['Company Name', 'No Of Bills', 'Last Due', 'Days Overdue', 'Total Debit', 'Received', 'Outstanding Amount', 'Status']],
+                    body: reportRows,
+                    theme: 'grid',
+                    headStyles: { fillColor: [44, 62, 80], textColor: [255, 255, 255], fontStyle: 'bold' },
+                    styles: { fontSize: 8, cellPadding: 2 },
+                    columnStyles: {
+                        1: { halign: 'center' },
+                        2: { halign: 'right' },
+                        3: { halign: 'right' },
+                        4: { halign: 'right', textColor: [220, 38, 38] },
+                        5: { halign: 'right', textColor: [0, 128, 0] },
+                        6: { halign: 'right', fontStyle: 'bold' },
+                        7: { halign: 'right' }
+                    }
+                });
+
+                companyFolder.file('Report.pdf', reportDoc.output('blob'));
 
                 // 3. GENERATE BILLS INVOICES & ATTACHMENTS
                 const billsFolder = companyFolder.folder('Bills');

@@ -182,8 +182,25 @@ export const InvoiceTemplate = forwardRef<HTMLDivElement, InvoiceTemplateProps>(
                         </div>
                     </div>
 
-                    {/* Attachment Link */}
-                    {bill.attachment && !hideAttachments && (
+                    {/* Attachment Links */}
+                    {(bill.attachments && bill.attachments.length > 0) ? (
+                        <div className="mt-3 space-y-1">
+                            {bill.attachments.map((attachmentUrl, idx) => (
+                                <button
+                                    key={idx}
+                                    onClick={(e) => {
+                                        e.preventDefault();
+                                        e.stopPropagation();
+                                        window.open(attachmentUrl, '_blank');
+                                    }}
+                                    className="flex items-center gap-1.5 text-[10px] font-bold text-blue-600 hover:text-blue-800 hover:underline cursor-pointer"
+                                >
+                                    <Download size={12} />
+                                    Download Attached Document {idx + 1} (PDF)
+                                </button>
+                            ))}
+                        </div>
+                    ) : bill.attachment && !hideAttachments ? (
                         <div className="mt-3">
                             <button
                                 onClick={(e) => {
@@ -197,7 +214,7 @@ export const InvoiceTemplate = forwardRef<HTMLDivElement, InvoiceTemplateProps>(
                                 Download Attached Document (PDF)
                             </button>
                         </div>
-                    )}
+                    ) : null}
 
                     {/* Conditional Notes */}
                     <div className="mt-4 space-y-1">

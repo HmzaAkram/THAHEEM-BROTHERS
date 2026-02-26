@@ -203,10 +203,10 @@ export default function ReportsPage() {
       pdf.setFont("helvetica", "bold");
 
       let reportTitle = "Report";
-      if (reportType === 'outstanding') reportTitle = 'OUTSTANDING BALANCE REPORT';
+      if (reportType === 'outstanding') reportTitle = 'BALANCE REPORT';
       if (reportType === 'bills') reportTitle = 'BILLS REPORT';
       if (reportType === 'payments') reportTitle = 'PAYMENTS REPORT';
-      if (reportType === 'company') reportTitle = 'COMPANY LEDGER REPORT';
+      if (reportType === 'company') reportTitle = 'LEDGER REPORT';
 
       pdf.text(reportTitle, pageWidth - 14, 18, { align: "right" });
 

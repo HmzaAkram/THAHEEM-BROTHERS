@@ -18,6 +18,12 @@ import {
   DialogTitle,
   DialogTrigger,
 } from '@/components/ui/dialog';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -74,7 +80,7 @@ const statusStyles = {
 import { PDFDocument } from 'pdf-lib';
 
 export default function BillsPage() {
-  const { bills, companies, addBill, updateBill, deleteBill, payments, getCompanyBalance } = useData();
+  const { bills, companies, addBill, updateBill, updateBillStatus, deleteBill, payments, getCompanyBalance } = useData();
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [isViewOpen, setIsViewOpen] = useState(false);
   const [selectedBill, setSelectedBill] = useState<Bill | null>(null);
@@ -102,6 +108,10 @@ export default function BillsPage() {
   // PIN Dialog State for Editing
   const [isEditPinDialogOpen, setIsEditPinDialogOpen] = useState(false);
   const [billToEdit, setBillToEdit] = useState<Bill | null>(null);
+
+  // PIN Dialog State for Status Update
+  const [isStatusPinDialogOpen, setIsStatusPinDialogOpen] = useState(false);
+  const [billToUpdateStatus, setBillToUpdateStatus] = useState<{ bill: Bill, newStatus: string } | null>(null);
 
   // Form Validation State
   const [formErrors, setFormErrors] = useState<Record<string, boolean>>({});
@@ -132,6 +142,32 @@ export default function BillsPage() {
       } finally {
         setIsPinDialogOpen(false);
         setBillToDelete(null);
+      }
+    }
+  };
+
+  const handleUpdateStatus = async () => {
+    if (billToUpdateStatus) {
+      try {
+        setLoading(true);
+        const { bill, newStatus } = billToUpdateStatus;
+        await updateBillStatus(bill.id, newStatus);
+
+        toast({
+          title: 'Status Updated',
+          description: `Bill status changed to ${newStatus}.`,
+        });
+      } catch (err) {
+        console.error("Failed to update status:", err);
+        toast({
+          title: 'Error',
+          description: 'Failed to update the status.',
+          variant: 'destructive',
+        });
+      } finally {
+        setLoading(false);
+        setIsStatusPinDialogOpen(false);
+        setBillToUpdateStatus(null);
       }
     }
   };
@@ -347,7 +383,7 @@ export default function BillsPage() {
   const [jobNumber, setJobNumber] = useState('');
   const [via, setVia] = useState('');
   const [weight, setWeight] = useState('');
-  const [attachment, setAttachment] = useState<File | null>(null);
+  const [attachments, setAttachments] = useState<(File | string)[]>([]);
   const [noteType, setNoteType] = useState<string>('All Necessary documents enclosed.');
   const [customNote, setCustomNote] = useState<string>('');
   const [taxRate, setTaxRate] = useState<number>(15);
@@ -421,7 +457,14 @@ export default function BillsPage() {
       setCustomNote(cleanNote);
     }
 
-    setAttachment(null); // Reset attachment as file input can't be pre-filled with URL
+    // Set attachments from bill data
+    if (bill.attachments && bill.attachments.length > 0) {
+      setAttachments(bill.attachments);
+    } else if (bill.attachment) {
+      setAttachments([bill.attachment]);
+    } else {
+      setAttachments([]);
+    }
 
     // Map existing items
     const existingItems = bill.items.map(item => ({
@@ -494,7 +537,11 @@ export default function BillsPage() {
       return;
     }
 
-    const fileToBase64 = (file: File): Promise<string> => {
+    const fileToBase64 = (file: File | string): Promise<string> => {
+      // If it's already a string (URL), return it directly
+      if (typeof file === 'string') {
+        return Promise.resolve(file);
+      }
       return new Promise((resolve, reject) => {
         const reader = new FileReader();
         reader.readAsDataURL(file);
@@ -505,10 +552,7 @@ export default function BillsPage() {
 
     setLoading(true);
     try {
-      let attachmentBase64;
-      if (attachment) {
-        attachmentBase64 = await fileToBase64(attachment);
-      }
+      const attachmentsBase64 = await Promise.all(attachments.map(fileToBase64));
 
       const billData = {
         companyId: selectedCompany.id,
@@ -527,7 +571,7 @@ export default function BillsPage() {
         jobNumber,
         via,
         weight,
-        attachment: attachmentBase64,
+        attachments: attachmentsBase64,
         items: finalItems,
         totalAmount: totalAmount,
         serviceCharges: Number(serviceCharges) || 0,
@@ -566,7 +610,7 @@ export default function BillsPage() {
         setNoOfContainers('');
         setContainerNo('');
         setPackages('');
-        setAttachment(null);
+        setAttachments([]);
         setNoteType('All Necessary documents enclosed.');
         setCustomNote('');
         setTaxRate(15);
@@ -795,7 +839,7 @@ export default function BillsPage() {
                   setEditingId(null);
                   setCompanyId('');
                   setItems([{ description: 'DUTY TAXES & ETO', notes: '', amount: 0, invoiceNo: '' }]);
-                  setJobNumber(''); setVia(''); setWeight(''); setExporter(''); setInvoiceNo(''); setInvoiceDate(new Date().toISOString().split('T')[0]); setHawb(''); setIgm(''); setIndexNo(''); setGdNumber(''); setServiceCharges(''); setSalesTax(''); setAdvancePayment(''); setNoOfContainers(''); setContainerNo(''); setPackages(''); setAttachment(null);
+                  setJobNumber(''); setVia(''); setWeight(''); setExporter(''); setInvoiceNo(''); setInvoiceDate(new Date().toISOString().split('T')[0]); setHawb(''); setIgm(''); setIndexNo(''); setGdNumber(''); setServiceCharges(''); setSalesTax(''); setAdvancePayment(''); setNoOfContainers(''); setContainerNo(''); setPackages(''); setAttachments([]);
                   setNoteType('All Necessary documents enclosed.');
                   setCustomNote('');
                   setTaxRate(15);
@@ -1245,27 +1289,36 @@ export default function BillsPage() {
                           </div>
                           <div className="text-center">
                             <p className="text-sm font-semibold text-foreground">Attach Shipment Documents</p>
-                            <p className="text-xs text-muted-foreground mt-1">Upload PDF Document</p>
+                            <p className="text-xs text-muted-foreground mt-1">Upload PDF Documents</p>
                           </div>
-                          <div className="relative w-full max-w-xs mt-2">
-                            {!attachment && (
-                              <Input
-                                type="file"
-                                className="opacity-0 absolute inset-0 w-full h-full cursor-pointer z-10"
-                                accept="application/pdf"
-                                onChange={(e) => {
-                                  const file = e.target.files?.[0];
-                                  if (file) setAttachment(file);
-                                }}
-                              />
-                            )}
+                          <div className="relative w-full max-w-lg mt-4">
+                            <div className="flex justify-center mb-4">
+                              <label className="cursor-pointer">
+                                <div className="flex items-center gap-2 px-6 py-2.5 border-2 rounded-xl bg-white dark:bg-slate-950 text-sm font-medium text-foreground/80 shadow-sm border-border/50 hover:bg-muted/50 transition-colors">
+                                  <Plus className="w-4 h-4 text-primary" />
+                                  Select PDFs
+                                </div>
+                                <Input
+                                  type="file"
+                                  multiple
+                                  className="hidden"
+                                  accept="application/pdf"
+                                  onChange={(e) => {
+                                    const files = Array.from(e.target.files || []);
+                                    setAttachments(prev => [...prev, ...files]);
+                                  }}
+                                />
+                              </label>
+                            </div>
 
-                            <div className="flex items-center gap-2">
-                              {attachment ? (
-                                <>
+                            <div className="flex flex-col gap-2">
+                              {attachments.map((file, idx) => (
+                                <div key={idx} className="flex items-center gap-2 w-full justify-between">
                                   <div className="flex-1 flex items-center gap-2 px-4 py-2.5 border-2 rounded-xl bg-white dark:bg-slate-950 text-sm font-medium text-foreground/80 shadow-sm border-border/50 relative">
                                     <FileText className="w-4 h-4 text-primary shrink-0" />
-                                    <span className="truncate">{attachment.name}</span>
+                                    <span className="truncate max-w-[200px] sm:max-w-xs block overflow-hidden">
+                                      {typeof file === 'string' ? file.split('/').pop() : file.name}
+                                    </span>
                                   </div>
                                   <Button
                                     type="button"
@@ -1275,17 +1328,13 @@ export default function BillsPage() {
                                     onClick={(e) => {
                                       e.preventDefault();
                                       e.stopPropagation();
-                                      setAttachment(null);
+                                      setAttachments(prev => prev.filter((_, i) => i !== idx));
                                     }}
                                   >
                                     <Trash2 className="w-4 h-4" />
                                   </Button>
-                                </>
-                              ) : (
-                                <div className="w-full flex items-center justify-center gap-2 px-6 py-2.5 border-2 rounded-xl bg-white dark:bg-slate-950 text-sm font-medium text-foreground/80 shadow-sm border-border/50">
-                                  Select PDF
                                 </div>
-                              )}
+                              ))}
                             </div>
                           </div>
                         </div>
@@ -1440,12 +1489,42 @@ export default function BillsPage() {
                             PKR {((item.grandTotal || 0) - (item.paidAmount || 0)).toLocaleString()}
                           </TableCell>
                           <TableCell>
-                            <span
-                              className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium border ${statusStyles[item.calculatedStatus || 'Unpaid']
-                                }`}
-                            >
-                              {item.calculatedStatus || 'Unpaid'}
-                            </span>
+                            <DropdownMenu>
+                              <DropdownMenuTrigger className="focus:outline-none">
+                                <span
+                                  className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium border cursor-pointer hover:opacity-80 transition-opacity ${statusStyles[item.calculatedStatus || 'Unpaid']
+                                    }`}
+                                >
+                                  {item.calculatedStatus || 'Unpaid'}
+                                </span>
+                              </DropdownMenuTrigger>
+                              <DropdownMenuContent align="end">
+                                <DropdownMenuItem onClick={() => {
+                                  if (item.calculatedStatus !== 'Paid') {
+                                    setBillToUpdateStatus({ bill: item, newStatus: 'Paid' });
+                                    setIsStatusPinDialogOpen(true);
+                                  }
+                                }}>
+                                  Override to Paid
+                                </DropdownMenuItem>
+                                <DropdownMenuItem onClick={() => {
+                                  if (item.calculatedStatus !== 'Partial') {
+                                    setBillToUpdateStatus({ bill: item, newStatus: 'Partial' });
+                                    setIsStatusPinDialogOpen(true);
+                                  }
+                                }}>
+                                  Override to Partial
+                                </DropdownMenuItem>
+                                <DropdownMenuItem onClick={() => {
+                                  if (item.calculatedStatus !== 'Unpaid') {
+                                    setBillToUpdateStatus({ bill: item, newStatus: 'Unpaid' });
+                                    setIsStatusPinDialogOpen(true);
+                                  }
+                                }}>
+                                  Override to Unpaid
+                                </DropdownMenuItem>
+                              </DropdownMenuContent>
+                            </DropdownMenu>
                           </TableCell>
                           <TableCell className="text-right">
                             <div className="flex items-center justify-end gap-2">
@@ -1606,6 +1685,17 @@ export default function BillsPage() {
         }}
         title="Edit Bill"
         description={`Authorize edit action for Job No. ${billToEdit?.jobNumber || 'Unknown'}.`}
+      />
+
+      <PinDialog
+        isOpen={isStatusPinDialogOpen}
+        onClose={() => {
+          setIsStatusPinDialogOpen(false);
+          setBillToUpdateStatus(null);
+        }}
+        onConfirm={handleUpdateStatus}
+        title="Update Bill Status"
+        description={`Authorize manual status change to '${billToUpdateStatus?.newStatus}' for Job No. ${billToUpdateStatus?.bill.jobNumber || 'Unknown'}.`}
       />
     </>
   );
