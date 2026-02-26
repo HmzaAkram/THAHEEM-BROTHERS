@@ -35,6 +35,7 @@ class SecurityController extends Controller
             'is_document_submitted' => 'boolean',
             'refund_due_date' => 'required|date',
             'receiver_name' => 'nullable|string',
+            'receiver_contact' => 'nullable|string',
             'is_refund_received' => 'boolean',
             'received_amount_date' => 'nullable|date',
             'pay_order_no' => 'nullable|string',

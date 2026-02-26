@@ -26,6 +26,10 @@ export const InvoiceTemplate = forwardRef<HTMLDivElement, InvoiceTemplateProps>(
     const companyPhone = (bill as any).company?.phone || 'N/A';
     const companyEmail = (bill as any).company?.email || 'N/A';
 
+    const trMatch = bill.note?.match(/\[TR:(\d+)\]/);
+    const displayTaxRate = trMatch ? trMatch[1] : '15';
+    const displayNote = bill.note?.replace(/\[TR:\d+\]/, '').trim();
+
     return (
         <div ref={ref} className="bg-white p-6 max-w-[210mm] mx-auto min-h-[297mm] relative text-slate-900" style={{ fontSize: '11px', lineHeight: '1.2' }}>
 
@@ -197,18 +201,21 @@ export const InvoiceTemplate = forwardRef<HTMLDivElement, InvoiceTemplateProps>(
 
                     {/* Conditional Notes */}
                     <div className="mt-4 space-y-1">
-                        {bill.note ? (
-                            <p className="text-[10px] text-slate-600 italic font-medium">Note: {bill.note}</p>
+                        {displayNote && displayNote.trim() !== '' && displayNote !== 'None' && displayNote !== 'No notes have been provided by the admin.' ? (
+                            <p className="text-[10px] text-slate-600 italic font-medium">Note: {displayNote}</p>
                         ) : (
-                            /* Fallback for old bills without note field */
-                            <>
+                            /* Fallback for old bills without note field or with 'None/No Notes' selected */
+                            <div className="space-y-1">
                                 {bill.attachment && (
                                     <p className="text-[10px] text-slate-600 italic font-medium">Note: All Necessary documents enclosed.</p>
                                 )}
                                 {advance === 0 && (
                                     <p className="text-[10px] text-slate-600 italic font-medium">Note: The consignee has not made any advance payment.</p>
                                 )}
-                            </>
+                                {(!bill.attachment && advance !== 0) && (
+                                    <p className="text-[10px] text-slate-600 italic font-medium">Note: No notes have been provided by the admin.</p>
+                                )}
+                            </div>
                         )}
                     </div>
                 </div>
@@ -224,8 +231,8 @@ export const InvoiceTemplate = forwardRef<HTMLDivElement, InvoiceTemplateProps>(
                             <span className="font-semibold text-slate-500">Service Charges</span>
                             <span className="font-mono font-bold">{serviceCharges.toLocaleString()}</span>
                         </div>
-                        <div className="flex justify-between border-b border-slate-200 pb-1">
-                            <span className="font-semibold text-slate-500">Sales Tax (15%)</span>
+                        <div className="flex justify-between border-b border-slate-200">
+                            <span className="text-slate-500">SBR Sales Tax ({displayTaxRate}%)</span>
                             <span className="font-mono font-bold">{salesTax.toLocaleString()}</span>
                         </div>
                         <div className="flex justify-between pt-0.5">

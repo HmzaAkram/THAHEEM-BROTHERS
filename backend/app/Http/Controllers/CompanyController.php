@@ -44,6 +44,7 @@ class CompanyController extends Controller
                 'username' => 'nullable|string|max:50|unique:companies,username|regex:/^[a-zA-Z0-9_]+$/',
                 'password' => 'nullable|string',
                 'status' => 'nullable|string|in:Active,Inactive',
+                'opening_balance' => 'nullable|numeric',
             ]);
 
             // Generate C-ID identifier (e.g., C1, C2, C3)
@@ -98,6 +99,7 @@ class CompanyController extends Controller
             'username' => 'nullable|string|max:50|unique:companies,username,' . $id . '|regex:/^[a-zA-Z0-9_]+$/',
             'password' => 'nullable|string',
             'status' => 'nullable|string|in:Active,Inactive',
+            'opening_balance' => 'nullable|numeric',
         ]);
 
         // Password is automatically hashed via Company model's 'hashed' cast

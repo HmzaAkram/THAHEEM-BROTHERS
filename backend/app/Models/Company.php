@@ -18,6 +18,7 @@ class Company extends Authenticatable
         'city',
         'ntn',
         'username',
+        'opening_balance',
         'status',
         'password',
     ];
@@ -62,13 +63,15 @@ class Company extends Authenticatable
         if (isset($this->bills_sum_grand_total)) {
             $billed = (float) ($this->bills_sum_grand_total ?? 0);
             $paid = (float) (($this->bills_sum_advance_payment ?? 0) + ($this->payments_sum_amount ?? 0) + ($this->payments_sum_adjustment ?? 0));
-            return $billed - $paid;
+            $opening = (float) ($this->opening_balance ?? 0);
+            return $billed - $paid + $opening;
         }
         
         // Fallback for single company loads (when not eager-loaded)
         $billed = (float) $this->bills()->sum('grand_total');
         $paid = (float) ($this->bills()->sum('advance_payment') + $this->payments()->sum('amount') + $this->payments()->sum('adjustment'));
-        return $billed - $paid;
+        $opening = (float) ($this->opening_balance ?? 0);
+        return $billed - $paid + $opening;
     }
 
 

@@ -186,8 +186,18 @@ export default function CompanyDetailsPage() {
                                         <div>
                                             <Label>Password</Label>
                                             <Input
-                                                value={editedCompany.password}
+                                                value={editedCompany.password || ''}
                                                 onChange={(e) => setEditedCompany({ ...editedCompany, password: e.target.value })}
+                                                placeholder="Leave blank to keep current"
+                                            />
+                                        </div>
+                                        <div>
+                                            <Label>Opening Balance (PKR)</Label>
+                                            <Input
+                                                type="number"
+                                                value={editedCompany.openingBalance || ''}
+                                                onChange={(e) => setEditedCompany({ ...editedCompany, openingBalance: Number(e.target.value) })}
+                                                placeholder="Enter opening balance"
                                             />
                                         </div>
                                         <div className="flex items-center gap-2">
@@ -233,6 +243,13 @@ export default function CompanyDetailsPage() {
                                                 <MapPin className="w-3 h-3" /> Company Address
                                             </p>
                                             <p className="font-medium break-words">{company.address}</p>
+                                        </div>
+                                        <Separator />
+                                        <div className="space-y-1">
+                                            <p className="text-xs text-muted-foreground uppercase tracking-wider flex items-center gap-1">
+                                                <DollarSign className="w-3 h-3" /> Opening Balance
+                                            </p>
+                                            <p className="font-medium">PKR {(company.openingBalance || 0).toLocaleString()}</p>
                                         </div>
                                         <Separator />
                                         <div className="space-y-1">

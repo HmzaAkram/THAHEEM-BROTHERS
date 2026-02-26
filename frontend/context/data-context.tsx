@@ -15,6 +15,7 @@ export interface Company {
   address: string;
   username?: string;
   password?: string; // Optional for now to avoid breaking existing logic immediately
+  openingBalance?: number;
   status: 'Active' | 'Inactive';
   createdAt: string;
 }
@@ -99,8 +100,8 @@ export interface LedgerEntry {
   note?: string;
   // Extra detailed bill fields for expansion
   via?: string;
-  weight?: string;
-  packages?: string;
+  weight?: string | number;
+  packages?: string | number;
   igm?: string;
   gdNumber?: string;
 }
@@ -121,6 +122,7 @@ export interface SecurityTracking {
   receivedAmountDate?: string | null;
   payOrderNo?: string | null;
   receiverName?: string | null;
+  receiverContact?: string | null;
   status: 'Pending' | 'Completed';
   createdAt: string;
 }
@@ -136,6 +138,7 @@ interface DataContextType {
   updateBill: (id: string, bill: Partial<Bill>) => Promise<any>;
   deleteBill: (id: string) => Promise<void>;
   addPayment: (payment: Omit<Payment, 'id' | 'createdAt'>) => Promise<any>;
+  updatePayment: (id: string, payment: Partial<Payment>) => Promise<any>;
   deletePayment: (id: string) => Promise<void>;
   addSecurity: (security: Omit<SecurityTracking, 'id' | 'createdAt' | 'status'>) => Promise<any>;
   updateSecurity: (id: string, data: Partial<SecurityTracking>) => void;
@@ -323,6 +326,22 @@ export function DataProvider({ children }: { children: ReactNode }) {
     }
   };
 
+  const updatePayment = async (id: string, paymentData: Partial<Payment>) => {
+    const token = localStorage.getItem('auth_token');
+    const result = await ApiService.put(`/payments/${id}`, paymentData, token);
+    if (result.ok && result.data) {
+      setPayments(prev => prev.map(p => p.id === id ? result.data : p));
+
+      // Refresh bills in case the payment edit affects bill statuses
+      const billsRes = await ApiService.get('/bills', token);
+      if (billsRes.ok) {
+        const billData = billsRes.data;
+        setBills(Array.isArray(billData) ? billData : (billData?.data || []));
+      }
+    }
+    return result;
+  };
+
   const deletePayment = async (id: string) => {
     const token = localStorage.getItem('auth_token');
     const result = await ApiService.delete(`/payments/${id}`, token);
@@ -385,10 +404,16 @@ export function DataProvider({ children }: { children: ReactNode }) {
 
       // 2. Add Credit Entry if Advance was paid
       if (b.advancePayment && b.advancePayment > 0) {
+        // Check for surplus applied marker in note
+        const surplusMatch = b.note?.match(/\[Surplus Applied: ([\d,.]+)\]/);
+        const description = surplusMatch
+          ? `Surplus Applied (from previous overpayment) - Job #${b.jobNumber || 'N/A'}`
+          : `Advance Payment - Job #${b.jobNumber || 'N/A'}`;
+
         entries.push({
           id: b.id + '_advance',
           date: b.date,
-          description: `Advance Payment - Job #${b.jobNumber || 'N/A'}`,
+          description: description,
           debit: 0,
           credit: b.advancePayment,
           balance: 0,
@@ -427,8 +452,30 @@ export function DataProvider({ children }: { children: ReactNode }) {
 
     const allEntries = [...companyBills, ...companyPayments].sort((a, b) => (a.timestamp || 0) - (b.timestamp || 0));
 
+    // Inject Opening Balance
+    const company = companies.find(c => Number(c.id) === Number(companyId));
+    const openingBalanceAmount = Number(company?.openingBalance || 0);
+
+    let entriesWithOpening = allEntries;
+    if (openingBalanceAmount > 0) {
+      const openingEntry: LedgerEntry = {
+        id: `opening_${companyId}`,
+        date: company?.createdAt ? new Date(company.createdAt).toISOString().split('T')[0] : new Date().toISOString().split('T')[0],
+        description: 'Opening Balance',
+        debit: openingBalanceAmount,
+        credit: 0,
+        balance: 0,
+        companyId: companyId,
+        companyName: company?.name,
+        referenceId: `opening_${companyId}`,
+        type: 'BILL' as const,
+        timestamp: 0, // Ensure it's the very first entry
+      };
+      entriesWithOpening = [openingEntry, ...allEntries];
+    }
+
     let runningBalance = 0;
-    return allEntries.map(entry => {
+    return entriesWithOpening.map(entry => {
       runningBalance = runningBalance + entry.debit - entry.credit;
       return { ...entry, balance: runningBalance };
     });
@@ -461,6 +508,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
         updateBill,
         deleteBill,
         addPayment,
+        updatePayment,
         deletePayment,
         addSecurity,
         updateSecurity,

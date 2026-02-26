@@ -145,6 +145,7 @@ export default function CompanyBillsPage() {
 
     // Apply Filters
     if (searchTerm) {
+      const lowerSearch = searchTerm.toLowerCase();
       filtered = filtered.filter(b =>
         b.jobNumber?.toLowerCase().includes(lowerSearch) ||
         b.gdNumber?.toLowerCase().includes(lowerSearch) ||
@@ -167,15 +168,23 @@ export default function CompanyBillsPage() {
     });
   }, [bills, currentCompany, searchTerm, startDate, endDate]);
 
+  const companyPayments = useMemo(() => {
+    if (!currentCompany) return [];
+    return payments.filter(p => String(p.companyId) === String(currentCompany.id));
+  }, [payments, currentCompany]);
+
   const stats = useMemo(() => {
-    const total = companyBills.reduce((sum, b) => sum + b.grandTotal, 0);
-    const paid = companyBills.reduce((sum, b) => sum + b.paidAmount, 0);
+    const openingBalance = Number(currentCompany?.openingBalance) || 0;
+    const total = companyBills.reduce((sum, b) => sum + (Number(b.grandTotal) || 0), 0) + openingBalance;
+    const paid =
+      companyBills.reduce((sum, b) => sum + (Number(b.advancePayment) || 0), 0) +
+      companyPayments.reduce((sum, p) => sum + (Number(p.amount) || 0) + (Number(p.adjustment) || 0), 0);
     return {
       total,
       paid,
       outstanding: total - paid
     };
-  }, [companyBills]);
+  }, [companyBills, companyPayments, currentCompany]);
 
   const handleExportPDF = async () => {
     if (!tableRef.current) return;

@@ -25,6 +25,7 @@ class SecurityTracking extends Model
         'received_amount_date',
         'pay_order_no',
         'receiver_name',
+        'receiver_contact',
         'status',
     ];
 

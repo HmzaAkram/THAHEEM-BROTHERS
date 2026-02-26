@@ -27,7 +27,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { Plus, Download, Filter, Search, DollarSign, TrendingUp, CreditCard } from 'lucide-react';
+import { Plus, Download, Filter, Search, DollarSign, TrendingUp, CreditCard, Pencil } from 'lucide-react';
 import { useState, useMemo } from 'react';
 import { useData, Payment } from '@/context/data-context';
 import { formatDate, formatCurrency } from '@/lib/utils';
@@ -39,9 +39,10 @@ import { Trash2 } from 'lucide-react';
 import Swal from 'sweetalert2';
 
 export default function PaymentsPage() {
-  const { payments, companies, addPayment, deletePayment, bills } = useData();
+  const { payments, companies, addPayment, updatePayment, deletePayment, bills } = useData();
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [editingPayment, setEditingPayment] = useState<Payment | null>(null);
 
   // PIN Dialog State for Deletion
   const [isPinDialogOpen, setIsPinDialogOpen] = useState(false);
@@ -93,6 +94,33 @@ export default function PaymentsPage() {
   const [chequeNo, setChequeNo] = useState('');
   const [payOrderNo, setPayOrderNo] = useState('');
   const [description, setDescription] = useState('');
+
+  const handleEditClick = (payment: Payment) => {
+    setEditingPayment(payment);
+    setCompanyId(payment.companyId);
+    setDate(payment.date);
+    setMethod(payment.method);
+
+    if (payment.billId) {
+      setPaymentMode('specific');
+      setSelectedBillIds([payment.billId]);
+      setBillPayments({
+        [payment.billId]: {
+          amount: String(payment.amount),
+          adjustment: String(payment.adjustment || 0)
+        }
+      });
+    } else {
+      setPaymentMode('lumpsum');
+      setLumpsumAmount(String(payment.amount));
+    }
+
+    setTrackingId(payment.trackingId || '');
+    setChequeNo(payment.chequeNo || '');
+    setPayOrderNo(payment.payOrderNo || '');
+    setDescription(payment.description || '');
+    setIsDialogOpen(true);
+  };
 
   const handleSubmit = async () => {
     if (!companyId || !date) {
@@ -156,7 +184,33 @@ export default function PaymentsPage() {
 
       const companyName = companies.find(c => String(c.id) === String(companyId))?.name || 'Unknown';
 
-      if (paymentMode === 'specific') {
+      if (editingPayment) {
+        const finalReference =
+          method === 'Bank Transfer' ? `TRF: ${trackingId}` :
+            method === 'Cheque' ? `CHQ: ${chequeNo}` :
+              method === 'Pay Order' ? `PO: ${payOrderNo}` :
+                method === 'Advance' ? `ADV: ${description}` : 'Cash';
+
+        const paymentData: Partial<Payment> = {
+          companyId,
+          companyName,
+          date,
+          amount: paymentMode === 'specific' ? Number(billPayments[selectedBillIds[0]]?.amount || 0) : Number(lumpsumAmount),
+          adjustment: paymentMode === 'specific' ? Number(billPayments[selectedBillIds[0]]?.adjustment || 0) : 0,
+          method,
+          billId: paymentMode === 'specific' ? selectedBillIds[0] : undefined,
+          trackingId: method === 'Bank Transfer' ? trackingId : undefined,
+          chequeNo: method === 'Cheque' ? chequeNo : undefined,
+          payOrderNo: method === 'Pay Order' ? payOrderNo : undefined,
+          description: description,
+          reference: finalReference
+        };
+
+        const result = await updatePayment(editingPayment.id, paymentData);
+        if (result.ok) successCount = 1;
+        else errorCount = 1;
+
+      } else if (paymentMode === 'specific') {
         for (const id of selectedBillIds) {
           const p = billPayments[id];
 
@@ -274,6 +328,7 @@ export default function PaymentsPage() {
         setChequeNo('');
         setPayOrderNo('');
         setDescription('');
+        setEditingPayment(null);
       } else {
         Swal.fire({
           title: 'Error',
@@ -373,14 +428,30 @@ export default function PaymentsPage() {
           </div>
           <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
             <DialogTrigger asChild>
-              <Button className="gap-2 shadow-md bg-green-600 hover:bg-green-700">
+              <Button
+                className="gap-2 shadow-md bg-green-600 hover:bg-green-700"
+                onClick={() => {
+                  setEditingPayment(null);
+                  setCompanyId('');
+                  setLumpsumAmount('');
+                  setSelectedBillIds([]);
+                  setBillPayments({});
+                  setTrackingId('');
+                  setChequeNo('');
+                  setPayOrderNo('');
+                  setDescription('');
+                  setMethod('Bank Transfer');
+                  setPaymentMode('specific');
+                  setIsDialogOpen(true);
+                }}
+              >
                 <Plus className="w-4 h-4" />
                 Record Payment
               </Button>
             </DialogTrigger>
             <DialogContent className="max-w-md max-h-[90vh] overflow-y-auto">
               <DialogHeader>
-                <DialogTitle>Record New Payment</DialogTitle>
+                <DialogTitle>{editingPayment ? 'Edit Payment' : 'Record New Payment'}</DialogTitle>
               </DialogHeader>
               <div className="space-y-4 pt-4">
                 <div>
@@ -583,12 +654,24 @@ export default function PaymentsPage() {
 
                 <div className="flex gap-2 pt-4">
                   <Button className="flex-1 bg-green-600 hover:bg-green-700" onClick={handleSubmit} disabled={loading}>
-                    {loading ? "Recording..." : "Save Payment"}
+                    {loading ? (editingPayment ? "Updating..." : "Recording...") : (editingPayment ? "Update Payment" : "Save Payment")}
                   </Button>
                   <Button
                     variant="outline"
                     className="flex-1"
-                    onClick={() => setIsDialogOpen(false)}
+                    onClick={() => {
+                      setIsDialogOpen(false);
+                      setEditingPayment(null);
+                      // Reset states
+                      setCompanyId('');
+                      setLumpsumAmount('');
+                      setSelectedBillIds([]);
+                      setBillPayments({});
+                      setTrackingId('');
+                      setChequeNo('');
+                      setPayOrderNo('');
+                      setDescription('');
+                    }}
                   >
                     Cancel
                   </Button>
@@ -705,18 +788,29 @@ export default function PaymentsPage() {
                             {linkedBill ? formatCurrency(linkedBill.grandTotal || 0) : '-'}
                           </TableCell>
                           <TableCell className="text-right">
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              className="text-destructive hover:bg-destructive/10 hover:text-destructive transition-colors"
-                              onClick={() => {
-                                setPaymentToDelete(payment);
-                                setIsPinDialogOpen(true);
-                              }}
-                              title="Delete Payment"
-                            >
-                              <Trash2 className="w-4 h-4" />
-                            </Button>
+                            <div className="flex justify-end gap-1">
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                className="text-primary hover:bg-primary/10 hover:text-primary transition-colors"
+                                onClick={() => handleEditClick(payment)}
+                                title="Edit Payment"
+                              >
+                                <Pencil className="w-4 h-4" />
+                              </Button>
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                className="text-destructive hover:bg-destructive/10 hover:text-destructive transition-colors"
+                                onClick={() => {
+                                  setPaymentToDelete(payment);
+                                  setIsPinDialogOpen(true);
+                                }}
+                                title="Delete Payment"
+                              >
+                                <Trash2 className="w-4 h-4" />
+                              </Button>
+                            </div>
                           </TableCell>
                         </TableRow>
                       );

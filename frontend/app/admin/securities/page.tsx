@@ -68,7 +68,7 @@ const calculateRefundDueDate = (startDate: string, days: number) => {
 };
 
 export default function SecuritiesPage() {
-    const { securities, companies, addSecurity, updateSecurity } = useData();
+    const { securities, companies, bills, addSecurity, updateSecurity } = useData();
     const [isDialogOpen, setIsDialogOpen] = useState(false);
     const [isViewDialogOpen, setIsViewDialogOpen] = useState(false);
     const [selectedSecurity, setSelectedSecurity] = useState<SecurityTracking | null>(null);
@@ -121,6 +121,7 @@ export default function SecuritiesPage() {
     const [receivedAmountDate, setReceivedAmountDate] = useState('');
     const [payOrderNo, setPayOrderNo] = useState('');
     const [receiverName, setReceiverName] = useState('');
+    const [receiverContact, setReceiverContact] = useState('');
 
     // Fix Hydration Error: Set default dates on client-side only
     useEffect(() => {
@@ -174,6 +175,7 @@ export default function SecuritiesPage() {
                 isRefundReceived: false,
                 payOrderNo: payOrderNo || null,
                 receiverName: receiverName || null,
+                receiverContact: receiverContact || null,
                 status: 'Pending',
                 receivedAmountDate: null,
             };
@@ -198,6 +200,7 @@ export default function SecuritiesPage() {
                 setReceivedAmountDate('');
                 setPayOrderNo('');
                 setReceiverName('');
+                setReceiverContact('');
             } else {
                 console.error('Security Save Failed:', result);
                 Swal.fire({
@@ -293,7 +296,13 @@ export default function SecuritiesPage() {
                                                     className="h-11 bg-white dark:bg-slate-950 border-border/40 rounded-xl font-mono"
                                                     value={gdNumber}
                                                     onChange={(e) => setGdNumber(e.target.value)}
+                                                    list="gd-numbers"
                                                 />
+                                                <datalist id="gd-numbers">
+                                                    {Array.from(new Set(bills.filter(b => b.companyId === companyId && b.gdNumber).map(b => b.gdNumber))).map((gd, idx) => (
+                                                        <option key={idx} value={gd} />
+                                                    ))}
+                                                </datalist>
                                             </div>
                                         </div>
                                     </div>
@@ -354,7 +363,16 @@ export default function SecuritiesPage() {
                                                     onChange={(e) => setReceiverName(e.target.value)}
                                                 />
                                             </div>
-                                            <div className="md:col-span-2 flex items-center justify-end px-6 rounded-xl bg-primary/5 border border-primary/10">
+                                            <div className="space-y-2">
+                                                <Label className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground/60">Receiver Person Contact</Label>
+                                                <Input
+                                                    placeholder="Example: 0300-1234567"
+                                                    className="h-11 bg-white dark:bg-slate-950 border-border/40 rounded-xl font-mono"
+                                                    value={receiverContact}
+                                                    onChange={(e) => setReceiverContact(e.target.value)}
+                                                />
+                                            </div>
+                                            <div className="md:col-span-3 flex items-center justify-end px-6 rounded-xl bg-primary/5 border border-primary/10">
                                                 <div className="text-right">
                                                     <p className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground/60">Total Security Amount</p>
                                                     <p className="text-xl font-black text-primary font-mono leading-none">{formatCurrency(totalAmountCalculated)}</p>
@@ -750,7 +768,11 @@ export default function SecuritiesPage() {
                                 <div className="grid grid-cols-2 gap-4">
                                     <div>
                                         <p className="text-xs text-muted-foreground font-semibold mb-1">Receiver Name</p>
-                                        <p className="font-bold text-foreground">{selectedSecurity.receiverName}</p>
+                                        <p className="font-bold text-foreground">{selectedSecurity.receiverName || 'N/A'}</p>
+                                    </div>
+                                    <div>
+                                        <p className="text-xs text-muted-foreground font-semibold mb-1">Receiver Contact</p>
+                                        <p className="font-bold text-foreground">{selectedSecurity.receiverContact || 'N/A'}</p>
                                     </div>
                                     <div>
                                         <p className="text-xs text-muted-foreground font-semibold mb-1">Document Submitted</p>

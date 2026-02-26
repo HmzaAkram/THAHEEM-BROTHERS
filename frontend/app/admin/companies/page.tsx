@@ -58,6 +58,7 @@ export default function CompaniesPage() {
     address: '',
     username: '',
     password: '',
+    openingBalance: '',
   });
 
   // PIN Dialog State
@@ -172,11 +173,12 @@ export default function CompaniesPage() {
         address: formData.address || '',
         username: formData.username,
         password: formData.password,
+        openingBalance: formData.openingBalance ? Number(formData.openingBalance) : 0,
         status: 'Active',
       }) as any;
 
       if (result.ok) {
-        setFormData({ name: '', ntn: '', email: '', phone: '', address: '', username: '', password: '' });
+        setFormData({ name: '', ntn: '', email: '', phone: '', address: '', username: '', password: '', openingBalance: '' });
         setIsDialogOpen(false);
       } else {
         Swal.fire({
@@ -300,6 +302,17 @@ export default function CompaniesPage() {
                       className="mt-1"
                     />
                   </div>
+                </div>
+                <div>
+                  <Label htmlFor="openingBalance">Opening Balance (PKR)</Label>
+                  <Input
+                    id="openingBalance"
+                    type="number"
+                    value={formData.openingBalance}
+                    onChange={handleInputChange}
+                    placeholder="Enter opening balance (e.g. 40000)"
+                    className="mt-1"
+                  />
                 </div>
                 <div className="flex gap-2 pt-4">
                   <Button className="flex-1" onClick={handleSubmit} disabled={loading}>

@@ -49,10 +49,11 @@ import {
   TrendingUp,
   CreditCard,
   Pencil,
+  Calculator
 } from 'lucide-react';
 import { useState, useMemo, useRef, useEffect } from 'react';
 import { useData, BillItem, Bill } from '@/context/data-context';
-import { formatDate, formatCurrency } from '@/lib/utils';
+import { cn, formatDate, formatCurrency } from '@/lib/utils';
 import JSZip from 'jszip';
 import { jsPDF } from 'jspdf';
 import autoTable from 'jspdf-autotable';
@@ -73,11 +74,12 @@ const statusStyles = {
 import { PDFDocument } from 'pdf-lib';
 
 export default function BillsPage() {
-  const { bills, companies, addBill, updateBill, deleteBill, payments } = useData();
+  const { bills, companies, addBill, updateBill, deleteBill, payments, getCompanyBalance } = useData();
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [isViewOpen, setIsViewOpen] = useState(false);
   const [selectedBill, setSelectedBill] = useState<Bill | null>(null);
   const [loading, setLoading] = useState(false);
+  const [availableCredit, setAvailableCredit] = useState<number>(0);
   const [isEditing, setIsEditing] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const tableRef = useRef<HTMLDivElement>(null);
@@ -96,6 +98,12 @@ export default function BillsPage() {
   // PIN Dialog State for Deletion
   const [isPinDialogOpen, setIsPinDialogOpen] = useState(false);
   const [billToDelete, setBillToDelete] = useState<Bill | null>(null);
+
+  // Form Validation State
+  const [formErrors, setFormErrors] = useState<Record<string, boolean>>({});
+  const companySelectRef = useRef<HTMLButtonElement>(null);
+  const dateInputRef = useRef<HTMLInputElement>(null);
+  const itemsSectionRef = useRef<HTMLDivElement>(null);
 
   const handleDeleteBill = async () => {
     if (billToDelete) {
@@ -307,6 +315,20 @@ export default function BillsPage() {
 
   // Form State
   const [companyId, setCompanyId] = useState('');
+
+  useEffect(() => {
+    if (companyId && !isEditing) {
+      const balance = getCompanyBalance(companyId);
+      if (balance < 0) {
+        setAvailableCredit(Math.abs(balance));
+      } else {
+        setAvailableCredit(0);
+      }
+    } else {
+      setAvailableCredit(0);
+    }
+  }, [companyId, getCompanyBalance, isEditing]);
+
   const [date, setDate] = useState(new Date().toISOString().split('T')[0]);
   const [exporter, setExporter] = useState('');
   const [invoiceNo, setInvoiceNo] = useState('');
@@ -322,7 +344,9 @@ export default function BillsPage() {
   const [via, setVia] = useState('');
   const [weight, setWeight] = useState('');
   const [attachment, setAttachment] = useState<File | null>(null);
-  const [note, setNote] = useState<string>('All Necessary documents enclosed.');
+  const [noteType, setNoteType] = useState<string>('All Necessary documents enclosed.');
+  const [customNote, setCustomNote] = useState<string>('');
+  const [taxRate, setTaxRate] = useState<number>(15);
 
   const currentItemsList = via && BILL_ITEMS_MAP[via] ? BILL_ITEMS_MAP[via] : DEFAULT_ITEMS;
   const ALL_BILL_ITEMS = [...currentItemsList, 'Others'];
@@ -334,15 +358,13 @@ export default function BillsPage() {
 
   const [items, setItems] = useState<Omit<BillItem, 'id'>[]>([
     { description: 'DUTY TAXES & ETO', notes: '', amount: 0, invoiceNo: '' },
-    { description: 'CIVIL AVIATION AUTHORITY', notes: '', amount: 0, invoiceNo: '' },
-    { description: "GERRYS' DANATA PVT LTD", notes: '', amount: 0, invoiceNo: '' },
   ]);
   const [serviceCharges, setServiceCharges] = useState<string>('');
   const [salesTax, setSalesTax] = useState<string>('');
   const [advancePayment, setAdvancePayment] = useState<string>('');
 
   const totalAmount = items.reduce((sum, item) => sum + (Number(item.amount) || 0), 0);
-  const calculatedSalesTax = (Number(salesTax) * 0.15) || 0;
+  const calculatedSalesTax = (Number(salesTax) * (taxRate / 100)) || 0;
   const grandTotal = totalAmount + (Number(serviceCharges) || 0) + calculatedSalesTax; // Gross Total (Advance not deducted)
 
 
@@ -365,7 +387,36 @@ export default function BillsPage() {
     setServiceCharges(String(bill.serviceCharges || ''));
     setSalesTax(String(bill.salesTax || ''));
     setAdvancePayment(String(bill.advancePayment || ''));
-    setNote(bill.note || 'All Necessary documents enclosed.');
+
+    // Handle Note logic
+    const predefinedNotes = [
+      'All Necessary documents enclosed.',
+      'The consignee has not made any advance payment.',
+      'All Necessary documents enclosed. The consignee has not made any advance payment.',
+      'No notes have been provided by the admin.'
+    ];
+
+    let cleanNote = bill.note || '';
+    let extractedTaxRate = 15;
+
+    const trMatch = cleanNote.match(/\[TR:(\d+)\]/);
+    if (trMatch) {
+      extractedTaxRate = parseInt(trMatch[1]);
+      cleanNote = cleanNote.replace(/\[TR:\d+\]/, '').trim();
+    }
+    setTaxRate(extractedTaxRate);
+
+    if (cleanNote && predefinedNotes.includes(cleanNote)) {
+      setNoteType(cleanNote);
+      setCustomNote('');
+    } else if (!cleanNote || cleanNote === ' ' || cleanNote === 'None') {
+      setNoteType('No notes have been provided by the admin.');
+      setCustomNote('');
+    } else {
+      setNoteType('Others');
+      setCustomNote(cleanNote);
+    }
+
     setAttachment(null); // Reset attachment as file input can't be pre-filled with URL
 
     // Map existing items
@@ -380,6 +431,7 @@ export default function BillsPage() {
 
     setEditingId(bill.id);
     setIsEditing(true);
+    setFormErrors({});
     setIsDialogOpen(true);
   };
 
@@ -400,8 +452,20 @@ export default function BillsPage() {
   };
 
   const handleSubmit = async () => {
-    if (!companyId || !date) {
-      Swal.fire({ title: 'Missing Information', text: "Please fill all required fields", icon: 'warning', confirmButtonColor: '#3b82f6' });
+    const errors: Record<string, boolean> = {};
+    if (!companyId) errors.companyId = true;
+    if (!date) errors.date = true;
+
+    if (Object.keys(errors).length > 0) {
+      setFormErrors(errors);
+      // Scroll to the first error
+      if (errors.companyId && companySelectRef.current) {
+        companySelectRef.current.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        companySelectRef.current.focus();
+      } else if (errors.date && dateInputRef.current) {
+        dateInputRef.current.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        dateInputRef.current.focus();
+      }
       return;
     }
 
@@ -419,7 +483,10 @@ export default function BillsPage() {
     })).filter(i => i.description && i.amount > 0);
 
     if (finalItems.length === 0) {
-      Swal.fire({ title: 'Invalid Items', text: "Please add at least one valid item", icon: 'warning', confirmButtonColor: '#3b82f6' });
+      setFormErrors(prev => ({ ...prev, items: true }));
+      if (itemsSectionRef.current) {
+        itemsSectionRef.current.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      }
       return;
     }
 
@@ -463,7 +530,7 @@ export default function BillsPage() {
         salesTax: calculatedSalesTax,
         advancePayment: Number(advancePayment) || 0,
         grandTotal: grandTotal,
-        note: note,
+        note: (noteType === 'Others' ? customNote : noteType) + (availableCredit > 0 && Number(advancePayment) === availableCredit ? ` [Surplus Applied: ${availableCredit}]` : '') + ` [TR:${taxRate}]`,
       };
 
       let result;
@@ -496,14 +563,15 @@ export default function BillsPage() {
         setContainerNo('');
         setPackages('');
         setAttachment(null);
-        setNote('All Necessary documents enclosed.');
+        setNoteType('All Necessary documents enclosed.');
+        setCustomNote('');
+        setTaxRate(15);
         setItems([
           { description: 'DUTY TAXES & ETO', notes: '', amount: 0, invoiceNo: '' },
-          { description: 'CIVIL AVIATION AUTHORITY', notes: '', amount: 0, invoiceNo: '' },
-          { description: "GERRYS' DANATA PVT LTD", notes: '', amount: 0, invoiceNo: '' },
         ]);
         setIsEditing(false);
         setEditingId(null);
+        setFormErrors({});
       } else {
         Swal.fire({ title: 'Error', text: `Failed to ${isEditing ? 'update' : 'generate'} bill: ${result?.message || 'Unknown error'}`, icon: 'error', confirmButtonColor: '#3b82f6' });
       }
@@ -711,13 +779,13 @@ export default function BillsPage() {
                 if (!open) {
                   setIsEditing(false);
                   setEditingId(null);
-                  // Optional: Reset form fields here if desired, otherwise they persist until next open/new click
-                  // For better UX, usually better to reset on 'Create New' click or reset here.
-                  // Let's reset here to avoid stale data when clicking "Create New" after closing "Edit"
                   setCompanyId('');
                   setItems([{ description: 'DUTY TAXES & ETO', notes: '', amount: 0, invoiceNo: '' }]);
-                  // Reset other fields... (Doing full reset might be verbose here, maybe extract reset logic)
-                  setJobNumber(''); setVia(''); setWeight(''); setExporter(''); setInvoiceNo(''); setInvoiceDate(new Date().toISOString().split('T')[0]); setHawb(''); setIgm(''); setIndexNo(''); setGdNumber(''); setServiceCharges(''); setSalesTax(''); setAdvancePayment(''); setNoOfContainers(''); setContainerNo(''); setPackages(''); setAttachment(null); setNote('All Necessary documents enclosed.');
+                  setJobNumber(''); setVia(''); setWeight(''); setExporter(''); setInvoiceNo(''); setInvoiceDate(new Date().toISOString().split('T')[0]); setHawb(''); setIgm(''); setIndexNo(''); setGdNumber(''); setServiceCharges(''); setSalesTax(''); setAdvancePayment(''); setNoOfContainers(''); setContainerNo(''); setPackages(''); setAttachment(null);
+                  setNoteType('All Necessary documents enclosed.');
+                  setCustomNote('');
+                  setTaxRate(15);
+                  setFormErrors({});
                 }
               }}>
                 <DialogTrigger asChild>
@@ -745,8 +813,12 @@ export default function BillsPage() {
                             <CompanySelect
                               companies={companies}
                               value={companyId}
-                              onValueChange={setCompanyId}
-                              className="h-10"
+                              onValueChange={(val) => {
+                                setCompanyId(val);
+                                setFormErrors(prev => ({ ...prev, companyId: false }));
+                              }}
+                              className={cn("h-10", formErrors.companyId && "border-destructive ring-destructive/20")}
+                              ref={companySelectRef}
                             />
                           </div>
                           <div>
@@ -754,9 +826,16 @@ export default function BillsPage() {
                             <div className="relative">
                               <Input
                                 type="date"
-                                className="bg-white dark:bg-slate-950 border-border/50 focus:ring-primary/20 transition-all pl-10 h-10"
+                                className={cn(
+                                  "bg-white dark:bg-slate-950 border-border/50 focus:ring-primary/20 transition-all pl-10 h-10",
+                                  formErrors.date && "border-destructive ring-destructive/20"
+                                )}
                                 value={date}
-                                onChange={(e) => setDate(e.target.value)}
+                                onChange={(e) => {
+                                  setDate(e.target.value);
+                                  setFormErrors(prev => ({ ...prev, date: false }));
+                                }}
+                                ref={dateInputRef}
                               />
                               <Calendar className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground/50 pointer-events-none" />
                             </div>
@@ -916,13 +995,16 @@ export default function BillsPage() {
                         </div>
                       </div>
 
-
-                      <div className="space-y-6">
+                      {/* Section 4: Billing Items */}
+                      <div className="space-y-6" ref={itemsSectionRef}>
                         <div className="flex justify-between items-center pb-2 border-b border-border/50">
                           <div className="flex items-center gap-3">
                             <Package className="w-5 h-5 text-primary" />
                             <h3 className="text-xs font-bold uppercase tracking-[0.2em] text-muted-foreground/80">Billing Items</h3>
                           </div>
+                          {formErrors.items && (
+                            <span className="text-[10px] font-bold text-destructive uppercase animate-pulse">Please add at least one valid item</span>
+                          )}
                         </div>
 
                         <div className="space-y-4">
@@ -953,7 +1035,6 @@ export default function BillsPage() {
                                         className="h-9 text-sm bg-primary/5 border-primary/10 focus:border-primary/30"
                                         value={item.description === 'Others' ? '' : item.description}
                                         onChange={(e) => handleItemChange(idx, 'description', e.target.value)}
-                                        autoFocus
                                       />
                                     </div>
                                   )}
@@ -979,7 +1060,10 @@ export default function BillsPage() {
                                     min="0"
                                     className="h-10 text-right font-mono [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none bg-muted/20 border-border/30"
                                     value={item.amount || ''}
-                                    onChange={(e) => handleItemChange(idx, 'amount', e.target.value)}
+                                    onChange={(e) => {
+                                      handleItemChange(idx, 'amount', e.target.value);
+                                      if (formErrors.items) setFormErrors(prev => ({ ...prev, items: false }));
+                                    }}
                                     onWheel={(e) => e.currentTarget.blur()}
                                   />
                                 </div>
@@ -1041,7 +1125,7 @@ export default function BillsPage() {
                               />
                             </div>
                             <div className="space-y-2">
-                              <Label className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground/60">SBR Sales Tax (15%)</Label>
+                              <Label className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground/60">SBR Sales Tax Input Amount</Label>
                               <Input
                                 type="number"
                                 placeholder="Example: 750"
@@ -1052,15 +1136,34 @@ export default function BillsPage() {
                               />
                             </div>
                             <div className="space-y-2">
-                              <Label className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground/60">Advance Payment Received</Label>
-                              <Input
-                                type="number"
-                                placeholder="Example: 10000"
-                                className="h-10 font-mono bg-white dark:bg-slate-950 border-border/50 text-green-600 dark:text-green-400 font-bold"
-                                value={advancePayment}
-                                onChange={(e) => setAdvancePayment(e.target.value)}
-                                onWheel={(e) => e.currentTarget.blur()}
-                              />
+                              <div className="flex justify-between items-center">
+                                <Label className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground/60">Advance Payment Received</Label>
+                                {availableCredit > 0 && !isEditing && (
+                                  <Badge variant="outline" className="text-[9px] bg-green-50 text-green-700 border-green-200 animate-pulse">
+                                    Credit Available: {formatCurrency(availableCredit)}
+                                  </Badge>
+                                )}
+                              </div>
+                              <div className="relative group">
+                                <Input
+                                  type="number"
+                                  placeholder="Example: 10000"
+                                  className="h-10 font-mono bg-white dark:bg-slate-950 border-border/50 text-green-600 dark:text-green-400 font-bold pr-20"
+                                  value={advancePayment}
+                                  onChange={(e) => setAdvancePayment(e.target.value)}
+                                  onWheel={(e) => e.currentTarget.blur()}
+                                />
+                                {availableCredit > 0 && !isEditing && (
+                                  <Button
+                                    size="sm"
+                                    variant="ghost"
+                                    className="absolute right-1 top-1 h-8 text-[10px] font-bold text-green-700 hover:bg-green-100 px-2 rounded-md"
+                                    onClick={() => setAdvancePayment(String(Math.min(availableCredit, grandTotal)))}
+                                  >
+                                    Use Credit
+                                  </Button>
+                                )}
+                              </div>
                             </div>
                           </div>
                         </div>
@@ -1068,6 +1171,26 @@ export default function BillsPage() {
                         <div className="bg-white dark:bg-slate-950 rounded-2xl p-6 border border-border/50 shadow-lg relative overflow-hidden group">
                           <div className="absolute top-0 right-0 w-24 h-24 bg-primary/5 rounded-full -mr-12 -mt-12 transition-transform group-hover:scale-110" />
                           <div className="space-y-3 relative">
+                            <div className="flex justify-between items-center pb-2 border-b border-border/50">
+                              <div className="flex items-center gap-3">
+                                <Calculator className="w-5 h-5 text-primary" />
+                                <h3 className="text-[10px] font-bold uppercase tracking-[0.2em] text-muted-foreground/80">Totals & Tax</h3>
+                              </div>
+                              <div className="flex items-center gap-2 bg-white dark:bg-slate-950 p-1 rounded-lg border border-border/50 shadow-sm">
+                                <span className="text-[9px] font-bold text-muted-foreground uppercase px-1">Tax Rate:</span>
+                                <Select value={String(taxRate)} onValueChange={(v) => setTaxRate(Number(v))}>
+                                  <SelectTrigger className="h-7 w-[80px] text-xs font-bold border-none bg-secondary/50 focus:ring-0">
+                                    <SelectValue />
+                                  </SelectTrigger>
+                                  <SelectContent>
+                                    <SelectItem value="5">5%</SelectItem>
+                                    <SelectItem value="10">10%</SelectItem>
+                                    <SelectItem value="15">15%</SelectItem>
+                                    <SelectItem value="20">20%</SelectItem>
+                                  </SelectContent>
+                                </Select>
+                              </div>
+                            </div>
                             <div className="flex justify-between items-center text-xs font-semibold text-muted-foreground uppercase tracking-widest">
                               <span>Subtotal Items</span>
                               <span className="font-mono">{formatCurrency(totalAmount)}</span>
@@ -1077,7 +1200,7 @@ export default function BillsPage() {
                               <span className="font-mono">{formatCurrency(Number(serviceCharges) || 0)}</span>
                             </div>
                             <div className="flex justify-between items-center text-xs font-semibold text-primary uppercase tracking-widest">
-                              <span>SBR Sales Tax (15% of Input)</span>
+                              <span>SBR Sales Tax ({taxRate}% of Input)</span>
                               <span className="font-mono">{formatCurrency(calculatedSalesTax)}</span>
                             </div>
                             {Number(advancePayment) > 0 && (
@@ -1100,7 +1223,7 @@ export default function BillsPage() {
                         </div>
                       </div>
 
-                      {/* Section 4: Document Attachment - RELOCATED ABOVE BUTTONS */}
+                      {/* Section 5: Document Attachment */}
                       <div className="bg-primary/[0.02] p-6 rounded-2xl border-2 border-dashed border-primary/20 hover:border-primary/40 transition-colors group mt-8">
                         <div className="flex flex-col items-center justify-center space-y-3">
                           <div className="w-12 h-12 rounded-full bg-primary/10 flex items-center justify-center group-hover:scale-110 transition-transform">
@@ -1111,9 +1234,6 @@ export default function BillsPage() {
                             <p className="text-xs text-muted-foreground mt-1">Upload PDF Document</p>
                           </div>
                           <div className="relative w-full max-w-xs mt-2">
-                            {/* File Input is ONLY active when no attachment is selected, OR keeps hidden to allow change if needed (but UI request implies separating actions) */}
-                            {/* Better approach: If attachment exists, hide the input completely or move it, so it doesn't block the delete button */}
-
                             {!attachment && (
                               <Input
                                 type="file"
@@ -1141,7 +1261,6 @@ export default function BillsPage() {
                                     onClick={(e) => {
                                       e.preventDefault();
                                       e.stopPropagation();
-                                      console.log("Deleting attachment...");
                                       setAttachment(null);
                                     }}
                                   >
@@ -1166,7 +1285,7 @@ export default function BillsPage() {
                         </div>
                         <div>
                           <Label className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground mb-1.5 block">Select Note</Label>
-                          <Select value={note} onValueChange={setNote}>
+                          <Select value={noteType} onValueChange={setNoteType}>
                             <SelectTrigger className="h-10 bg-white dark:bg-slate-950 border-border/50">
                               <SelectValue placeholder="Select a note" />
                             </SelectTrigger>
@@ -1174,10 +1293,22 @@ export default function BillsPage() {
                               <SelectItem value="All Necessary documents enclosed.">All Necessary documents enclosed.</SelectItem>
                               <SelectItem value="The consignee has not made any advance payment.">The consignee has not made any advance payment.</SelectItem>
                               <SelectItem value="All Necessary documents enclosed. The consignee has not made any advance payment.">All Necessary documents enclosed. & No advance payment.</SelectItem>
-                              <SelectItem value=" ">None</SelectItem>
+                              <SelectItem value="No notes have been provided by the admin.">No Notes</SelectItem>
+                              <SelectItem value="Others">Others</SelectItem>
                             </SelectContent>
                           </Select>
                         </div>
+                        {noteType === 'Others' && (
+                          <div className="mt-4 animate-in fade-in slide-in-from-top-2">
+                            <Label className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground mb-1.5 block">Custom Note</Label>
+                            <Input
+                              placeholder="Enter your custom note here..."
+                              className="bg-white dark:bg-slate-950 border-border/50 h-10"
+                              value={customNote}
+                              onChange={(e) => setCustomNote(e.target.value)}
+                            />
+                          </div>
+                        )}
                       </div>
 
                       <div className="flex gap-4 pt-6">
@@ -1200,8 +1331,8 @@ export default function BillsPage() {
                   </div>
                 </DialogContent>
               </Dialog>
-            </div>
-          </div>
+            </div >
+          </div >
 
           <Card className="shadow-md border-border/50">
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-7">
@@ -1416,7 +1547,7 @@ export default function BillsPage() {
 
             </DialogContent>
           </Dialog>
-        </div>
+        </div >
       </DashboardLayout >
       {/* Hidden Capture Area for PDF Generation  */}
       <div style={{ position: 'fixed', top: '200vh', left: 0 }} suppressHydrationWarning>
@@ -1428,8 +1559,9 @@ export default function BillsPage() {
               paidDate={getPaidDate(downloadState.bill.id)}
             />
           </div>
-        )}
-      </div>
+        )
+        }
+      </div >
 
       <PinDialog
         isOpen={isPinDialogOpen}
@@ -1438,7 +1570,7 @@ export default function BillsPage() {
           setBillToDelete(null);
         }}
         onConfirm={handleDeleteBill}
-        actionTitle="Delete Bill"
+        title="Delete Bill"
         description={`This will permanently delete Job No. ${billToDelete?.jobNumber || 'Unknown'}.`}
       />
     </>

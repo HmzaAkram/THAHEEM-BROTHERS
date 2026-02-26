@@ -48,6 +48,32 @@ class PaymentController extends Controller
         return response()->json($payment, 201);
     }
 
+    public function update(Request $request, Payment $payment)
+    {
+        $user = auth('sanctum')->user();
+        if (!$user instanceof \App\Models\User || $user->role !== 'admin') {
+            return response()->json(['message' => 'Unauthorized. Admin access required.'], 403);
+        }
+
+        $validated = $request->validate([
+            'company_id' => 'sometimes|required|exists:companies,id',
+            'company_name' => 'sometimes|required|string',
+            'date' => 'sometimes|required|date',
+            'amount' => 'sometimes|required|numeric',
+            'reference' => 'nullable|string',
+            'method' => 'nullable|string',
+            'description' => 'nullable|string',
+            'bill_id' => 'nullable|exists:bills,id',
+            'adjustment' => 'nullable|numeric',
+            'tracking_id' => 'nullable|string',
+            'cheque_no' => 'nullable|string',
+            'pay_order_no' => 'nullable|string',
+        ]);
+
+        $payment->update($validated);
+        return response()->json($payment);
+    }
+
     public function destroy(Payment $payment)
     {
         $user = auth('sanctum')->user();

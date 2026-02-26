@@ -34,7 +34,7 @@ interface CompanySelectProps {
     allOptionLabel?: string
 }
 
-export function CompanySelect({
+export const CompanySelect = React.forwardRef<HTMLButtonElement, CompanySelectProps>(({
     companies,
     value,
     onValueChange,
@@ -43,7 +43,7 @@ export function CompanySelect({
     className,
     showAllOption = false,
     allOptionLabel = "-- All Companies --"
-}: CompanySelectProps) {
+}, ref) => {
     const [open, setOpen] = React.useState(false)
 
     const selectedCompany = React.useMemo(() => {
@@ -55,6 +55,7 @@ export function CompanySelect({
         <Popover open={open} onOpenChange={setOpen}>
             <PopoverTrigger asChild>
                 <Button
+                    ref={ref}
                     variant="outline"
                     role="combobox"
                     aria-expanded={open}
@@ -115,4 +116,6 @@ export function CompanySelect({
             </PopoverContent>
         </Popover>
     )
-}
+})
+
+CompanySelect.displayName = "CompanySelect"

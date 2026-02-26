@@ -75,7 +75,9 @@ export function MultiSearchSelect({
                                         className="rounded-sm px-1 font-normal bg-green-50 text-green-700 border-green-200 dark:bg-green-900/20 dark:text-green-400"
                                     >
                                         {option?.label.split(' (')[0] || id}
-                                        <button
+                                        <div
+                                            role="button"
+                                            tabIndex={0}
                                             className="ml-1 ring-offset-background rounded-full outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2"
                                             onKeyDown={(e) => {
                                                 if (e.key === "Enter") {
@@ -86,10 +88,14 @@ export function MultiSearchSelect({
                                                 e.preventDefault()
                                                 e.stopPropagation()
                                             }}
-                                            onClick={() => removeId(id)}
+                                            onClick={(e) => {
+                                                e.preventDefault()
+                                                e.stopPropagation()
+                                                removeId(id)
+                                            }}
                                         >
                                             <X className="h-3 w-3 text-muted-foreground hover:text-foreground" />
-                                        </button>
+                                        </div>
                                     </Badge>
                                 )
                             })

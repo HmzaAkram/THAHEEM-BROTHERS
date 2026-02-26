@@ -66,7 +66,8 @@ export default function CompanyDashboard() {
 
   const stats = useMemo(() => {
     if (!currentCompany) return { billed: 0, paid: 0, outstanding: 0 };
-    const billed = companyBills.reduce((sum, b) => sum + (Number(b.grandTotal) || 0), 0);
+    const openingBalance = Number(currentCompany.openingBalance) || 0;
+    const billed = companyBills.reduce((sum, b) => sum + (Number(b.grandTotal) || 0), 0) + openingBalance;
     const paid =
       companyBills.reduce((sum, b) => sum + (Number(b.advancePayment) || 0), 0) +
       companyPayments.reduce((sum, p) => sum + (Number(p.amount) || 0) + (Number(p.adjustment) || 0), 0);
