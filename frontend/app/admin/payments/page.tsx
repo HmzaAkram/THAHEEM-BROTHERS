@@ -48,6 +48,10 @@ export default function PaymentsPage() {
   const [isPinDialogOpen, setIsPinDialogOpen] = useState(false);
   const [paymentToDelete, setPaymentToDelete] = useState<Payment | null>(null);
 
+  // PIN Dialog State for Editing
+  const [isEditPinDialogOpen, setIsEditPinDialogOpen] = useState(false);
+  const [paymentToEdit, setPaymentToEdit] = useState<Payment | null>(null);
+
   const handleDeletePayment = async () => {
     if (paymentToDelete) {
       try {
@@ -793,7 +797,10 @@ export default function PaymentsPage() {
                                 variant="ghost"
                                 size="icon"
                                 className="text-primary hover:bg-primary/10 hover:text-primary transition-colors"
-                                onClick={() => handleEditClick(payment)}
+                                onClick={() => {
+                                  setPaymentToEdit(payment);
+                                  setIsEditPinDialogOpen(true);
+                                }}
                                 title="Edit Payment"
                               >
                                 <Pencil className="w-4 h-4" />
@@ -853,8 +860,25 @@ export default function PaymentsPage() {
           setPaymentToDelete(null);
         }}
         onConfirm={handleDeletePayment}
-        actionTitle="Delete Payment"
+        title="Delete Payment"
         description={`This will permanently delete the payment of ${formatCurrency(paymentToDelete?.amount || 0)}.`}
+      />
+
+      <PinDialog
+        isOpen={isEditPinDialogOpen}
+        onClose={() => {
+          setIsEditPinDialogOpen(false);
+          setPaymentToEdit(null);
+        }}
+        onConfirm={() => {
+          if (paymentToEdit) {
+            handleEditClick(paymentToEdit);
+          }
+          setIsEditPinDialogOpen(false);
+          setPaymentToEdit(null);
+        }}
+        title="Edit Payment"
+        description={`Authorize edit action for payment.`}
       />
     </DashboardLayout>
   );

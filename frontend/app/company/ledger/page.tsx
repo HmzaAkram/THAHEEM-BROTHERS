@@ -89,7 +89,6 @@ export default function CompanyLedgerPage() {
       const pdf = new jsPDF('p', 'mm', 'a4');
       const pageWidth = pdf.internal.pageSize.getWidth();
 
-      // Add Logo
       const img = new Image();
       img.src = '/logo.PNG'; // Ensure this matches the correct path
 
@@ -99,9 +98,8 @@ export default function CompanyLedgerPage() {
       });
 
       if (img.width > 0) {
-        // Calculate dimensions to maintain aspect ratio
-        const maxLogoHeight = 20;
-        const maxLogoWidth = 60;
+        const maxLogoHeight = 16;
+        const maxLogoWidth = 16;
         let logoWidth = img.width;
         let logoHeight = img.height;
 
@@ -109,24 +107,45 @@ export default function CompanyLedgerPage() {
         logoWidth *= ratio;
         logoHeight *= ratio;
 
-        // Center the logo
-        pdf.addImage(img, 'PNG', (pageWidth - logoWidth) / 2, 10, logoWidth, logoHeight);
+        pdf.addImage(img, 'PNG', 14, 10, logoWidth, logoHeight);
       }
+
+      // Company Info (Thaheem Brothers)
+      pdf.setTextColor(15, 23, 42); // slate-900
+      pdf.setFontSize(14);
+      pdf.setFont("helvetica", "bold");
+      pdf.text("THAHEEM BROTHERS", 34, 14);
+
+      pdf.setTextColor(100, 116, 139); // slate-500
+      pdf.setFontSize(8);
+      pdf.setFont("helvetica", "normal");
+      pdf.text("Suite 23, 2nd Floor, R.K. Square Ext, Shahrah-e-Liaquat, Karachi", 34, 19);
+      pdf.text("+92 21 32421347 | +92 300 2791780 | import.khi@hotmail.com", 34, 23);
+
+      // Line Separator
+      pdf.setDrawColor(226, 232, 240); // slate-200
+      pdf.setLineWidth(0.5);
+      pdf.line(14, 28, pageWidth - 14, 28);
 
       // Add Title
+      pdf.setTextColor(15, 23, 42); // slate-900
       pdf.setFontSize(16);
       pdf.setFont("helvetica", "bold");
-      pdf.text("Company Ledger", pageWidth / 2, 38, { align: "center" });
+      const title = currentCompany?.name || 'Company Ledger';
+      pdf.text(title, pageWidth - 14, 18, { align: "right" });
 
-      // Add Filter Info
-      pdf.setFontSize(10);
+      let yPos = 36;
+      pdf.setFontSize(9);
       pdf.setFont("helvetica", "normal");
-
-      pdf.text(`Company: ${currentCompany?.name || 'Report'}`, 14, 48);
-
+      pdf.setTextColor(100, 116, 139);
       if (startDate || endDate) {
-        pdf.text(`Period: ${startDate ? formatDate(startDate) : 'Beginning'} to ${endDate ? formatDate(endDate) : 'Present'}`, 14, 54);
+        pdf.text(`Period: ${startDate ? formatDate(startDate) : 'Beginning'} to ${endDate ? formatDate(endDate) : 'Present'}`, 14, yPos);
+      } else {
+        pdf.text(`Period: All Time`, 14, yPos);
       }
+
+      pdf.text(`Date Printed: ${formatDate(new Date().toISOString())}`, pageWidth - 14, yPos, { align: "right" });
+      yPos += 8;
 
       let body = ledgerEntries.map(entry => {
         let desc = entry.description;
@@ -150,7 +169,7 @@ export default function CompanyLedgerPage() {
       }
 
       autoTable(pdf, {
-        startY: (startDate || endDate) ? 62 : 56,
+        startY: yPos,
         head: [['Date', 'Description', 'Job No', 'Weight', 'Debit', 'Credit', 'Balance']],
         body: body,
         theme: 'grid',

@@ -111,6 +111,8 @@ export default function ReportsPage() {
 
       return {
         company: c.name,
+        totalDebit: billed,
+        received: paid,
         outstanding,
         billsCount: companyBills.length,
         daysOverdue,
@@ -167,61 +169,91 @@ export default function ReportsPage() {
       });
 
       if (img.width > 0) {
-        const maxLogoHeight = 20;
-        const maxLogoWidth = 60;
+        const maxLogoHeight = 16;
+        const maxLogoWidth = 16;
         let logoWidth = img.width;
         let logoHeight = img.height;
         const ratio = Math.min(maxLogoWidth / logoWidth, maxLogoHeight / logoHeight);
         logoWidth *= ratio;
         logoHeight *= ratio;
 
-        pdf.addImage(img, 'PNG', (pageWidth - logoWidth) / 2, 10, logoWidth, logoHeight);
+        pdf.addImage(img, 'PNG', 14, 10, logoWidth, logoHeight);
       }
 
+      // Company Info (Thaheem Brothers)
+      pdf.setTextColor(15, 23, 42); // slate-900
+      pdf.setFontSize(14);
+      pdf.setFont("helvetica", "bold");
+      pdf.text("THAHEEM BROTHERS", 34, 14);
+
+      pdf.setTextColor(100, 116, 139); // slate-500
+      pdf.setFontSize(8);
+      pdf.setFont("helvetica", "normal");
+      pdf.text("Suite 23, 2nd Floor, R.K. Square Ext, Shahrah-e-Liaquat, Karachi", 34, 19);
+      pdf.text("+92 21 32421347 | +92 300 2791780 | import.khi@hotmail.com", 34, 23);
+
+      // Line Separator
+      pdf.setDrawColor(226, 232, 240); // slate-200
+      pdf.setLineWidth(0.5);
+      pdf.line(14, 28, pageWidth - 14, 28);
+
       // Add Title
+      pdf.setTextColor(15, 23, 42); // slate-900
       pdf.setFontSize(16);
       pdf.setFont("helvetica", "bold");
 
       let reportTitle = "Report";
-      if (reportType === 'outstanding') reportTitle = 'Outstanding Balance Report';
-      if (reportType === 'bills') reportTitle = 'Bills Report';
-      if (reportType === 'payments') reportTitle = 'Payments Report';
-      if (reportType === 'company') reportTitle = 'Company Ledger Report';
+      if (reportType === 'outstanding') reportTitle = 'OUTSTANDING BALANCE REPORT';
+      if (reportType === 'bills') reportTitle = 'BILLS REPORT';
+      if (reportType === 'payments') reportTitle = 'PAYMENTS REPORT';
+      if (reportType === 'company') reportTitle = 'COMPANY LEDGER REPORT';
 
-      pdf.text(reportTitle, pageWidth / 2, 38, { align: "center" });
+      pdf.text(reportTitle, pageWidth - 14, 18, { align: "right" });
 
-      // Add Filter Info
+      // Add Filter Info Below Line
+      let yPos = 36;
       pdf.setFontSize(10);
-      pdf.setFont("helvetica", "normal");
+      pdf.setFont("helvetica", "bold");
+      pdf.setTextColor(15, 23, 42);
 
       if (reportType === 'company') {
         const companyNameStr = selectedCompanyId !== 'all' ? companies.find(c => c.id === selectedCompanyId)?.name || 'All Companies' : 'All Companies';
-        pdf.text(`Company: ${companyNameStr}`, 14, 48);
+        pdf.text(`Client: ${companyNameStr}`, 14, yPos);
       }
 
-      pdf.text(`Period: ${formatDate(dateFrom)} to ${formatDate(dateTo)}`, 14, reportType === 'company' ? 54 : 48);
+      pdf.setFontSize(9);
+      pdf.setFont("helvetica", "normal");
+      pdf.setTextColor(100, 116, 139);
 
-      let yPos = reportType === 'company' ? 62 : 56;
+      const periodYPos = reportType === 'company' ? yPos + 5 : yPos;
+      pdf.text(`Period: ${formatDate(dateFrom)} to ${formatDate(dateTo)}`, 14, periodYPos);
+      pdf.text(`Date Printed: ${formatDate(new Date().toISOString())}`, pageWidth - 14, yPos, { align: "right" });
+
+      yPos = reportType === 'company' ? periodYPos + 10 : periodYPos + 10;
       let head = [];
       let body = [];
       let customStyles = {};
 
       if (reportType === 'outstanding') {
-        head = [['Company', 'Outstanding', '# Bills', 'Last Due', 'Days Overdue', 'Status']];
+        head = [['Company Name', 'No Of Bills', 'Last Due', 'Days Overdue', 'Total Debit', 'Received', 'Outstanding Amount', 'Status']];
         body = outstandingData.map(item => [
           item.company,
-          formatCurrency(item.outstanding),
           item.billsCount.toString(),
           formatDate(item.lastDueDate),
           item.daysOverdue > 0 ? `${item.daysOverdue} days` : 'Current',
+          formatCurrency(item.totalDebit),
+          formatCurrency(item.received),
+          formatCurrency(item.outstanding),
           item.outstanding > 300000 ? 'High Risk' : item.outstanding > 100000 ? 'Medium' : 'Low Risk'
         ]);
         customStyles = {
-          1: { halign: 'right' },
+          1: { halign: 'center' },
           2: { halign: 'right' },
           3: { halign: 'right' },
-          4: { halign: 'right' },
-          5: { halign: 'right', fontStyle: 'bold' }
+          4: { halign: 'right', textColor: [220, 38, 38] },
+          5: { halign: 'right', textColor: [0, 128, 0] },
+          6: { halign: 'right', fontStyle: 'bold' },
+          7: { halign: 'right' }
         };
       } else if (reportType === 'bills') {
         head = [['Date', 'Job No', 'Company', 'Amount', 'Status']];
@@ -404,11 +436,13 @@ export default function ReportsPage() {
                 <>
                   <TableHeader>
                     <TableRow>
-                      <TableHead>Company</TableHead>
-                      <TableHead className="text-right">Outstanding</TableHead>
-                      <TableHead className="text-right"># Bills</TableHead>
+                      <TableHead>Company Name</TableHead>
+                      <TableHead className="text-center">No Of Bills</TableHead>
                       <TableHead className="text-right">Last Due</TableHead>
                       <TableHead className="text-right">Days Overdue</TableHead>
+                      <TableHead className="text-right">Total Debit</TableHead>
+                      <TableHead className="text-right">Received</TableHead>
+                      <TableHead className="text-right">Outstanding Amount</TableHead>
                       <TableHead className="text-right">Status</TableHead>
                     </TableRow>
                   </TableHeader>
@@ -416,10 +450,7 @@ export default function ReportsPage() {
                     {outstandingData.map((item, idx) => (
                       <TableRow key={idx}>
                         <TableCell className="font-medium">{item.company}</TableCell>
-                        <TableCell className="text-right font-semibold">
-                          {formatCurrency(item.outstanding)}
-                        </TableCell>
-                        <TableCell className="text-right">{item.billsCount}</TableCell>
+                        <TableCell className="text-center font-medium">{item.billsCount}</TableCell>
                         <TableCell className="text-right text-muted-foreground">{formatDate(item.lastDueDate)}</TableCell>
                         <TableCell className="text-right">
                           {item.daysOverdue > 0 ? (
@@ -429,6 +460,15 @@ export default function ReportsPage() {
                           ) : (
                             <span className="text-green-600">Current</span>
                           )}
+                        </TableCell>
+                        <TableCell className="text-right font-semibold text-destructive">
+                          {formatCurrency(item.totalDebit)}
+                        </TableCell>
+                        <TableCell className="text-right font-semibold text-green-600">
+                          {formatCurrency(item.received)}
+                        </TableCell>
+                        <TableCell className="text-right font-bold text-primary">
+                          {formatCurrency(item.outstanding)}
                         </TableCell>
                         <TableCell className="text-right">
                           <span

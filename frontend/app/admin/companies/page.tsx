@@ -65,6 +65,10 @@ export default function CompaniesPage() {
   const [isPinDialogOpen, setIsPinDialogOpen] = useState(false);
   const [deleteTargetId, setDeleteTargetId] = useState<string | null>(null);
 
+  // PIN Dialog State for Editing
+  const [isEditPinDialogOpen, setIsEditPinDialogOpen] = useState(false);
+  const [editTargetId, setEditTargetId] = useState<string | null>(null);
+
   const confirmDelete = () => {
     if (deleteTargetId) {
       deleteCompany(deleteTargetId);
@@ -125,7 +129,7 @@ export default function CompaniesPage() {
       }
 
       // Sum totals
-      const billed = companyBills.reduce((s, b) => s + (Number(b.grandTotal) || 0), 0);
+      const billed = companyBills.reduce((s, b) => s + (Number(b.grandTotal) || 0), 0) + (Number(company.openingBalance) || 0);
       const advances = companyBills.reduce((s, b) => s + (Number(b.advancePayment) || 0), 0);
       const paymentReceived = companyPayments.reduce((s, p) => s + (Number(p.amount) || 0) + (Number(p.adjustment) || 0), 0);
 
@@ -460,7 +464,10 @@ export default function CompaniesPage() {
                                   variant="ghost"
                                   size="sm"
                                   className="h-8 w-8 p-0 hover:bg-orange-100"
-                                  onClick={() => router.push(`/admin/companies/${company.id}`)}
+                                  onClick={() => {
+                                    setEditTargetId(company.id);
+                                    setIsEditPinDialogOpen(true);
+                                  }}
                                   title="Edit Company"
                                 >
                                   <Edit2 className="w-4 h-4 text-orange-600" />
@@ -539,8 +546,25 @@ export default function CompaniesPage() {
           setDeleteTargetId(null);
         }}
         onConfirm={confirmDelete}
-        actionTitle="Delete Company"
+        title="Delete Company"
         description="Are you sure you want to delete this company? This will also remove associated bills and payments permanently."
+      />
+
+      <PinDialog
+        isOpen={isEditPinDialogOpen}
+        onClose={() => {
+          setIsEditPinDialogOpen(false);
+          setEditTargetId(null);
+        }}
+        onConfirm={() => {
+          if (editTargetId) {
+            router.push(`/admin/companies/${editTargetId}`);
+          }
+          setIsEditPinDialogOpen(false);
+          setEditTargetId(null);
+        }}
+        title="Edit Company"
+        description="Authorize edit action for company."
       />
     </DashboardLayout>
   );

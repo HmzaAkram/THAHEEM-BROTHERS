@@ -826,7 +826,7 @@ export default function SecuritiesPage() {
                     setPinActionSecurity(null);
                 }}
                 onConfirm={handleConfirmPinAction}
-                actionTitle="Mark Security as Received"
+                title="Mark Security as Received"
                 description={`This will mark the security refund for GD No. ${pinActionSecurity?.gdNumber} as received.`}
             />
         </DashboardLayout>

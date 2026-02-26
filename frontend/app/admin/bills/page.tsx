@@ -99,6 +99,10 @@ export default function BillsPage() {
   const [isPinDialogOpen, setIsPinDialogOpen] = useState(false);
   const [billToDelete, setBillToDelete] = useState<Bill | null>(null);
 
+  // PIN Dialog State for Editing
+  const [isEditPinDialogOpen, setIsEditPinDialogOpen] = useState(false);
+  const [billToEdit, setBillToEdit] = useState<Bill | null>(null);
+
   // Form Validation State
   const [formErrors, setFormErrors] = useState<Record<string, boolean>>({});
   const companySelectRef = useRef<HTMLButtonElement>(null);
@@ -629,13 +633,23 @@ export default function BillsPage() {
 
   // Dynamic Totals
   const tableTotals = useMemo(() => {
+    const uniqueCompanyIds = new Set(filteredBills.map(b => String(b.companyId)));
+    let totalOpeningBalance = 0;
+
+    uniqueCompanyIds.forEach(id => {
+      const comp = companies.find(c => String(c.id) === id);
+      if (comp) {
+        totalOpeningBalance += (Number(comp.openingBalance) || 0);
+      }
+    });
+
     return filteredBills.reduce((acc, bill) => {
       acc.billed += bill.grandTotal;
       acc.paid += bill.paidAmount;
       acc.balance += (bill.grandTotal - bill.paidAmount);
       return acc;
-    }, { billed: 0, paid: 0, balance: 0 });
-  }, [filteredBills]);
+    }, { billed: 0, paid: 0, balance: totalOpeningBalance });
+  }, [filteredBills, companies]);
 
   const handleExportPDF = async () => {
     try {
@@ -1447,7 +1461,10 @@ export default function BillsPage() {
                                 variant="ghost"
                                 size="icon"
                                 className="hover:text-primary hover:bg-primary/5 transition-colors"
-                                onClick={() => handleEditClick(item)}
+                                onClick={() => {
+                                  setBillToEdit(item);
+                                  setIsEditPinDialogOpen(true);
+                                }}
                                 title="Edit Bill"
                               >
                                 <Pencil className="w-4 h-4" />
@@ -1572,6 +1589,23 @@ export default function BillsPage() {
         onConfirm={handleDeleteBill}
         title="Delete Bill"
         description={`This will permanently delete Job No. ${billToDelete?.jobNumber || 'Unknown'}.`}
+      />
+
+      <PinDialog
+        isOpen={isEditPinDialogOpen}
+        onClose={() => {
+          setIsEditPinDialogOpen(false);
+          setBillToEdit(null);
+        }}
+        onConfirm={() => {
+          if (billToEdit) {
+            handleEditClick(billToEdit);
+          }
+          setIsEditPinDialogOpen(false);
+          setBillToEdit(null);
+        }}
+        title="Edit Bill"
+        description={`Authorize edit action for Job No. ${billToEdit?.jobNumber || 'Unknown'}.`}
       />
     </>
   );

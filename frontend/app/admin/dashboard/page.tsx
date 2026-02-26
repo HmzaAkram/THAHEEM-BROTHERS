@@ -216,7 +216,7 @@ export default function AdminDashboard() {
       const companyBills = bills.filter(b => String(b.companyId) === String(company.id));
       const companyPayments = payments.filter(p => String(p.companyId) === String(company.id));
 
-      const debit = companyBills.reduce((sum, b) => sum + (Number(b.grandTotal) || 0), 0);
+      const debit = companyBills.reduce((sum, b) => sum + (Number(b.grandTotal) || 0), 0) + (Number(company.openingBalance) || 0);
       const credit =
         companyBills.reduce((sum, b) => sum + (Number(b.advancePayment) || 0), 0) +
         companyPayments.reduce((sum, p) => sum + (Number(p.amount) || 0) + (Number(p.adjustment) || 0), 0);
@@ -287,16 +287,53 @@ export default function AdminDashboard() {
         const pageWidth = ledgerDoc.internal.pageSize.getWidth();
 
         if (logoWidth > 0) {
-          ledgerDoc.addImage(img, 'PNG', (pageWidth - logoWidth) / 2, 10, logoWidth, logoHeight);
+          const maxLogoHeight = 16;
+          const maxLogoWidth = 16;
+          let newLogoWidth = logoWidth;
+          let newLogoHeight = logoHeight;
+          const ratio = Math.min(maxLogoWidth / newLogoWidth, maxLogoHeight / newLogoHeight);
+          newLogoWidth *= ratio;
+          newLogoHeight *= ratio;
+
+          ledgerDoc.addImage(img, 'PNG', 14, 10, newLogoWidth, newLogoHeight);
         }
 
+        // Company Info (Thaheem Brothers)
+        ledgerDoc.setTextColor(15, 23, 42); // slate-900
+        ledgerDoc.setFontSize(14);
+        ledgerDoc.setFont("helvetica", "bold");
+        ledgerDoc.text("THAHEEM BROTHERS", 34, 14);
+
+        ledgerDoc.setTextColor(100, 116, 139); // slate-500
+        ledgerDoc.setFontSize(8);
+        ledgerDoc.setFont("helvetica", "normal");
+        ledgerDoc.text("Suite 23, 2nd Floor, R.K. Square Ext, Shahrah-e-Liaquat, Karachi", 34, 19);
+        ledgerDoc.text("+92 21 32421347 | +92 300 2791780 | import.khi@hotmail.com", 34, 23);
+
+        // Line Separator
+        ledgerDoc.setDrawColor(226, 232, 240); // slate-200
+        ledgerDoc.setLineWidth(0.5);
+        ledgerDoc.line(14, 28, pageWidth - 14, 28);
+
+        // Add Title
+        ledgerDoc.setTextColor(15, 23, 42); // slate-900
         ledgerDoc.setFontSize(16);
         ledgerDoc.setFont("helvetica", "bold");
-        ledgerDoc.text("General Ledger", pageWidth / 2, 38, { align: "center" });
+        ledgerDoc.text("SUMMARY", pageWidth - 14, 18, { align: "right" });
 
+        // Add Filter Info Below Line
+        let yPos = 36;
         ledgerDoc.setFontSize(10);
+        ledgerDoc.setFont("helvetica", "bold");
+        ledgerDoc.setTextColor(15, 23, 42);
+        ledgerDoc.text(`Client: ${company.name}`, 14, yPos);
+
+        ledgerDoc.setFontSize(9);
         ledgerDoc.setFont("helvetica", "normal");
-        ledgerDoc.text(`Company: ${company.name}`, 14, 48);
+        ledgerDoc.setTextColor(100, 116, 139);
+        ledgerDoc.text(`Period: All Time`, 14, yPos + 5);
+        ledgerDoc.text(`Date Printed: ${formatDate(new Date().toISOString())}`, pageWidth - 14, yPos, { align: "right" });
+        yPos += 12;
 
         const companyLedger = getCompanyLedger(company.id);
         const ledgerRows = companyLedger.map(l => {
@@ -317,7 +354,7 @@ export default function AdminDashboard() {
         });
 
         autoTable(ledgerDoc, {
-          startY: 54,
+          startY: yPos,
           head: [['Date', 'Description', 'Job/Bill No', 'Weight', 'Debit', 'Credit', 'Balance']],
           body: ledgerRows.length > 0 ? ledgerRows : [['-', 'No transactions', '-', '-', '-', '-', '-']],
           theme: 'grid',

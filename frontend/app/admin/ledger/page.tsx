@@ -32,7 +32,7 @@ import { DashboardCard } from '@/components/dashboard-card';
 import { CompanySelect } from '@/components/company-select';
 
 export default function LedgerPage() {
-  const { companies, getCompanyLedger } = useData();
+  const { companies, bills, payments } = useData();
   const [selectedCompanyId, setSelectedCompanyId] = useState<string>('all');
   const [startDate, setStartDate] = useState('');
   const [endDate, setEndDate] = useState('');
@@ -50,41 +50,96 @@ export default function LedgerPage() {
   };
 
   const { ledgerData, openingBalance } = useMemo(() => {
-    let allEntries: LedgerEntry[] = [];
+    let consolidatedEntries: any[] = [];
 
-    if (selectedCompanyId === 'all') {
-      companies.forEach(c => {
-        allEntries.push(...getCompanyLedger(c.id));
+    // Process Bills
+    const companyBills = selectedCompanyId === 'all' ? bills : bills.filter(b => String(b.companyId) === selectedCompanyId);
+
+    companyBills.forEach(bill => {
+      // Find all payments linked to this bill
+      const linkedPayments = payments.filter(p => String(p.billId) === String(bill.id));
+      const totalPaid = linkedPayments.reduce((sum, p) => sum + Number(p.amount || 0), 0);
+      const totalAdjustment = linkedPayments.reduce((sum, p) => sum + Number(p.adjustment || 0), 0);
+
+      const debitAmount = bill.grandTotal || bill.totalAmount || 0;
+      const advanceAmount = bill.advancePayment || 0;
+      const outstanding = debitAmount - advanceAmount - totalPaid - totalAdjustment;
+
+      consolidatedEntries.push({
+        id: `bill_${bill.id}`,
+        date: bill.date,
+        type: 'BILL',
+        description: bill.description || `Job #${bill.jobNumber || 'N/A'}`,
+        companyName: bill.companyName,
+        jobNumber: bill.jobNumber,
+        debit: debitAmount,
+        advance: advanceAmount,
+        paid: totalPaid,
+        adjustment: totalAdjustment,
+        credit: advanceAmount + totalPaid + totalAdjustment,
+        outstanding: outstanding,
+        via: bill.via,
+        weight: bill.weight,
+        packages: bill.packages,
+        igm: bill.igm,
+        gdNumber: bill.gdNumber,
       });
+    });
+
+    // Process Unlinked Payments (Payments with no billId, advance generic payments)
+    const companyPayments = selectedCompanyId === 'all' ? payments : payments.filter(p => String(p.companyId) === selectedCompanyId);
+    companyPayments.forEach(p => {
+      if (!p.billId) {
+        consolidatedEntries.push({
+          id: `pay_${p.id}`,
+          date: p.date,
+          type: 'PAYMENT',
+          description: p.description ? `Payment: ${p.description}` : 'Payment Received',
+          companyName: p.companyName,
+          jobNumber: null,
+          debit: 0,
+          advance: 0,
+          paid: Number(p.amount || 0),
+          adjustment: Number(p.adjustment || 0),
+          credit: Number(p.amount || 0) + Number(p.adjustment || 0),
+          outstanding: 0,
+          method: p.method,
+          paymentRef: p.reference,
+        });
+      }
+    });
+
+    // Sort chronologically
+    consolidatedEntries.sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+
+    // Calculate exact inherent opening balance for "ALL" time
+    let baseOpeningBal = 0;
+    if (selectedCompanyId === 'all') {
+      companies.forEach(c => baseOpeningBal += (Number(c.openingBalance) || 0));
     } else {
-      allEntries = getCompanyLedger(selectedCompanyId);
+      const comp = companies.find(c => String(c.id) === selectedCompanyId);
+      if (comp) baseOpeningBal = (Number(comp.openingBalance) || 0);
     }
 
-    // Sort chronologically for calculation
-    allEntries.sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
-
-    let openingBal = 0;
-    let filteredEntries = allEntries;
+    let openingBal = baseOpeningBal;
+    let filteredEntries = consolidatedEntries;
 
     // Filter by Starting Date & Calculate Opening Balance
     if (startDate) {
       const start = new Date(startDate);
-      start.setHours(0, 0, 0, 0); // Set to beginning of the day
+      start.setHours(0, 0, 0, 0);
 
-      const previousEntries = allEntries.filter(e => new Date(e.date) < start);
-
-      // Calculate opening balance from previous entries
+      const previousEntries = consolidatedEntries.filter(e => new Date(e.date) < start);
       previousEntries.forEach(e => {
         openingBal += (e.debit - e.credit);
       });
 
-      filteredEntries = allEntries.filter(e => new Date(e.date) >= start);
+      filteredEntries = consolidatedEntries.filter(e => new Date(e.date) >= start);
     }
 
     // Filter by End Date
     if (endDate) {
       const end = new Date(endDate);
-      // Include the end date fully
       end.setHours(23, 59, 59, 999);
       filteredEntries = filteredEntries.filter(e => new Date(e.date) <= end);
     }
@@ -97,13 +152,19 @@ export default function LedgerPage() {
     });
 
     return { ledgerData: dataWithBalance, openingBalance: openingBal };
-  }, [selectedCompanyId, companies, getCompanyLedger, startDate, endDate]);
+  }, [selectedCompanyId, companies, bills, payments, startDate, endDate]);
 
   const totals = useMemo(() => {
-    return ledgerData.reduce((acc, item) => ({
-      debit: acc.debit + item.debit,
-      credit: acc.credit + item.credit
-    }), { debit: 0, credit: 0 });
+    return ledgerData.reduce((acc, item) => {
+      // Do not sum the explicit "Opening Balance" injected entry into "Total Billed" (debit), 
+      // as it's already represented in the "Opening Balance" card.
+      if (item.description === 'Opening Balance') return acc;
+
+      return {
+        debit: acc.debit + item.debit,
+        credit: acc.credit + item.credit
+      };
+    }, { debit: 0, credit: 0 });
   }, [ledgerData]);
 
   const handleExportPDF = async () => {
@@ -111,7 +172,6 @@ export default function LedgerPage() {
       const pdf = new jsPDF('p', 'mm', 'a4');
       const pageWidth = pdf.internal.pageSize.getWidth();
 
-      // Add Logo
       const img = new Image();
       img.src = '/logo.PNG'; // Ensure this matches the correct path
 
@@ -121,9 +181,8 @@ export default function LedgerPage() {
       });
 
       if (img.width > 0) {
-        // Calculate dimensions to maintain aspect ratio (max height 20mm, max width 60mm)
-        const maxLogoHeight = 20;
-        const maxLogoWidth = 60;
+        const maxLogoHeight = 16;
+        const maxLogoWidth = 16;
         let logoWidth = img.width;
         let logoHeight = img.height;
 
@@ -131,27 +190,53 @@ export default function LedgerPage() {
         logoWidth *= ratio;
         logoHeight *= ratio;
 
-        // Center the logo
-        pdf.addImage(img, 'PNG', (pageWidth - logoWidth) / 2, 10, logoWidth, logoHeight);
+        // Left aligned logo
+        pdf.addImage(img, 'PNG', 14, 10, logoWidth, logoHeight);
       }
+
+      // Company Info (Thaheem Brothers)
+      pdf.setTextColor(15, 23, 42); // slate-900
+      pdf.setFontSize(14);
+      pdf.setFont("helvetica", "bold");
+      pdf.text("THAHEEM BROTHERS", 34, 14);
+
+      pdf.setTextColor(100, 116, 139); // slate-500
+      pdf.setFontSize(8);
+      pdf.setFont("helvetica", "normal");
+      pdf.text("Suite 23, 2nd Floor, R.K. Square Ext, Shahrah-e-Liaquat, Karachi", 34, 19);
+      pdf.text("+92 21 32421347 | +92 300 2791780 | import.khi@hotmail.com", 34, 23);
+
+      // Line Separator
+      pdf.setDrawColor(226, 232, 240); // slate-200
+      pdf.setLineWidth(0.5);
+      pdf.line(14, 28, pageWidth - 14, 28);
 
       // Add Title
+      pdf.setTextColor(15, 23, 42); // slate-900
       pdf.setFontSize(16);
       pdf.setFont("helvetica", "bold");
-      const title = "General Ledger";
-      pdf.text(title, pageWidth / 2, 38, { align: "center" });
+      const title = "SUMMARY";
+      pdf.text(title, pageWidth - 14, 18, { align: "right" });
 
-      // Add Company Info
+      // Add Client Info Below Line
+      let yPos = 36;
       pdf.setFontSize(10);
-      pdf.setFont("helvetica", "normal");
+      pdf.setFont("helvetica", "bold");
+      pdf.setTextColor(15, 23, 42);
       const companyNameStr = selectedCompanyId !== 'all' ? companies.find(c => c.id === selectedCompanyId)?.name || 'All Companies' : 'All Companies';
-      pdf.text(`Company: ${companyNameStr}`, 14, 48);
+      pdf.text(`Client: ${companyNameStr}`, 14, yPos);
 
-      let yPos = 54;
+      pdf.setFontSize(9);
+      pdf.setFont("helvetica", "normal");
+      pdf.setTextColor(100, 116, 139);
       if (startDate || endDate) {
-        pdf.text(`Period: ${startDate ? formatDate(startDate) : 'Beginning'} to ${endDate ? formatDate(endDate) : 'Present'}`, 14, yPos);
-        yPos += 6;
+        pdf.text(`Period: ${startDate ? formatDate(startDate) : 'Beginning'} to ${endDate ? formatDate(endDate) : 'Present'}`, 14, yPos + 5);
+      } else {
+        pdf.text(`Period: All Time`, 14, yPos + 5);
       }
+      
+      pdf.text(`Date Printed: ${formatDate(new Date().toISOString())}`, pageWidth - 14, yPos, { align: "right" });
+      yPos += 12;
 
       // Prepare Table Data
       let tableRows = [];
@@ -165,6 +250,8 @@ export default function LedgerPage() {
           '-',
           '-',
           '-',
+          '-',
+          '-',
           formatCurrency(openingBalance)
         ]);
       }
@@ -173,17 +260,19 @@ export default function LedgerPage() {
       const exportData = ledgerData.map(entry => {
         let desc = entry.description;
         if (entry.type === 'PAYMENT') {
-          desc = (entry as any).method ? `Payment Received (${(entry as any).method})` : 'Advance Received';
-          if ((entry as any).paymentRef) desc += ` - Ref: ${(entry as any).paymentRef}`;
+          desc = entry.method ? `Payment Received (${entry.method})` : 'Advance Received';
+          if (entry.paymentRef) desc += ` - Ref: ${entry.paymentRef}`;
         }
 
         return [
           new Date(entry.date).toLocaleDateString(),
-          selectedCompanyId === 'all' ? `${entry.companyName}\\n${desc}` : desc,
+          selectedCompanyId === 'all' ? `${entry.companyName}\n${desc}` : desc,
           entry.jobNumber || '-',
-          entry.weight ? `${entry.weight} KG` : '-',
           entry.debit > 0 ? formatCurrency(entry.debit) : '-',
-          entry.credit > 0 ? formatCurrency(entry.credit) : '-',
+          entry.advance > 0 ? formatCurrency(entry.advance) : '-',
+          entry.paid > 0 ? formatCurrency(entry.paid) : '-',
+          entry.adjustment > 0 ? formatCurrency(entry.adjustment) : '-',
+          entry.outstanding > 0 ? formatCurrency(entry.outstanding) : '-',
           formatCurrency(entry.balance)
         ];
       });
@@ -191,21 +280,24 @@ export default function LedgerPage() {
       tableRows = [...tableRows, ...exportData];
 
       if (tableRows.length === 0) {
-        tableRows.push(['-', 'No transactions found', '-', '-', '-', '-', '-']);
+        tableRows.push(['-', 'No transactions found', '-', '-', '-', '-', '-', '-', '-']);
       }
 
       autoTable(pdf, {
         startY: yPos + 4,
-        head: [['Date', 'Description', 'Job No', 'Weight', 'Debit', 'Credit', 'Balance']],
+        head: [['Date', 'Description', 'Job No', 'Bill Total', 'Advance', 'Paid', 'Adj.', 'Outst.', 'Balance']],
         body: tableRows,
         theme: 'grid',
         headStyles: { fillColor: [44, 62, 80], textColor: [255, 255, 255], fontStyle: 'bold' },
-        styles: { fontSize: 8, cellPadding: 2 },
+        styles: { fontSize: 7, cellPadding: 1.5 },
         columnStyles: {
-          0: { cellWidth: 20 },
+          0: { cellWidth: 18 },
+          3: { halign: 'right' },
           4: { halign: 'right' },
           5: { halign: 'right' },
-          6: { halign: 'right', fontStyle: 'bold' }
+          6: { halign: 'right' },
+          7: { halign: 'right' },
+          8: { halign: 'right', fontStyle: 'bold' }
         },
         didParseCell: function (data) {
           if (data.section === 'body') {
@@ -214,7 +306,7 @@ export default function LedgerPage() {
               data.cell.styles.textColor = [100, 100, 100];
             }
 
-            if (data.column.index === 6) {
+            if (data.column.index === 8) {
               const valStr = data.cell.text[0] || '';
               const numStr = valStr.replace(/[^0-9.-]/g, '');
               const numVal = parseFloat(numStr);
@@ -242,7 +334,7 @@ export default function LedgerPage() {
     <DashboardLayout>
       <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
         <div>
-          <h1 className="text-3xl font-bold text-foreground">General Ledger</h1>
+          <h1 className="text-3xl font-bold text-foreground">Summary</h1>
           <p className="text-muted-foreground mt-1">
             View transaction history and running balances.
           </p>
@@ -303,14 +395,17 @@ export default function LedgerPage() {
               <Table>
                 <TableHeader>
                   <TableRow className="bg-muted/50">
-                    <TableHead className="w-[120px]">Date</TableHead>
-                    <TableHead className="w-[40px]"></TableHead>
-                    <TableHead className="min-w-[250px]">Description</TableHead>
-                    <TableHead className="w-[150px]">Job No</TableHead>
-                    <TableHead className="text-right text-destructive w-[120px]">Debit</TableHead>
-                    <TableHead className="text-right text-green-600 w-[120px]">Credit</TableHead>
+                    <TableHead className="w-[100px] text-xs">Date</TableHead>
+                    <TableHead className="w-[30px]"></TableHead>
+                    <TableHead className="min-w-[200px] text-xs">Description</TableHead>
+                    <TableHead className="w-[100px] text-xs">Job No</TableHead>
+                    <TableHead className="text-right text-destructive w-[100px] text-xs">Bill Total</TableHead>
+                    <TableHead className="text-right text-muted-foreground w-[90px] text-xs">Advance</TableHead>
+                    <TableHead className="text-right text-green-600 w-[90px] text-xs">Paid</TableHead>
+                    <TableHead className="text-right text-amber-600 w-[80px] text-xs">Adj.</TableHead>
+                    <TableHead className="text-right text-blue-600 w-[100px] text-xs">Outst.</TableHead>
                     {selectedCompanyId !== 'all' && (
-                      <TableHead className="text-right font-bold bg-muted/30 w-[140px]">Balance</TableHead>
+                      <TableHead className="text-right font-bold bg-muted/30 w-[120px] text-xs">Balance</TableHead>
                     )}
                   </TableRow>
                 </TableHeader>
@@ -321,7 +416,7 @@ export default function LedgerPage() {
                       <TableCell className="text-sm font-medium text-muted-foreground">
                         {formatDate(startDate)}
                       </TableCell>
-                      <TableCell colSpan={4} className="font-medium italic text-muted-foreground">
+                      <TableCell colSpan={7} className="font-medium italic text-muted-foreground">
                         Opening Balance b/f
                       </TableCell>
                       <TableCell className="text-right font-bold font-mono text-sm">
@@ -332,7 +427,7 @@ export default function LedgerPage() {
 
                   {ledgerData.length === 0 ? (
                     <TableRow>
-                      <TableCell colSpan={6} className="h-24 text-center text-muted-foreground">
+                      <TableCell colSpan={selectedCompanyId !== 'all' ? 10 : 9} className="h-24 text-center text-muted-foreground">
                         No transactions found for the selected period.
                       </TableCell>
                     </TableRow>
@@ -411,10 +506,10 @@ export default function LedgerPage() {
                             )}
                           </TableCell>
 
-                          {/* 4. Debit */}
+                          {/* 4. Bill Total */}
                           <TableCell className="text-right text-sm align-top pt-3">
                             {entry.debit > 0 ? (
-                              <span className="text-destructive font-bold">
+                              <span className="text-destructive font-bold" title="Total Bill Amount">
                                 {formatCurrency(entry.debit)}
                               </span>
                             ) : (
@@ -422,18 +517,53 @@ export default function LedgerPage() {
                             )}
                           </TableCell>
 
-                          {/* 5. Credit */}
+                          {/* 5. Advance */}
                           <TableCell className="text-right text-sm align-top pt-3">
-                            {entry.credit > 0 ? (
-                              <span className="text-green-600 font-bold">
-                                {formatCurrency(entry.credit)}
+                            {entry.advance > 0 ? (
+                              <span className="text-muted-foreground font-medium" title="Advance Received">
+                                {formatCurrency(entry.advance)}
                               </span>
                             ) : (
                               <span className="text-muted-foreground/30">-</span>
                             )}
                           </TableCell>
 
-                          {/* 6. Balance */}
+                          {/* 6. Paid */}
+                          <TableCell className="text-right text-sm align-top pt-3">
+                            {entry.paid > 0 ? (
+                              <span className="text-green-600 font-bold" title="Payment Received">
+                                {formatCurrency(entry.paid)}
+                              </span>
+                            ) : (
+                              <span className="text-muted-foreground/30">-</span>
+                            )}
+                          </TableCell>
+
+                          {/* 7. Adjustment */}
+                          <TableCell className="text-right text-sm align-top pt-3">
+                            {entry.adjustment > 0 ? (
+                              <span className="text-amber-600 font-medium" title="Adjustment Made">
+                                {formatCurrency(entry.adjustment)}
+                              </span>
+                            ) : (
+                              <span className="text-muted-foreground/30">-</span>
+                            )}
+                          </TableCell>
+
+                          {/* 8. Outstanding */}
+                          <TableCell className="text-right text-sm align-top pt-3 bg-blue-50/30 dark:bg-blue-900/10">
+                            {entry.outstanding > 0 ? (
+                              <span className="text-blue-600 font-bold" title="Outstanding Bill Balance">
+                                {formatCurrency(entry.outstanding)}
+                              </span>
+                            ) : entry.type === 'BILL' ? (
+                              <span className="text-muted-foreground/50 text-xs italic">Clear</span>
+                            ) : (
+                              <span className="text-muted-foreground/30">-</span>
+                            )}
+                          </TableCell>
+
+                          {/* 9. Balance */}
                           {selectedCompanyId !== 'all' && (
                             <TableCell className="text-right font-mono text-sm align-top pt-3 bg-muted/10 font-bold">
                               {formatCurrency(entry.balance)}
@@ -444,7 +574,7 @@ export default function LedgerPage() {
                         {/* Expandable Sub-Row */}
                         {entry.type === 'BILL' && expandedRows.has(entry.id) && (
                           <TableRow className="bg-muted/5">
-                            <TableCell colSpan={selectedCompanyId !== 'all' ? 7 : 6} className="p-0 border-b">
+                            <TableCell colSpan={selectedCompanyId !== 'all' ? 10 : 9} className="p-0 border-b">
                               <div className="p-4 animate-in slide-in-from-top-2 fade-in duration-200">
                                 <div className="grid grid-cols-2 md:grid-cols-6 gap-4 text-xs">
                                   <div>
