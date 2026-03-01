@@ -45,7 +45,7 @@ export default function BackupPage() {
         setExportLoading(true);
         try {
             const token = localStorage.getItem('authToken');
-            const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000/api'}/backup/export`, {
+            const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000/api/v1'}/backup/export`, {
                 headers: {
                     'Authorization': `Bearer ${token}`
                 }
@@ -104,7 +104,7 @@ export default function BackupPage() {
             const formData = new FormData();
             formData.append('backup_file', selectedFile);
 
-            const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000/api'}/backup/import`, {
+            const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000/api/v1'}/backup/import`, {
                 method: 'POST',
                 headers: {
                     'Authorization': `Bearer ${token}`
