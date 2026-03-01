@@ -308,7 +308,7 @@ export default function CompaniesPage() {
                   </div>
                 </div>
                 <div>
-                  <Label htmlFor="openingBalance">Opening Balance (PKR)</Label>
+                  <Label htmlFor="openingBalance">Opening Balance</Label>
                   <Input
                     id="openingBalance"
                     type="number"

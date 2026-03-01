@@ -79,14 +79,22 @@ export default function SecuritiesPage() {
     // PIN Dialog State
     const [isPinDialogOpen, setIsPinDialogOpen] = useState(false);
     const [pinActionSecurity, setPinActionSecurity] = useState<SecurityTracking | null>(null);
+    const [pinActionType, setPinActionType] = useState<'documents' | 'refund' | null>(null);
 
     const handleConfirmPinAction = async () => {
-        if (pinActionSecurity) {
+        if (pinActionSecurity && pinActionType) {
             try {
-                const result = await updateSecurity(pinActionSecurity.id, { isRefundReceived: true, status: 'Completed' });
+                const updateData = pinActionType === 'documents'
+                    ? { isDocumentSubmitted: true }
+                    : { isRefundReceived: true, status: 'Completed' as const };
+
+                const result = await updateSecurity(pinActionSecurity.id, updateData);
+
                 Swal.fire({
                     title: 'Success!',
-                    text: 'Security refund marked as received.',
+                    text: pinActionType === 'documents'
+                        ? 'Documents marked as Submitted successfully.'
+                        : 'Security refund marked as Received successfully.',
                     icon: 'success',
                     confirmButtonColor: '#10b981',
                     timer: 2000,
@@ -103,6 +111,7 @@ export default function SecuritiesPage() {
             } finally {
                 setIsPinDialogOpen(false);
                 setPinActionSecurity(null);
+                setPinActionType(null);
             }
         }
     };
@@ -130,17 +139,21 @@ export default function SecuritiesPage() {
         setRefundDueDate(new Date().toISOString().split('T')[0]);
     }, []);
 
-    const filteredSecurities = securities.filter(s => {
-        const matchesSearch = s.companyName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-            s.gdNumber.toLowerCase().includes(searchTerm.toLowerCase()) ||
-            s.containerNo.toLowerCase().includes(searchTerm.toLowerCase());
+    const filteredSecurities = useMemo(() => {
+        return securities
+            .filter(s => {
+                const matchesSearch = s.companyName.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                    s.gdNumber.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                    s.containerNo.toLowerCase().includes(searchTerm.toLowerCase());
 
-        const matchesStatus = statusFilter === 'all' ? true :
-            statusFilter === 'pending' ? !s.isRefundReceived :
-                s.isRefundReceived;
+                const matchesStatus = statusFilter === 'all' ? true :
+                    statusFilter === 'pending' ? !s.isRefundReceived :
+                        s.isRefundReceived;
 
-        return matchesSearch && matchesStatus;
-    });
+                return matchesSearch && matchesStatus;
+            })
+            .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+    }, [securities, searchTerm, statusFilter]);
 
     const handleSubmit = async () => {
         setLoading(true);
@@ -249,7 +262,7 @@ export default function SecuritiesPage() {
                             <TabsList className="grid w-full grid-cols-3 h-10 bg-muted/50">
                                 <TabsTrigger value="all" className="text-xs font-bold uppercase">All</TabsTrigger>
                                 <TabsTrigger value="pending" className="text-xs font-bold uppercase">Pending</TabsTrigger>
-                                <TabsTrigger value="received" className="text-xs font-bold uppercase">Received</TabsTrigger>
+                                <TabsTrigger value="received" className="text-xs font-bold uppercase">Refund Received</TabsTrigger>
                             </TabsList>
                         </Tabs>
 
@@ -430,7 +443,7 @@ export default function SecuritiesPage() {
                                                     checked={isDocumentSubmitted}
                                                     onCheckedChange={(checked) => setIsDocumentSubmitted(!!checked)}
                                                 />
-                                                <Label htmlFor="docSubmitted" className="text-sm font-bold cursor-pointer">Document Submitted</Label>
+                                                <Label htmlFor="docSubmitted" className="text-sm font-bold cursor-pointer">Documents Submitted</Label>
                                             </div>
                                             <div className="flex items-center space-x-3 p-3 rounded-xl bg-white dark:bg-slate-950 border border-border/40">
                                                 <Checkbox
@@ -551,7 +564,7 @@ export default function SecuritiesPage() {
                                         <TableHead className="w-[200px] pl-8 font-black uppercase tracking-widest text-[10px] text-muted-foreground/70">Company</TableHead>
                                         <TableHead className="font-black uppercase tracking-widest text-[10px] text-muted-foreground/70">GD No & Port</TableHead>
                                         <TableHead className="font-black uppercase tracking-widest text-[10px] text-muted-foreground/70 text-center">Containers</TableHead>
-                                        <TableHead className="font-black uppercase tracking-widest text-[10px] text-muted-foreground/70 text-right">Amount (PKR)</TableHead>
+                                        <TableHead className="font-black uppercase tracking-widest text-[10px] text-muted-foreground/70 text-right">Amount</TableHead>
                                         <TableHead className="font-black uppercase tracking-widest text-[10px] text-muted-foreground/70">Refund Due</TableHead>
                                         <TableHead className="font-black uppercase tracking-widest text-[10px] text-muted-foreground/70">Receiver</TableHead>
                                         <TableHead className="font-black uppercase tracking-widest text-[10px] text-muted-foreground/70">Status</TableHead>
@@ -614,9 +627,11 @@ export default function SecuritiesPage() {
                                                 <TableCell>
                                                     <Badge className={`rounded-lg px-3 py-1 font-black uppercase tracking-widest text-[9px] border shadow-sm ${security.isRefundReceived
                                                         ? 'bg-green-100 text-green-800 border-green-200'
-                                                        : 'bg-orange-100 text-orange-800 border-orange-200'
+                                                        : security.isDocumentSubmitted
+                                                            ? 'bg-blue-100 text-blue-800 border-blue-200'
+                                                            : 'bg-orange-100 text-orange-800 border-orange-200'
                                                         }`}>
-                                                        {security.isRefundReceived ? 'Received' : 'Pending Refund'}
+                                                        {security.isRefundReceived ? 'Refund Received' : security.isDocumentSubmitted ? 'Documents Submitted' : 'Pending Refund'}
                                                     </Badge>
                                                 </TableCell>
                                                 <TableCell className="pr-8 text-right">
@@ -626,23 +641,31 @@ export default function SecuritiesPage() {
                                                             size="icon"
                                                             className="h-9 w-9 rounded-xl text-muted-foreground hover:bg-white hover:text-primary hover:shadow-md transition-all active:scale-95"
                                                             onClick={async () => {
-                                                                const confirmResult = await Swal.fire({
-                                                                    title: 'Mark as Received?',
-                                                                    text: "Are you sure you want to mark this refund as received?",
-                                                                    icon: 'warning',
+                                                                const { value: action } = await Swal.fire({
+                                                                    title: 'Update Security Status',
+                                                                    text: 'Select the action you want to perform:',
+                                                                    icon: 'question',
+                                                                    showDenyButton: true,
                                                                     showCancelButton: true,
-                                                                    confirmButtonColor: '#10b981',
-                                                                    cancelButtonColor: '#ef4444',
-                                                                    confirmButtonText: 'Yes, mark it!'
+                                                                    confirmButtonText: 'Documents Submitted',
+                                                                    denyButtonText: 'Refund Received',
+                                                                    confirmButtonColor: '#3b82f6',
+                                                                    denyButtonColor: '#10b981',
+                                                                    cancelButtonColor: '#64748b',
                                                                 });
 
-                                                                if (confirmResult.isConfirmed) {
+                                                                if (action === true) { // Documents Submitted
                                                                     setPinActionSecurity(security);
+                                                                    setPinActionType('documents');
+                                                                    setIsPinDialogOpen(true);
+                                                                } else if (action === false) { // Refund Received (Swal Deny returns false)
+                                                                    setPinActionSecurity(security);
+                                                                    setPinActionType('refund');
                                                                     setIsPinDialogOpen(true);
                                                                 }
                                                             }}
-                                                            disabled={security.isRefundReceived}
-                                                            title="Mark as Received"
+                                                            disabled={security.isRefundReceived && security.isDocumentSubmitted}
+                                                            title="Update Status"
                                                         >
                                                             <CheckCircle2 className="w-4 h-4" />
                                                         </Button>
@@ -694,7 +717,7 @@ export default function SecuritiesPage() {
                                 </div>
                                 <div className="flex items-center justify-between p-5 rounded-2xl bg-white dark:bg-slate-900 border-2 border-border/30 shadow-md hover:shadow-lg transition-all">
                                     <div>
-                                        <p className="text-xs font-bold uppercase tracking-wider text-muted-foreground mb-2">Total Received</p>
+                                        <p className="text-xs font-bold uppercase tracking-wider text-muted-foreground mb-2">Total Refund Received</p>
                                         <p className="text-2xl font-black text-emerald-600 font-mono">
                                             {formatCurrency(securities.filter(s => s.isRefundReceived).reduce((sum, s) => sum + (s.noOfContainers * s.amountPerContainer), 0))}
                                         </p>
@@ -722,7 +745,7 @@ export default function SecuritiesPage() {
                                     Displaying {filteredSecurities.length} of {securities.length} securities
                                 </span>
                                 <span className="text-muted-foreground font-semibold">
-                                    {securities.filter(s => !s.isRefundReceived).length} Pending • {securities.filter(s => s.isRefundReceived).length} Received
+                                    {securities.filter(s => !s.isRefundReceived).length} Pending • {securities.filter(s => s.isRefundReceived).length} Refund Received
                                 </span>
                             </div>
                         </CardContent>
@@ -833,17 +856,17 @@ export default function SecuritiesPage() {
                                         <p className="font-bold text-foreground">{selectedSecurity.receiverContact || 'N/A'}</p>
                                     </div>
                                     <div>
-                                        <p className="text-xs text-muted-foreground font-semibold mb-1">Document Submitted</p>
+                                        <p className="text-xs text-muted-foreground font-semibold mb-1">Documents Submitted</p>
                                         <div className="inline-flex items-center gap-1.5">
                                             {selectedSecurity.isDocumentSubmitted ? (
                                                 <>
                                                     <CheckCircle2 className="w-4 h-4 text-emerald-600" />
-                                                    <span className="font-bold text-emerald-600">Received</span>
+                                                    <span className="font-bold text-emerald-600">Submitted</span>
                                                 </>
                                             ) : (
                                                 <>
                                                     <Clock className="w-4 h-4 text-amber-600" />
-                                                    <span className="font-bold text-amber-600">Not Received</span>
+                                                    <span className="font-bold text-amber-600">Pending</span>
                                                 </>
                                             )}
                                         </div>
@@ -859,7 +882,7 @@ export default function SecuritiesPage() {
                                             ) : (
                                                 <>
                                                     <Clock className="w-4 h-4 text-amber-600" />
-                                                    <span className="font-bold text-amber-600">Pending</span>
+                                                    <span className="font-bold text-amber-600">No</span>
                                                 </>
                                             )}
                                         </div>
@@ -882,10 +905,11 @@ export default function SecuritiesPage() {
                 onClose={() => {
                     setIsPinDialogOpen(false);
                     setPinActionSecurity(null);
+                    setPinActionType(null);
                 }}
                 onConfirm={handleConfirmPinAction}
-                title="Mark Security as Received"
-                description={`This will mark the security refund for GD No. ${pinActionSecurity?.gdNumber} as received.`}
+                title={`Confirm ${pinActionType === 'documents' ? 'Documents Submission' : 'Refund Received'}`}
+                description={`This will mark ${pinActionType === 'documents' ? 'documents as submitted' : 'security refund as received'} for GD No. ${pinActionSecurity?.gdNumber}.`}
             />
         </DashboardLayout>
     );

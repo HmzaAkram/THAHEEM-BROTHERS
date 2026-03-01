@@ -37,7 +37,7 @@ export const InvoiceTemplate = forwardRef<HTMLDivElement, InvoiceTemplateProps>(
             <div className="flex justify-between items-start border-b-2 border-slate-800 pb-4 mb-4">
                 <div className="flex gap-3 max-w-[60%]">
                     <div className="w-14 h-14 object-contain flex-shrink-0">
-                        <img src="/logo.PNG" alt="Logo" className="w-full h-full" />
+                        <img src="/logo.jpeg" alt="Logo" className="w-full h-full" />
                     </div>
                     <div>
                         <h1 className="text-xl font-bold uppercase tracking-wide leading-tight">Thaheem Brothers</h1>

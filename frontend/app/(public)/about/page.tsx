@@ -84,6 +84,85 @@ export default function AboutPage() {
                     </div>
                 </div>
 
+                {/* Our Team */}
+                <div className="space-y-16">
+                    <div className="text-center space-y-4">
+                        <h2 className="text-3xl font-bold">Our Professional Team</h2>
+                        <p className="text-muted-foreground max-w-2xl mx-auto">
+                            Meet the dedicated professionals who ensure your logistics operations run smoothly across all touchpoints.
+                        </p>
+                    </div>
+
+                    {[
+                        {
+                            title: "Office Team",
+                            members: [
+                                { name: "Rana Irfan Ali", role: "CEO", phone: "03002912726" },
+                                { name: "Nadeem Ahmed", role: "General Manager", phone: "0300" },
+                                { name: "Munwar Ali", role: "Accountant", phone: "03002912726" },
+                                { name: "Zakria Owais", role: "IT", phone: "03202017200" },
+                                { name: "Imran Ali", role: "Operations", phone: "0300" },
+                                { name: "Zaeem Ahmed", role: "Operations", phone: "0300" },
+                                { name: "Sohail", role: "Outdoor Incharge", phone: "0300" },
+                                { name: "Bilal", role: "Office Boy", phone: "0300" },
+                            ]
+                        },
+                        {
+                            title: "Airport Team",
+                            members: [
+                                { name: "Khalid Hussain", role: "Airport Incharge", phone: "0300" },
+                                { name: "Imran Khan", role: "Airport Clerk", phone: "0300" },
+                                { name: "Husnain", role: "Airport Clerk", phone: "0300" },
+                            ]
+                        },
+                        {
+                            title: "SEA PORT Team",
+                            members: [
+                               { name: "Arbab Ahmed", role: "Operations", phone: "0300" },
+                               { name: "Rashid", role: "Operations", phone: "0300" },
+                               { name: "Abdul Rehman", role: "Sea Port Clerk", phone: "0300" },
+                               { name: "Rana Safdar", role: "Sea Port Incharge", phone: "0300" },
+                            ]
+                        },
+                        {
+                            title: "EPZ Team",
+                            members: [
+                                { name: "Rana Murtaza", role: "EPZ Incharge", phone: "0300" },
+                                { name: "Rizwan", role: "EPZ Clerk", phone: "0300" },
+                            ]
+                        }
+                    ].map((group, idx) => (
+                        <div key={idx} className="space-y-8">
+                            <h3 className="text-2xl font-bold border-l-4 border-primary pl-4">{group.title}</h3>
+                            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+                                {group.members.map((member, mIdx) => (
+                                    <Card key={mIdx} className="overflow-hidden group hover:shadow-lg transition-all duration-300 border-none bg-slate-50/50">
+                                        <div className="aspect-[4/5] relative bg-slate-200 overflow-hidden">
+                                            <div className="absolute inset-0 flex items-center justify-center text-slate-400 group-hover:scale-110 transition-transform duration-500">
+                                                <Users size={64} strokeWidth={1} />
+                                            </div>
+                                            {/* Gradient overlay */}
+                                            <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
+                                        </div>
+                                        <CardContent className="p-5 space-y-2">
+                                            <div>
+                                                <h4 className="font-bold text-lg leading-tight group-hover:text-primary transition-colors">{member.name}</h4>
+                                                <p className="text-sm font-medium text-primary/80 uppercase tracking-wider">{member.role}</p>
+                                            </div>
+                                            {member.phone && (
+                                                <div className="flex items-center gap-2 text-sm text-muted-foreground pt-2 border-t border-slate-100">
+                                                    <Phone size={14} className="text-primary" />
+                                                    <span>{member.phone}</span>
+                                                </div>
+                                            )}
+                                        </CardContent>
+                                    </Card>
+                                ))}
+                            </div>
+                        </div>
+                    ))}
+                </div>
+
                 {/* Why Thaheem Brothers */}
                 <div className="bg-slate-50 -mx-4 px-4 py-16 rounded-3xl">
                     <div className="max-w-4xl mx-auto">

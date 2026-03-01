@@ -320,13 +320,13 @@ export default function CompanyBillsPage() {
                             {formatDate(bill.date)}
                           </TableCell>
                           <TableCell className="font-bold">
-                            PKR {bill.grandTotal.toLocaleString()}
+                            {bill.grandTotal.toLocaleString()}
                           </TableCell>
                           <TableCell className="text-sm text-muted-foreground">
-                            PKR {(bill.paidAmount || 0).toLocaleString()}
+                            {(bill.paidAmount || 0).toLocaleString()}
                           </TableCell>
                           <TableCell className="font-bold text-primary">
-                            PKR {((bill.grandTotal || 0) - (bill.paidAmount || 0)).toLocaleString()}
+                            {((bill.grandTotal || 0) - (bill.paidAmount || 0)).toLocaleString()}
                           </TableCell>
                           <TableCell>
                             <span
@@ -374,7 +374,7 @@ export default function CompanyBillsPage() {
                 <div className="text-center space-y-1">
                   <p className="text-muted-foreground text-xs font-bold uppercase tracking-widest">Total Invoiced</p>
                   <p className="text-2xl font-black text-foreground">
-                    PKR {stats.total.toLocaleString()}
+                    {stats.total.toLocaleString()}
                   </p>
                 </div>
               </CardContent>
@@ -384,7 +384,7 @@ export default function CompanyBillsPage() {
                 <div className="text-center space-y-1">
                   <p className="text-muted-foreground text-xs font-bold uppercase tracking-widest">Paid Amount</p>
                   <p className="text-2xl font-black text-green-600">
-                    PKR {stats.paid.toLocaleString()}
+                    {stats.paid.toLocaleString()}
                   </p>
                 </div>
               </CardContent>
@@ -394,7 +394,7 @@ export default function CompanyBillsPage() {
                 <div className="text-center space-y-1">
                   <p className="text-muted-foreground text-xs font-bold uppercase tracking-widest">Outstanding</p>
                   <p className="text-2xl font-black text-red-600">
-                    PKR {stats.outstanding.toLocaleString()}
+                    {stats.outstanding.toLocaleString()}
                   </p>
                 </div>
               </CardContent>

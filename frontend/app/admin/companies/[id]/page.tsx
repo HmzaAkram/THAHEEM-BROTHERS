@@ -192,7 +192,7 @@ export default function CompanyDetailsPage() {
                                             />
                                         </div>
                                         <div>
-                                            <Label>Opening Balance (PKR)</Label>
+                                            <Label>Opening Balance</Label>
                                             <Input
                                                 type="number"
                                                 value={editedCompany.openingBalance || ''}
@@ -249,7 +249,7 @@ export default function CompanyDetailsPage() {
                                             <p className="text-xs text-muted-foreground uppercase tracking-wider flex items-center gap-1">
                                                 <DollarSign className="w-3 h-3" /> Opening Balance
                                             </p>
-                                            <p className="font-medium">PKR {(company.openingBalance || 0).toLocaleString()}</p>
+                                            <p className="font-medium">{(company.openingBalance || 0).toLocaleString()}</p>
                                         </div>
                                         <Separator />
                                         <div className="space-y-1">
@@ -296,18 +296,18 @@ export default function CompanyDetailsPage() {
                                 <div className="flex justify-between items-end">
                                     <div>
                                         <p className="text-blue-200 text-sm">Outstanding Balance</p>
-                                        <h3 className="text-3xl font-bold mt-1">PKR {stats.outstanding.toLocaleString()}</h3>
+                                        <h3 className="text-3xl font-bold mt-1">{stats.outstanding.toLocaleString()}</h3>
                                     </div>
                                     <TrendingUp className="w-8 h-8 text-blue-300 opacity-50" />
                                 </div>
                                 <div className="grid grid-cols-2 gap-4">
                                     <div className="bg-white/10 p-3 rounded-lg backdrop-blur-sm">
                                         <p className="text-blue-200 text-xs">Total Billed</p>
-                                        <p className="font-semibold text-lg">PKR {stats.totalBilled.toLocaleString()}</p>
+                                        <p className="font-semibold text-lg">{stats.totalBilled.toLocaleString()}</p>
                                     </div>
                                     <div className="bg-white/10 p-3 rounded-lg backdrop-blur-sm">
                                         <p className="text-blue-200 text-xs">Total Paid</p>
-                                        <p className="font-semibold text-lg">PKR {stats.totalPaid.toLocaleString()}</p>
+                                        <p className="font-semibold text-lg">{stats.totalPaid.toLocaleString()}</p>
                                     </div>
                                 </div>
                             </CardContent>
@@ -327,7 +327,7 @@ export default function CompanyDetailsPage() {
                                         <LineChart data={chartData}>
                                             <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" opacity={0.5} />
                                             <XAxis dataKey="date" stroke="var(--muted-foreground)" fontSize={12} tickLine={false} axisLine={false} />
-                                            <YAxis stroke="var(--muted-foreground)" fontSize={12} tickLine={false} axisLine={false} tickFormatter={(value) => `PKR ${value / 1000}k`} />
+                                            <YAxis stroke="var(--muted-foreground)" fontSize={12} tickLine={false} axisLine={false} tickFormatter={(value) => `${value / 1000}k`} />
                                             <Tooltip
                                                 contentStyle={{ backgroundColor: 'var(--card)', border: '1px solid var(--border)', borderRadius: '8px' }}
                                             />

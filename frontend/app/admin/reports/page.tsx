@@ -43,9 +43,31 @@ export default function ReportsPage() {
   const [dateTo, setDateTo] = useState(new Date().toISOString().split('T')[0]);
   const [reportType, setReportType] = useState('outstanding');
   const [selectedCompanyId, setSelectedCompanyId] = useState('all');
+  const [searchTerm, setSearchTerm] = useState('');
+  const [timeFilter, setTimeFilter] = useState<'custom' | 'overall' | '6months' | '3months'>('overall');
   const reportRef = useRef<HTMLDivElement>(null);
 
-  const { outstandingData, totalOutstanding, timeSeriesData, filteredBills, filteredPayments, companyLedger } = useMemo(() => {
+  // Helper to set timeframe
+  const handleTimeframeChange = (filter: 'overall' | '6months' | '3months') => {
+    setTimeFilter(filter);
+    const end = new Date().toISOString().split('T')[0];
+    let start = '2026-01-01';
+
+    if (filter === '6months') {
+      const d = new Date();
+      d.setMonth(d.getMonth() - 6);
+      start = d.toISOString().split('T')[0];
+    } else if (filter === '3months') {
+      const d = new Date();
+      d.setMonth(d.getMonth() - 3);
+      start = d.toISOString().split('T')[0];
+    }
+
+    setDateFrom(start);
+    setDateTo(end);
+  };
+
+  const { outstandingData, totalOutstanding, totalOverdue, timeSeriesData, filteredBills, filteredPayments, companyLedger, ledgerOpeningBalance } = useMemo(() => {
     // 1. Filter raw data based on dates
     const start = new Date(dateFrom);
     const end = new Date(dateTo);
@@ -53,82 +75,158 @@ export default function ReportsPage() {
 
     const fBills = bills.filter(b => {
       const d = new Date(b.date);
-      return d >= start && d <= end;
+      const dateMatch = d >= start && d <= end;
+      const searchMatch = searchTerm === '' || b.companyName.toLowerCase().includes(searchTerm.toLowerCase());
+      return dateMatch && searchMatch;
     });
 
     const fPayments = payments.filter(p => {
       const d = new Date(p.date);
-      return d >= start && d <= end;
+      const dateMatch = d >= start && d <= end;
+      const searchMatch = searchTerm === '' || p.companyName.toLowerCase().includes(searchTerm.toLowerCase());
+      return dateMatch && searchMatch;
     });
 
-    // 2. Company Ledger Data (if type is company)
-    const companyLedger = reportType === 'company' && selectedCompanyId !== 'all'
-      ? [...fBills.filter(b => String(b.companyId) === selectedCompanyId).map(b => ({ ...b, type: 'BILL' })),
-      ...fPayments.filter(p => String(p.companyId) === selectedCompanyId).map(p => ({ ...p, type: 'PAYMENT' }))]
-        .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime())
-      : [];
+    // 2. Company Ledger Data (Detailed format for export)
+    let companyLedger: any[] = [];
+    let ledgerOpeningBalance = 0;
+
+    if (reportType === 'company' && selectedCompanyId !== 'all') {
+      const selectedCompany = companies.find(c => String(c.id) === selectedCompanyId);
+      const baseOpeningBal = Number(selectedCompany?.openingBalance) || 0;
+
+      let consolidatedEntries: any[] = [];
+      const companyBills = bills.filter(b => String(b.companyId) === selectedCompanyId);
+      const companyPayments = payments.filter(p => String(p.companyId) === selectedCompanyId);
+
+      companyBills.forEach(bill => {
+        const linkedPayments = payments.filter(p => String(p.billId) === String(bill.id));
+        const totalPaid = linkedPayments.reduce((sum, p) => sum + Number(p.amount || 0), 0);
+        const totalAdjustment = linkedPayments.reduce((sum, p) => sum + Number(p.adjustment || 0), 0);
+        const debitAmount = bill.grandTotal || bill.totalAmount || 0;
+        const advanceAmount = bill.advancePayment || 0;
+
+        consolidatedEntries.push({
+          date: bill.date,
+          type: 'BILL',
+          description: (bill as any).description || `Job #${bill.jobNumber || 'N/A'}`,
+          jobNumber: bill.jobNumber,
+          debit: debitAmount,
+          advance: advanceAmount,
+          paid: totalPaid,
+          adjustment: totalAdjustment,
+          credit: advanceAmount + totalPaid + totalAdjustment,
+          outstanding: debitAmount - advanceAmount - totalPaid - totalAdjustment,
+        });
+      });
+
+      companyPayments.forEach(p => {
+        if (!p.billId) {
+          consolidatedEntries.push({
+            date: p.date,
+            type: 'PAYMENT',
+            description: p.description ? `Payment: ${p.description}` : 'Payment Received',
+            jobNumber: null,
+            debit: 0,
+            advance: 0,
+            paid: Number(p.amount || 0),
+            adjustment: Number(p.adjustment || 0),
+            credit: Number(p.amount || 0) + Number(p.adjustment || 0),
+            outstanding: 0,
+            method: (p as any).method,
+            paymentRef: p.reference,
+          });
+        }
+      });
+
+      consolidatedEntries.sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+
+      // Filter by period and calculate opening balance for THAT period
+      let runningOpening = baseOpeningBal;
+      const startOfPeriod = new Date(dateFrom);
+      startOfPeriod.setHours(0, 0, 0, 0);
+
+      const previousEntries = consolidatedEntries.filter(e => new Date(e.date) < startOfPeriod);
+      previousEntries.forEach(e => {
+        runningOpening += (e.debit - e.credit);
+      });
+
+      const periodEntries = consolidatedEntries.filter(e => {
+        const d = new Date(e.date);
+        return d >= startOfPeriod && d <= end;
+      });
+
+      let running = runningOpening;
+      companyLedger = periodEntries.map(e => {
+        running += (e.debit - e.credit);
+        return { ...e, balance: running };
+      });
+      ledgerOpeningBalance = runningOpening;
+    }
 
     // 3. Calculate Outstanding
     // Note: For "Outstanding Report", usually we show ALL outstanding, 
     // but we can filter the "Last Due" or "Bills Count" within range.
-    const companyStats = companies.map(c => {
-      const companyBills = bills.filter(b => b.companyId === c.id);
-      const companyPayments = payments.filter(p => p.companyId === c.id);
+    const companyStats = companies
+      .filter(c => searchTerm === '' || c.name.toLowerCase().includes(searchTerm.toLowerCase()))
+      .map(c => {
+        const companyBills = bills.filter(b => b.companyId === c.id);
+        const companyPayments = payments.filter(p => p.companyId === c.id);
 
-      const billed = companyBills.reduce((sum, b) => sum + (Number(b.grandTotal) || 0), 0);
-      const paid =
-        companyBills.reduce((sum, b) => sum + (Number(b.advancePayment) || 0), 0) +
-        companyPayments.reduce((sum, p) => sum + (Number(p.amount) || 0) + (Number(p.adjustment) || 0), 0);
-      const outstanding = billed - paid;
+        const billed = companyBills.reduce((sum, b) => sum + (Number(b.grandTotal) || 0), 0);
+        const paid =
+          companyBills.reduce((sum, b) => sum + (Number(b.advancePayment) || 0), 0) +
+          companyPayments.reduce((sum, p) => sum + (Number(p.amount) || 0) + (Number(p.adjustment) || 0), 0);
+        const outstanding = billed - paid;
 
-      // Unpaid bills within range for report clarity
-      const unpaidBills = companyBills.filter(b => b.status !== 'Paid');
-      unpaidBills.sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+        // Unpaid bills within range for report clarity
+        const unpaidBills = companyBills.filter(b => b.status !== 'Paid');
+        unpaidBills.sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
 
-      let daysOverdue = 0;
-      let lastDueDate = '-';
-      let overdueCount = 0;
+        let daysOverdue = 0;
+        let lastDueDate = '-';
+        let overdueCount = 0;
 
-      if (unpaidBills.length > 0) {
-        const today = new Date();
-        unpaidBills.forEach(bill => {
-          const d = new Date(bill.date);
-          d.setDate(d.getDate() + 30); // 30 days credit period
-          if (today > d) {
-            overdueCount++;
+        if (unpaidBills.length > 0) {
+          const today = new Date();
+          unpaidBills.forEach(bill => {
+            const d = new Date(bill.date);
+            d.setDate(d.getDate() + 30); // 30 days credit period
+            if (today > d) {
+              overdueCount++;
+            }
+          });
+
+          const oldestUnpaid = unpaidBills[0];
+          const dueDate = new Date(oldestUnpaid.date);
+          dueDate.setDate(dueDate.getDate() + 30);
+
+          if (today > dueDate) {
+            daysOverdue = Math.floor((today.getTime() - dueDate.getTime()) / (1000 * 3600 * 24));
           }
-        });
-
-        const oldestUnpaid = unpaidBills[0];
-        const dueDate = new Date(oldestUnpaid.date);
-        dueDate.setDate(dueDate.getDate() + 30);
-
-        if (today > dueDate) {
-          daysOverdue = Math.floor((today.getTime() - dueDate.getTime()) / (1000 * 3600 * 24));
+          lastDueDate = oldestUnpaid.date;
         }
-        lastDueDate = oldestUnpaid.date;
-      }
 
-      return {
-        company: c.name,
-        totalDebit: billed,
-        received: paid,
-        outstanding,
-        billsCount: companyBills.length,
-        daysOverdue,
-        lastDueDate,
-        overdueCount
-      };
-    }).filter(s => s.outstanding > 0 || s.billsCount > 0);
+        return {
+          company: c.name,
+          totalDebit: billed,
+          received: paid,
+          outstanding,
+          billsCount: companyBills.length,
+          daysOverdue,
+          lastDueDate,
+          overdueCount
+        };
+      }).filter(s => s.outstanding > 0 || s.billsCount > 0);
 
     const total = companyStats.reduce((sum, item) => sum + item.outstanding, 0);
-    const totalOverdueInvoices = companyStats.reduce((sum, item) => sum + item.overdueCount, 0);
+    const totalOverdue = companyStats.reduce((sum, item) => sum + item.overdueCount, 0);
 
     // 3. Time Series (Monthly Billing Trend)
     const monthsData: { month: string; outstanding: number; year: number; monthIdx: number }[] = [];
+    const now = new Date();
     for (let i = 5; i >= 0; i--) {
-      const d = new Date();
-      d.setMonth(d.getMonth() - i);
+      const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
       monthsData.push({
         month: d.toLocaleString('default', { month: 'short' }),
         outstanding: 0,
@@ -146,13 +244,14 @@ export default function ReportsPage() {
     return {
       outstandingData: companyStats,
       totalOutstanding: total,
-      totalOverdueInvoices,
+      totalOverdue: totalOverdue,
       timeSeriesData: monthsData,
       filteredBills: fBills,
       filteredPayments: fPayments,
-      companyLedger
+      companyLedger,
+      ledgerOpeningBalance
     };
-  }, [companies, bills, payments, dateFrom, dateTo, reportType, selectedCompanyId]);
+  }, [companies, bills, payments, dateFrom, dateTo, reportType, selectedCompanyId, searchTerm]);
 
   const handleExport = async () => {
     try {
@@ -161,7 +260,7 @@ export default function ReportsPage() {
 
       // Add Logo
       const img = new Image();
-      img.src = '/logo.PNG';
+      img.src = '/logo.jpeg';
 
       await new Promise((resolve) => {
         img.onload = resolve;
@@ -184,18 +283,18 @@ export default function ReportsPage() {
       pdf.setTextColor(15, 23, 42); // slate-900
       pdf.setFontSize(14);
       pdf.setFont("helvetica", "bold");
-      pdf.text("THAHEEM BROTHERS", 34, 14);
+      pdf.text("THAHEEM BROTHERS", 34, 12);
 
       pdf.setTextColor(100, 116, 139); // slate-500
       pdf.setFontSize(8);
       pdf.setFont("helvetica", "normal");
-      pdf.text("Suite 23, 2nd Floor, R.K. Square Ext, Shahrah-e-Liaquat, Karachi", 34, 19);
-      pdf.text("+92 21 32421347 | +92 300 2791780 | import.khi@hotmail.com", 34, 23);
+      pdf.text("Suite 23, 2nd Floor, R.K. Square Ext, Shahrah-e-Liaquat, Karachi", 34, 16);
+      pdf.text("+92 21 32421347 | +92 300 2791780 | import.khi@hotmail.com", 34, 20);
 
       // Line Separator
       pdf.setDrawColor(226, 232, 240); // slate-200
       pdf.setLineWidth(0.5);
-      pdf.line(14, 28, pageWidth - 14, 28);
+      pdf.line(14, 29, pageWidth - 14, 29);
 
       // Add Title
       pdf.setTextColor(15, 23, 42); // slate-900
@@ -208,7 +307,7 @@ export default function ReportsPage() {
       if (reportType === 'payments') reportTitle = 'PAYMENTS REPORT';
       if (reportType === 'company') reportTitle = 'LEDGER REPORT';
 
-      pdf.text(reportTitle, pageWidth - 14, 18, { align: "right" });
+      pdf.text(reportTitle, pageWidth - 14, 27, { align: "right" });
 
       // Add Filter Info Below Line
       let yPos = 36;
@@ -281,17 +380,47 @@ export default function ReportsPage() {
           4: { halign: 'right', fontStyle: 'bold', textColor: [0, 128, 0] }
         };
       } else if (reportType === 'company') {
-        head = [['Date', 'Type', 'Ref/Job No', 'Debit', 'Credit']];
-        body = companyLedger.map((entry: any) => [
-          formatDate(entry.date),
-          entry.type,
-          entry.jobNumber || entry.reference || '-',
-          entry.type === 'BILL' ? formatCurrency(entry.grandTotal) : '-',
-          entry.type === 'PAYMENT' ? formatCurrency(Number(entry.amount) + (Number(entry.adjustment) || 0)) : '-'
+        head = [['Date', 'Description', 'Job No', 'Bill Total', 'Advance', 'Paid', 'Adj.', 'Outst.', 'Balance']];
+
+        // Opening Balance Row
+        body.push([
+          formatDate(dateFrom),
+          'Opening Balance b/f',
+          '-',
+          '-',
+          '-',
+          '-',
+          '-',
+          '-',
+          formatCurrency(ledgerOpeningBalance)
         ]);
+
+        companyLedger.forEach((entry: any) => {
+          let desc = entry.description;
+          if (entry.type === 'PAYMENT') {
+            desc = entry.method ? `Payment Received (${entry.method})` : 'Advance Received';
+            if (entry.paymentRef) desc += ` - Ref: ${entry.paymentRef}`;
+          }
+          body.push([
+            formatDate(entry.date),
+            desc,
+            entry.jobNumber || '-',
+            entry.debit > 0 ? formatCurrency(entry.debit) : '-',
+            entry.advance > 0 ? formatCurrency(entry.advance) : '-',
+            entry.paid > 0 ? formatCurrency(entry.paid) : '-',
+            entry.adjustment > 0 ? formatCurrency(entry.adjustment) : '-',
+            entry.outstanding > 0 ? formatCurrency(entry.outstanding) : '-',
+            formatCurrency(entry.balance)
+          ]);
+        });
+
         customStyles = {
-          3: { halign: 'right', fontStyle: 'bold', textColor: [220, 38, 38] },
-          4: { halign: 'right', fontStyle: 'bold', textColor: [0, 128, 0] }
+          3: { halign: 'right' },
+          4: { halign: 'right' },
+          5: { halign: 'right' },
+          6: { halign: 'right' },
+          7: { halign: 'right' },
+          8: { halign: 'right', fontStyle: 'bold' }
         };
       }
 
@@ -319,6 +448,19 @@ export default function ReportsPage() {
             } else if (text === 'Partial' || text === 'Medium') {
               data.cell.styles.textColor = [202, 138, 4]; // Yellow
             }
+
+            // Color coding for Balance column in Company Ledger
+            if (reportType === 'company' && data.column.index === 8) {
+              const numStr = text.replace(/[^0-9.-]/g, '');
+              const numVal = parseFloat(numStr);
+              if (!isNaN(numVal)) {
+                if (numVal > 0) {
+                  data.cell.styles.textColor = [220, 38, 38]; // Red
+                } else if (numVal <= 0) {
+                  data.cell.styles.textColor = [0, 128, 0]; // Green
+                }
+              }
+            }
           }
         }
       });
@@ -336,24 +478,40 @@ export default function ReportsPage() {
       <div className="space-y-6">
       </div>
 
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-base">Report Filters</CardTitle>
+      <Card className="border-none shadow-xl shadow-slate-200/40 rounded-3xl overflow-hidden bg-white">
+        <div className="h-1.5 bg-gradient-to-r from-primary via-indigo-500 to-primary" />
+        <CardHeader className="pb-2 pt-6">
+          <CardTitle className="text-xs font-black uppercase tracking-widest text-slate-500 flex items-center gap-2">
+            <span className="w-2 h-2 rounded-full bg-primary" />
+            Advanced Filter Engine
+          </CardTitle>
         </CardHeader>
-        <CardContent className="space-y-4">
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+        <CardContent className="space-y-6 pb-8">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-6 gap-6">
+            <div className="lg:col-span-2">
+              <Label htmlFor="search-company" className="text-[10px] font-black uppercase tracking-widest text-slate-400 mb-1.5 block">
+                Search Company
+              </Label>
+              <Input
+                id="search-company"
+                type="text"
+                placeholder="Type name to filter..."
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                className="h-11 bg-slate-50 border-slate-100 rounded-xl font-bold focus:ring-primary/20"
+              />
+            </div>
+
             <div>
-              <Label htmlFor="report-type" className="text-sm">
+              <Label htmlFor="report-type" className="text-[10px] font-black uppercase tracking-widest text-slate-400 mb-1.5 block">
                 Report Type
               </Label>
               <Select value={reportType} onValueChange={setReportType}>
-                <SelectTrigger className="mt-1">
+                <SelectTrigger className="h-11 bg-slate-50 border-slate-100 rounded-xl font-bold">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="outstanding">
-                    Outstanding Balance
-                  </SelectItem>
+                  <SelectItem value="outstanding">Outstanding Balance</SelectItem>
                   <SelectItem value="bills">Bills by Date</SelectItem>
                   <SelectItem value="payments">Payments by Date</SelectItem>
                   <SelectItem value="company">Company Ledger</SelectItem>
@@ -362,36 +520,42 @@ export default function ReportsPage() {
             </div>
 
             <div>
-              <Label htmlFor="date-from" className="text-sm">
+              <Label htmlFor="date-from" className="text-[10px] font-black uppercase tracking-widest text-slate-400 mb-1.5 block">
                 From
               </Label>
               <Input
                 id="date-from"
                 type="date"
                 value={dateFrom}
-                onChange={(e) => setDateFrom(e.target.value)}
-                className="mt-1"
+                onChange={(e) => {
+                  setDateFrom(e.target.value);
+                  setTimeFilter('custom');
+                }}
+                className="h-11 bg-slate-50 border-slate-100 rounded-xl font-bold"
               />
             </div>
 
             <div>
-              <Label htmlFor="date-to" className="text-sm">
+              <Label htmlFor="date-to" className="text-[10px] font-black uppercase tracking-widest text-slate-400 mb-1.5 block">
                 To
               </Label>
               <Input
                 id="date-to"
                 type="date"
                 value={dateTo}
-                onChange={(e) => setDateTo(e.target.value)}
-                className="mt-1"
+                onChange={(e) => {
+                  setDateTo(e.target.value);
+                  setTimeFilter('custom');
+                }}
+                className="h-11 bg-slate-50 border-slate-100 rounded-xl font-bold"
               />
             </div>
 
             {reportType === 'company' && (
               <div>
-                <Label className="text-sm">Select Company</Label>
+                <Label className="text-[10px] font-black uppercase tracking-widest text-slate-400 mb-1.5 block">Select Company</Label>
                 <Select value={selectedCompanyId} onValueChange={setSelectedCompanyId}>
-                  <SelectTrigger className="mt-1">
+                  <SelectTrigger className="h-11 bg-slate-50 border-slate-100 rounded-xl font-bold">
                     <SelectValue placeholder="All Companies" />
                   </SelectTrigger>
                   <SelectContent>
@@ -403,9 +567,34 @@ export default function ReportsPage() {
                 </Select>
               </div>
             )}
+          </div>
 
-            <div className="flex items-end gap-2">
-              <Button className="flex-1">Generate</Button>
+          <div className="flex flex-wrap items-center justify-between gap-4 pt-4 border-t border-slate-100">
+            <div className="flex items-center gap-2">
+              <span className="text-[10px] font-black uppercase text-slate-400 tracking-widest mr-2">Quick Timeframe:</span>
+              <div className="flex gap-1.5 bg-slate-100 p-1 rounded-xl">
+                {(['overall', '6months', '3months'] as const).map((filter) => (
+                  <Button
+                    key={filter}
+                    variant={timeFilter === filter ? 'default' : 'ghost'}
+                    size="sm"
+                    onClick={() => handleTimeframeChange(filter)}
+                    className={`h-8 px-4 rounded-lg text-[9px] font-black uppercase tracking-widest transition-all ${timeFilter === filter
+                      ? 'bg-primary text-white shadow-lg shadow-primary/20'
+                      : 'text-slate-500 hover:bg-white hover:text-slate-800'
+                      }`}
+                  >
+                    {filter === 'overall' ? 'Overall' : filter === '6months' ? '6 Months' : '3 Months'}
+                  </Button>
+                ))}
+              </div>
+            </div>
+
+            <div className="flex items-center gap-3">
+              <span className="text-[10px] font-black text-slate-300 uppercase italic">Powering Business Logic</span>
+              <Button onClick={() => handleTimeframeChange('overall')} variant="outline" className="h-10 rounded-xl border-slate-200 text-xs font-black uppercase tracking-widest px-6 hover:bg-slate-50">
+                Reset All
+              </Button>
             </div>
           </div>
         </CardContent>
@@ -628,7 +817,7 @@ export default function ReportsPage() {
                 <div>
                   <p className="text-xs text-muted-foreground">Total Outstanding</p>
                   <p className="text-2xl font-bold text-primary mt-1">
-                    PKR {totalOutstanding.toLocaleString()}
+                    {totalOutstanding.toLocaleString()}
                   </p>
                 </div>
                 <div>

@@ -173,7 +173,7 @@ export default function LedgerPage() {
       const pageWidth = pdf.internal.pageSize.getWidth();
 
       const img = new Image();
-      img.src = '/logo.PNG'; // Ensure this matches the correct path
+      img.src = '/logo.jpeg'; // Ensure this matches the correct path
 
       await new Promise((resolve) => {
         img.onload = resolve;
@@ -234,7 +234,7 @@ export default function LedgerPage() {
       } else {
         pdf.text(`Period: All Time`, 14, yPos + 5);
       }
-      
+
       pdf.text(`Date Printed: ${formatDate(new Date().toISOString())}`, pageWidth - 14, yPos, { align: "right" });
       yPos += 12;
 

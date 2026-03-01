@@ -57,10 +57,17 @@ class SecurityController extends Controller
         }
 
         $validated = $request->validate([
-            'is_refund_received' => 'boolean',
+            'is_document_submitted' => 'nullable|boolean',
+            'is_refund_received' => 'nullable|boolean',
             'received_amount_date' => 'nullable|date',
             'pay_order_no' => 'nullable|string',
             'status' => 'nullable|string',
+            'receiver_name' => 'nullable|string',
+            'receiver_contact' => 'nullable|string',
+            'port' => 'nullable|string',
+            'refund_days' => 'nullable|integer',
+            'paid_by' => 'nullable|string',
+            'cheque_name' => 'nullable|string',
         ]);
 
         $security->update($validated);

@@ -50,7 +50,7 @@ export default function AccountSummaryPage() {
 
       // Add Logo
       const img = new Image();
-      img.src = '/logo.PNG'; // Ensure this matches the correct path
+      img.src = '/logo.jpeg'; // Ensure this matches the correct path
 
       await new Promise((resolve) => {
         img.onload = resolve;
@@ -135,11 +135,11 @@ export default function AccountSummaryPage() {
       pdf.setFontSize(10);
       pdf.setFont("helvetica", "normal");
 
-      pdf.text(`Total Debit:   PKR ${summary.totalDebit.toLocaleString()}`, 14, finalY + 18);
-      pdf.text(`Total Credit:  PKR ${summary.totalCredit.toLocaleString()}`, 14, finalY + 24);
+      pdf.text(`Total Debit:   ${summary.totalDebit.toLocaleString()}`, 14, finalY + 18);
+      pdf.text(`Total Credit:  ${summary.totalCredit.toLocaleString()}`, 14, finalY + 24);
 
       pdf.setFont("helvetica", "bold");
-      pdf.text(`Balance:       PKR ${summary.balance.toLocaleString()}`, 14, finalY + 30);
+      pdf.text(`Balance:       ${summary.balance.toLocaleString()}`, 14, finalY + 30);
 
       pdf.save(`Account_Statement_${currentCompany.name.replace(/[/\\?%*:|"<>\s]/g, '_')}_${new Date().toISOString().split('T')[0]}.pdf`);
       toast.success("Statement downloaded successfully");
@@ -259,21 +259,21 @@ export default function AccountSummaryPage() {
                 <div>
                   <p className="text-xs font-medium text-white/70 mb-1 leading-none uppercase tracking-widest">Total Debit (Billed)</p>
                   <p className="text-3xl font-black font-mono tracking-tighter">
-                    PKR {summary.totalDebit.toLocaleString()}
+                    {summary.totalDebit.toLocaleString()}
                   </p>
                 </div>
                 <div className="h-px bg-white/20" />
                 <div>
                   <p className="text-xs font-medium text-white/70 mb-1 leading-none uppercase tracking-widest">Total Credit (Paid)</p>
                   <p className="text-3xl font-black font-mono tracking-tighter">
-                    PKR {summary.totalCredit.toLocaleString()}
+                    {summary.totalCredit.toLocaleString()}
                   </p>
                 </div>
                 <div className="h-px bg-white/20" />
                 <div className="bg-white/10 p-4 rounded-xl border border-white/20">
                   <p className="text-xs font-black text-white/90 mb-2 leading-none uppercase tracking-widest">Current Outstanding</p>
                   <p className="text-4xl font-black font-mono tracking-tighter text-yellow-300 drop-shadow-md">
-                    PKR {summary.balance.toLocaleString()}
+                    {summary.balance.toLocaleString()}
                   </p>
                 </div>
               </CardContent>

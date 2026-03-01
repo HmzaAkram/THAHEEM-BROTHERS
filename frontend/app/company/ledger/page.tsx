@@ -90,7 +90,7 @@ export default function CompanyLedgerPage() {
       const pageWidth = pdf.internal.pageSize.getWidth();
 
       const img = new Image();
-      img.src = '/logo.PNG'; // Ensure this matches the correct path
+      img.src = '/logo.jpeg'; // Ensure this matches the correct path
 
       await new Promise((resolve) => {
         img.onload = resolve;
@@ -340,7 +340,7 @@ export default function CompanyLedgerPage() {
                           <TableCell className="text-right text-sm align-top pt-3">
                             {entry.debit > 0 ? (
                               <span className="text-red-600 font-semibold">
-                                PKR {entry.debit.toLocaleString()}
+                                {entry.debit.toLocaleString()}
                               </span>
                             ) : (
                               <span className="text-muted-foreground">-</span>
@@ -349,14 +349,14 @@ export default function CompanyLedgerPage() {
                           <TableCell className="text-right text-sm align-top pt-3">
                             {entry.credit > 0 ? (
                               <span className="text-green-600 font-semibold">
-                                PKR {entry.credit.toLocaleString()}
+                                {entry.credit.toLocaleString()}
                               </span>
                             ) : (
                               <span className="text-muted-foreground">-</span>
                             )}
                           </TableCell>
                           <TableCell className="text-right font-semibold text-sm align-top pt-3 bg-muted/10 font-bold">
-                            PKR {entry.balance.toLocaleString()}
+                            {entry.balance.toLocaleString()}
                           </TableCell>
                         </TableRow>
 
@@ -388,7 +388,7 @@ export default function CompanyLedgerPage() {
                                   </div>
                                   <div>
                                     <p className="text-muted-foreground font-semibold mb-1 uppercase tracking-wider">Total Bill</p>
-                                    <p className="font-medium text-primary font-bold">PKR {entry.debit.toLocaleString()}</p>
+                                    <p className="font-medium text-primary font-bold">{entry.debit.toLocaleString()}</p>
                                   </div>
                                 </div>
                               </div>
@@ -407,19 +407,19 @@ export default function CompanyLedgerPage() {
                 <div>
                   <p className="text-xs text-muted-foreground font-bold uppercase tracking-wider">Total Charged</p>
                   <p className="text-lg font-black text-foreground mt-1">
-                    PKR {stats.totalCharged.toLocaleString()}
+                    {stats.totalCharged.toLocaleString()}
                   </p>
                 </div>
                 <div>
                   <p className="text-xs text-muted-foreground font-bold uppercase tracking-wider">Total Paid</p>
                   <p className="text-lg font-black text-foreground mt-1">
-                    PKR {stats.totalPaid.toLocaleString()}
+                    {stats.totalPaid.toLocaleString()}
                   </p>
                 </div>
                 <div>
                   <p className="text-xs text-muted-foreground font-bold uppercase tracking-wider">Current Balance</p>
                   <p className="text-lg font-black text-primary mt-1">
-                    PKR {stats.currentBalance.toLocaleString()}
+                    {stats.currentBalance.toLocaleString()}
                   </p>
                 </div>
               </div>

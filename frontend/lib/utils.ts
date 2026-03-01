@@ -17,12 +17,12 @@ export function formatDate(date: string | Date | null | undefined): string {
   return `${day}/${month}/${year}`;
 }
 export function formatCurrency(amount: number | string | undefined | null): string {
-  if (amount === undefined || amount === null) return 'PKR 0';
+  if (amount === undefined || amount === null) return '0';
   const num = typeof amount === 'string' ? parseFloat(amount) : amount;
-  if (isNaN(num)) return 'PKR 0';
+  if (isNaN(num)) return '0';
 
   // Use Math.round to avoid floating point artifacts and get a clean integer
   // if decimals are not needed. If you want decimals, use toFixed(2).
   // The user requested it to be clean like 40000.
-  return `PKR ${Math.round(num).toLocaleString()}`;
+  return `${Math.round(num).toLocaleString()}`;
 }

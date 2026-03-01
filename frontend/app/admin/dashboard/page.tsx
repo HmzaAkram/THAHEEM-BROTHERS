@@ -259,7 +259,7 @@ export default function AdminDashboard() {
 
       // Load logo once for PDFs
       const img = new Image();
-      img.src = '/logo.PNG';
+      img.src = '/logo.jpeg';
       await new Promise((resolve) => {
         img.onload = resolve;
         img.onerror = resolve;
@@ -302,24 +302,24 @@ export default function AdminDashboard() {
         ledgerDoc.setTextColor(15, 23, 42); // slate-900
         ledgerDoc.setFontSize(14);
         ledgerDoc.setFont("helvetica", "bold");
-        ledgerDoc.text("THAHEEM BROTHERS", 34, 14);
+        ledgerDoc.text("THAHEEM BROTHERS", 34, 12);
 
         ledgerDoc.setTextColor(100, 116, 139); // slate-500
         ledgerDoc.setFontSize(8);
         ledgerDoc.setFont("helvetica", "normal");
-        ledgerDoc.text("Suite 23, 2nd Floor, R.K. Square Ext, Shahrah-e-Liaquat, Karachi", 34, 19);
-        ledgerDoc.text("+92 21 32421347 | +92 300 2791780 | import.khi@hotmail.com", 34, 23);
+        ledgerDoc.text("Suite 23, 2nd Floor, R.K. Square Ext, Shahrah-e-Liaquat, Karachi", 34, 16);
+        ledgerDoc.text("+92 21 32421347 | +92 300 2791780 | import.khi@hotmail.com", 34, 20);
 
         // Line Separator
         ledgerDoc.setDrawColor(226, 232, 240); // slate-200
         ledgerDoc.setLineWidth(0.5);
-        ledgerDoc.line(14, 28, pageWidth - 14, 28);
+        ledgerDoc.line(14, 29, pageWidth - 14, 29);
 
         // Add Title
         ledgerDoc.setTextColor(15, 23, 42); // slate-900
         ledgerDoc.setFontSize(16);
         ledgerDoc.setFont("helvetica", "bold");
-        ledgerDoc.text("SUMMARY", pageWidth - 14, 18, { align: "right" });
+        ledgerDoc.text("SUMMARY", pageWidth - 14, 27, { align: "right" });
 
         // Add Filter Info Below Line
         let yPos = 36;
@@ -456,29 +456,44 @@ export default function AdminDashboard() {
                 // Save the invoice PDF inside the job-number folder
                 jobFolder.file(`Invoice_${jobFolderName}.pdf`, invoiceDoc.output('blob'));
 
-                // Process attachments — also inside the same job-number folder
-                if (bill.attachment) {
-                  try {
-                    const filename = bill.attachment.split('/').pop();
-                    if (filename) {
-                      const token = localStorage.getItem('authToken');
-                      const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000/api/v1';
-                      const attachUrl = `${apiUrl}/bills/attachment/${filename}`;
+                // Process attachments — organized into an "attachments" sub-folder
+                const allAttachments: string[] = [];
+                if (bill.attachment) allAttachments.push(bill.attachment);
+                if (bill.attachments && Array.isArray(bill.attachments)) {
+                  bill.attachments.forEach(a => {
+                    if (a && !allAttachments.includes(a)) allAttachments.push(a);
+                  });
+                }
 
-                      const attRes = await fetch(attachUrl, {
-                        headers: { 'Authorization': `Bearer ${token}` }
-                      });
+                if (allAttachments.length > 0) {
+                  const attachmentsFolder = jobFolder.folder('attachments');
+                  if (attachmentsFolder) {
+                    for (let k = 0; k < allAttachments.length; k++) {
+                      const attachmentUrl = allAttachments[k];
+                      try {
+                        const filename = attachmentUrl.split('/').pop();
+                        if (filename) {
+                          const token = localStorage.getItem('authToken');
+                          const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000/api/v1';
+                          const attachUrl = `${apiUrl}/bills/attachment/${filename}`;
 
-                      if (attRes.ok) {
-                        const attBlob = await attRes.blob();
-                        const ext = filename.split('.').pop() || 'pdf';
-                        jobFolder.file(`Attachment_${bill.jobNumber || bill.id}.${ext}`, attBlob);
-                      } else {
-                        console.warn(`Failed to fetch attachment from ${attachUrl}: ${attRes.status}`);
+                          const attRes = await fetch(attachUrl, {
+                            headers: { 'Authorization': `Bearer ${token}` }
+                          });
+
+                          if (attRes.ok) {
+                            const attBlob = await attRes.blob();
+                            // Use original filename or a descriptive name if missing
+                            const fileNameToSave = filename || `attachment_${k + 1}.pdf`;
+                            attachmentsFolder.file(fileNameToSave, attBlob);
+                          } else {
+                            console.warn(`Failed to fetch attachment from ${attachUrl}: ${attRes.status}`);
+                          }
+                        }
+                      } catch (attErr) {
+                        console.error('Failed to fetch attachment', attErr);
                       }
                     }
-                  } catch (attErr) {
-                    console.error('Failed to fetch attachment', attErr);
                   }
                 }
 
@@ -845,7 +860,7 @@ export default function AdminDashboard() {
                             </TableCell>
                             <TableCell className="py-4 px-4 text-center">
                               <span className="inline-flex items-center gap-1 px-2 py-1 rounded-md bg-primary/10 text-primary font-bold text-xs">
-                                {security.noOfContainers} × PKR {security.amountPerContainer.toLocaleString()}
+                                {security.noOfContainers} × {security.amountPerContainer.toLocaleString()}
                               </span>
                             </TableCell>
                             <TableCell className="py-4 px-4 text-right">
@@ -987,12 +1002,12 @@ export default function AdminDashboard() {
                       </div>
                       <div>
                         <p className="text-xs text-muted-foreground font-semibold mb-1">Amount Per Container</p>
-                        <p className="font-mono font-bold text-foreground">PKR {selectedSecurity.amountPerContainer.toLocaleString()}</p>
+                        <p className="font-mono font-bold text-foreground">{selectedSecurity.amountPerContainer.toLocaleString()}</p>
                       </div>
                       <div>
                         <p className="text-xs text-muted-foreground font-semibold mb-1">Total Amount</p>
                         <p className="font-mono font-black text-primary text-lg">
-                          PKR {(selectedSecurity.noOfContainers * selectedSecurity.amountPerContainer).toLocaleString()}
+                          {(selectedSecurity.noOfContainers * selectedSecurity.amountPerContainer).toLocaleString()}
                         </p>
                       </div>
                     </div>
@@ -1113,7 +1128,7 @@ export default function AdminDashboard() {
                       fontSize={12}
                       tickLine={false}
                       axisLine={false}
-                      tickFormatter={(value: number) => `PKR ${value / 1000}k`}
+                      tickFormatter={(value: number) => `${value / 1000}k`}
                     />
                     <Tooltip
                       cursor={{ fill: 'var(--muted)', opacity: 0.2 }}
@@ -1171,7 +1186,7 @@ export default function AdminDashboard() {
                       <TableCell className="text-xs">{bill.companyName}</TableCell>
                       <TableCell className="text-xs font-mono">{bill.jobNumber}</TableCell>
                       <TableCell className="text-xs text-right font-bold">
-                        PKR {(bill.totalAmount - (bill.paidAmount || 0)).toLocaleString()}
+                        {(bill.totalAmount - (bill.paidAmount || 0)).toLocaleString()}
                       </TableCell>
                     </TableRow>
                   ))
@@ -1180,7 +1195,7 @@ export default function AdminDashboard() {
             </Table>
             <div className="mt-4 text-right">
               <p className="text-sm font-black">
-                Total Outstanding: PKR {bills.reduce((s, b) => s + (b.totalAmount - (b.paidAmount || 0)), 0).toLocaleString()}
+                Total Outstanding: {bills.reduce((s, b) => s + (b.totalAmount - (b.paidAmount || 0)), 0).toLocaleString()}
               </p>
             </div>
           </div>

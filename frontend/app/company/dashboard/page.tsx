@@ -151,7 +151,7 @@ export default function CompanyDashboard() {
 
       // Add Logo
       const img = new Image();
-      img.src = '/logo.PNG'; // Ensure this matches the correct path
+      img.src = '/logo.jpeg'; // Ensure this matches the correct path
 
       await new Promise((resolve) => {
         img.onload = resolve;
@@ -236,11 +236,11 @@ export default function CompanyDashboard() {
       pdf.setFontSize(10);
       pdf.setFont("helvetica", "normal");
 
-      pdf.text(`Total Debit:   PKR ${summary.totalDebit.toLocaleString()}`, 14, finalY + 18);
-      pdf.text(`Total Credit:  PKR ${summary.totalCredit.toLocaleString()}`, 14, finalY + 24);
+      pdf.text(`Total Debit:   ${summary.totalDebit.toLocaleString()}`, 14, finalY + 18);
+      pdf.text(`Total Credit:  ${summary.totalCredit.toLocaleString()}`, 14, finalY + 24);
 
       pdf.setFont("helvetica", "bold");
-      pdf.text(`Balance:       PKR ${summary.balance.toLocaleString()}`, 14, finalY + 30);
+      pdf.text(`Balance:       ${summary.balance.toLocaleString()}`, 14, finalY + 30);
 
       pdf.save(`Account_Statement_${currentCompany.name.replace(/[/\\?%*:|"<>\s]/g, '_')}_${new Date().toISOString().split('T')[0]}.pdf`);
       toast.success('Statement downloaded successfully');
@@ -302,7 +302,7 @@ export default function CompanyDashboard() {
           {recentActivity.find(a => a.type === 'PAYMENT') && (
             <DashboardCard
               title="Last Payment Success"
-              value={`PKR ${recentActivity.find(a => a.type === 'PAYMENT')?.amount.toLocaleString()}`}
+              value={`${recentActivity.find(a => a.type === 'PAYMENT')?.amount.toLocaleString()}`}
               icon={CheckCircle2}
               change={new Date(recentActivity.find(a => a.type === 'PAYMENT')?.date || '').toLocaleDateString('en-GB', { day: '2-digit', month: 'short' })}
               changeType="positive"
@@ -311,21 +311,21 @@ export default function CompanyDashboard() {
           )}
           <DashboardCard
             title="Total Billed"
-            value={`PKR ${(stats.billed / 1000).toFixed(1)}K`}
+            value={`${(stats.billed / 1000).toFixed(1)}K`}
             icon={FileText}
             change="All time total"
             changeType="neutral"
           />
           <DashboardCard
             title="Total Paid"
-            value={`PKR ${(stats.paid / 1000).toFixed(1)}K`}
+            value={`${(stats.paid / 1000).toFixed(1)}K`}
             icon={DollarSign}
             change="Total payments"
             changeType="positive"
           />
           <DashboardCard
             title="Outstanding Balance"
-            value={`PKR ${stats.outstanding.toLocaleString()}`}
+            value={`${stats.outstanding.toLocaleString()}`}
             icon={TrendingUp}
             change="Amount due"
             changeType={stats.outstanding > 0 ? "negative" : "positive"}
@@ -362,7 +362,7 @@ export default function CompanyDashboard() {
                       fontSize={12}
                       tickLine={false}
                       axisLine={false}
-                      tickFormatter={(value) => `PKR ${value / 1000}k`}
+                      tickFormatter={(value) => `${value / 1000}k`}
                     />
                     <Tooltip
                       contentStyle={{
@@ -416,7 +416,7 @@ export default function CompanyDashboard() {
                       </div>
                       <div className="text-right">
                         <p className={`font-bold text-sm ${activity.type === 'BILL' ? 'text-foreground' : 'text-green-600'}`}>
-                          {activity.type === 'BILL' ? '-' : '+'} PKR {activity.amount.toLocaleString()}
+                          {activity.type === 'BILL' ? '-' : '+'} {activity.amount.toLocaleString()}
                         </p>
                         <span
                           className={`text-[10px] font-bold uppercase px-2 py-0.5 rounded-full inline-block mt-1 ${activity.status === 'Paid' ? 'bg-green-100 text-green-700' :

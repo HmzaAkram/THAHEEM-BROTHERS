@@ -1,7 +1,15 @@
+'use client';
 import Link from 'next/link';
 import { Mail, Phone, MapPin, Facebook, Linkedin, Twitter } from 'lucide-react';
+import { useState, useEffect } from 'react';
 
 export function PublicFooter() {
+    const [year, setYear] = useState<number | string>('2026'); // Fallback to current year as a string or a default
+
+    useEffect(() => {
+        setYear(new Date().getFullYear());
+    }, []);
+
     return (
         <footer className="bg-muted/30 border-t pt-16 pb-8">
             <div className="container mx-auto px-4">
@@ -122,9 +130,9 @@ export function PublicFooter() {
                     </div>
                 </div>
 
-                <div className="border-t pt-8 text-center text-sm text-muted-foreground">
+                <div className="border-t pt-8 text-center text-sm text-muted-foreground" suppressHydrationWarning>
                     <p>
-                        &copy; {new Date().getFullYear()} THAHEEM BROTHERS. All rights reserved.
+                        &copy; {year} THAHEEM BROTHERS. All rights reserved.
                     </p>
                 </div>
             </div>

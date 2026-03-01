@@ -136,7 +136,7 @@ export default function BackupPage() {
 
             // Load logo once for PDFs
             const img = new Image();
-            img.src = '/logo.PNG';
+            img.src = '/logo.jpeg';
             await new Promise((resolve) => {
                 img.onload = resolve;
                 img.onerror = resolve;
@@ -159,6 +159,10 @@ export default function BackupPage() {
                 const companyFolder = zip.folder(`${company.name}_${company.identifier}`);
                 if (!companyFolder) continue;
 
+                // Pre-filter company specific data
+                const companyBills = bills.filter(b => String(b.companyId) === String(company.id));
+                const companyPayments = payments.filter(p => String(p.companyId) === String(company.id));
+
                 // 1. GENERATE LEDGER PDF
                 const ledgerDoc = new jsPDF('p', 'mm', 'a4');
                 const pageWidth = ledgerDoc.internal.pageSize.getWidth();
@@ -179,24 +183,24 @@ export default function BackupPage() {
                 ledgerDoc.setTextColor(15, 23, 42); // slate-900
                 ledgerDoc.setFontSize(14);
                 ledgerDoc.setFont("helvetica", "bold");
-                ledgerDoc.text("THAHEEM BROTHERS", 34, 14);
+                ledgerDoc.text("THAHEEM BROTHERS", 34, 12);
 
                 ledgerDoc.setTextColor(100, 116, 139); // slate-500
                 ledgerDoc.setFontSize(8);
                 ledgerDoc.setFont("helvetica", "normal");
-                ledgerDoc.text("Suite 23, 2nd Floor, R.K. Square Ext, Shahrah-e-Liaquat, Karachi", 34, 19);
-                ledgerDoc.text("+92 21 32421347 | +92 300 2791780 | import.khi@hotmail.com", 34, 23);
+                ledgerDoc.text("Suite 23, 2nd Floor, R.K. Square Ext, Shahrah-e-Liaquat, Karachi", 34, 16);
+                ledgerDoc.text("+92 21 32421347 | +92 300 2791780 | import.khi@hotmail.com", 34, 20);
 
                 // Line Separator
                 ledgerDoc.setDrawColor(226, 232, 240); // slate-200
                 ledgerDoc.setLineWidth(0.5);
-                ledgerDoc.line(14, 28, pageWidth - 14, 28);
+                ledgerDoc.line(14, 29, pageWidth - 14, 29);
 
                 // Add Title
                 ledgerDoc.setTextColor(15, 23, 42); // slate-900
                 ledgerDoc.setFontSize(16);
                 ledgerDoc.setFont("helvetica", "bold");
-                ledgerDoc.text("SUMMARY", pageWidth - 14, 18, { align: "right" });
+                ledgerDoc.text("LEDGER REPORT", pageWidth - 14, 27, { align: "right" });
 
                 // Add Filter Info Below Line
                 let yPos = 36;
@@ -212,48 +216,114 @@ export default function BackupPage() {
                 ledgerDoc.text(`Date Printed: ${formatDate(new Date().toISOString())}`, pageWidth - 14, yPos, { align: "right" });
                 yPos += 12;
 
-                const companyLedger = getCompanyLedger(company.id);
-                const ledgerRows = companyLedger.map(l => {
-                    let desc = l.description;
-                    if (l.type === 'PAYMENT') {
-                        desc = (l as any).method ? `Payment Received (${(l as any).method})` : 'Advance Received';
-                        if ((l as any).paymentRef) desc += ` - Ref: ${(l as any).paymentRef}`;
+                // DETAILED LEDGER CONSOLIDATION LOGIC
+                let consolidatedEntries: any[] = [];
+
+                companyBills.forEach(bill => {
+                    const linkedPayments = payments.filter(p => String(p.billId) === String(bill.id));
+                    const totalPaid = linkedPayments.reduce((sum, p) => sum + Number(p.amount || 0), 0);
+                    const totalAdjustment = linkedPayments.reduce((sum, p) => sum + Number(p.adjustment || 0), 0);
+                    const debitAmount = bill.grandTotal || bill.totalAmount || 0;
+                    const advanceAmount = bill.advancePayment || 0;
+
+                    consolidatedEntries.push({
+                        date: bill.date,
+                        type: 'BILL',
+                        description: (bill as any).description || `Job #${bill.jobNumber || 'N/A'}`,
+                        jobNumber: bill.jobNumber,
+                        debit: debitAmount,
+                        advance: advanceAmount,
+                        paid: totalPaid,
+                        adjustment: totalAdjustment,
+                        credit: advanceAmount + totalPaid + totalAdjustment,
+                        outstanding: debitAmount - advanceAmount - totalPaid - totalAdjustment,
+                    });
+                });
+
+                companyPayments.forEach(p => {
+                    if (!p.billId) {
+                        consolidatedEntries.push({
+                            date: p.date,
+                            type: 'PAYMENT',
+                            description: p.description ? `Payment: ${p.description}` : 'Payment Received',
+                            jobNumber: null,
+                            debit: 0,
+                            advance: 0,
+                            paid: Number(p.amount || 0),
+                            adjustment: Number(p.adjustment || 0),
+                            credit: Number(p.amount || 0) + Number(p.adjustment || 0),
+                            outstanding: 0,
+                            method: p.method,
+                            paymentRef: p.reference,
+                        });
                     }
+                });
+
+                consolidatedEntries.sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+
+                let openingBal = Number(company.openingBalance) || 0;
+                let running = openingBal;
+
+                const tableRows = consolidatedEntries.map(entry => {
+                    let desc = entry.description;
+                    if (entry.type === 'PAYMENT') {
+                        desc = entry.method ? `Payment Received (${entry.method})` : 'Advance Received';
+                        if (entry.paymentRef) desc += ` - Ref: ${entry.paymentRef}`;
+                    }
+                    running += (entry.debit - entry.credit);
+
                     return [
-                        formatDate(l.date),
+                        formatDate(entry.date),
                         desc,
-                        l.jobNumber || l.billNo || '-',
-                        l.weight ? `${l.weight} KG` : '-',
-                        l.debit > 0 ? formatCurrency(l.debit) : '-',
-                        l.credit > 0 ? formatCurrency(l.credit) : '-',
-                        formatCurrency(l.balance)
+                        entry.jobNumber || '-',
+                        entry.debit > 0 ? formatCurrency(entry.debit) : '-',
+                        entry.advance > 0 ? formatCurrency(entry.advance) : '-',
+                        entry.paid > 0 ? formatCurrency(entry.paid) : '-',
+                        entry.adjustment > 0 ? formatCurrency(entry.adjustment) : '-',
+                        entry.outstanding > 0 ? formatCurrency(entry.outstanding) : '-',
+                        formatCurrency(running)
                     ];
                 });
 
+                // Add Opening Balance as first row
+                tableRows.unshift([
+                    '-',
+                    'Opening Balance b/f',
+                    '-',
+                    '-',
+                    '-',
+                    '-',
+                    '-',
+                    '-',
+                    formatCurrency(openingBal)
+                ]);
+
                 autoTable(ledgerDoc, {
                     startY: yPos,
-                    head: [['Date', 'Description', 'Job/Bill No', 'Weight', 'Debit', 'Credit', 'Balance']],
-                    body: ledgerRows.length > 0 ? ledgerRows : [['-', 'No transactions', '-', '-', '-', '-', '-']],
+                    head: [['Date', 'Description', 'Job No', 'Bill Total', 'Advance', 'Paid', 'Adj.', 'Outst.', 'Balance']],
+                    body: tableRows,
                     theme: 'grid',
                     headStyles: { fillColor: [44, 62, 80], textColor: [255, 255, 255], fontStyle: 'bold' },
-                    styles: { fontSize: 8, cellPadding: 2 },
+                    styles: { fontSize: 7, cellPadding: 1.5 },
                     columnStyles: {
-                        0: { cellWidth: 20 },
+                        3: { halign: 'right' },
                         4: { halign: 'right' },
                         5: { halign: 'right' },
-                        6: { halign: 'right', fontStyle: 'bold' }
+                        6: { halign: 'right' },
+                        7: { halign: 'right' },
+                        8: { halign: 'right', fontStyle: 'bold' }
                     },
                     didParseCell: function (data) {
                         if (data.section === 'body') {
-                            if (data.column.index === 6) {
+                            if (data.column.index === 8) {
                                 const valStr = data.cell.text[0] || '';
                                 const numStr = valStr.replace(/[^0-9.-]/g, '');
                                 const numVal = parseFloat(numStr);
                                 if (!isNaN(numVal)) {
                                     if (numVal > 0) {
-                                        data.cell.styles.textColor = [220, 38, 38]; // Red for outstanding balance
+                                        data.cell.styles.textColor = [220, 38, 38];
                                     } else if (numVal <= 0) {
-                                        data.cell.styles.textColor = [0, 128, 0]; // Green for zero or credit balance
+                                        data.cell.styles.textColor = [0, 128, 0];
                                     }
                                 }
                             }
@@ -281,22 +351,22 @@ export default function BackupPage() {
                 paymentDoc.setTextColor(15, 23, 42);
                 paymentDoc.setFontSize(14);
                 paymentDoc.setFont("helvetica", "bold");
-                paymentDoc.text("THAHEEM BROTHERS", 34, 14);
+                paymentDoc.text("THAHEEM BROTHERS", 34, 12);
 
                 paymentDoc.setTextColor(100, 116, 139);
                 paymentDoc.setFontSize(8);
                 paymentDoc.setFont("helvetica", "normal");
-                paymentDoc.text("Suite 23, 2nd Floor, R.K. Square Ext, Shahrah-e-Liaquat, Karachi", 34, 19);
-                paymentDoc.text("+92 21 32421347 | +92 300 2791780 | import.khi@hotmail.com", 34, 23);
+                paymentDoc.text("Suite 23, 2nd Floor, R.K. Square Ext, Shahrah-e-Liaquat, Karachi", 34, 16);
+                paymentDoc.text("+92 21 32421347 | +92 300 2791780 | import.khi@hotmail.com", 34, 20);
 
                 paymentDoc.setDrawColor(226, 232, 240);
                 paymentDoc.setLineWidth(0.5);
-                paymentDoc.line(14, 28, pPageWidth - 14, 28);
+                paymentDoc.line(14, 29, pPageWidth - 14, 29);
 
                 paymentDoc.setTextColor(15, 23, 42);
                 paymentDoc.setFontSize(16);
                 paymentDoc.setFont("helvetica", "bold");
-                paymentDoc.text("PAYMENT HISTORY OVERVIEW", pPageWidth - 14, 18, { align: "right" });
+                paymentDoc.text("PAYMENT HISTORY", pPageWidth - 14, 27, { align: "right" });
 
                 let yPosPayment = 36;
                 paymentDoc.setFontSize(10);
@@ -310,11 +380,10 @@ export default function BackupPage() {
                 paymentDoc.text(`Date Printed: ${formatDate(new Date().toISOString())}`, pPageWidth - 14, yPosPayment, { align: "right" });
                 yPosPayment += 12;
 
-                const companyPayments = payments.filter(p => p.companyId === company.id);
-                // Sort by date desc
-                companyPayments.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+                // Sort by date desc for history
+                const sortedPayments = [...companyPayments].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
 
-                const paymentRows = companyPayments.map(p => {
+                const paymentRows = sortedPayments.map(p => {
                     const linkedBill = p.billId ? bills.find(b => b.id.toString() === p.billId.toString()) : null;
                     const cashPaid = Number(p.amount) || 0;
                     const adjustment = Number(p.adjustment) || 0;
@@ -325,7 +394,7 @@ export default function BackupPage() {
                         formatDate(p.date),
                         company.name,
                         linkedBill?.jobNumber || 'N/A',
-                        p.paymentMethod || '-',
+                        (p as any).paymentMethod || '-',
                         p.reference || (linkedBill ? 'Payment' : 'Advance'),
                         adjustment > 0 ? formatCurrency(adjustment) : '-',
                         cashPaid > 0 ? formatCurrency(cashPaid) : '-',
@@ -369,22 +438,22 @@ export default function BackupPage() {
                 reportDoc.setTextColor(15, 23, 42);
                 reportDoc.setFontSize(14);
                 reportDoc.setFont("helvetica", "bold");
-                reportDoc.text("THAHEEM BROTHERS", 34, 14);
+                reportDoc.text("THAHEEM BROTHERS", 34, 12);
 
                 reportDoc.setTextColor(100, 116, 139);
                 reportDoc.setFontSize(8);
                 reportDoc.setFont("helvetica", "normal");
-                reportDoc.text("Suite 23, 2nd Floor, R.K. Square Ext, Shahrah-e-Liaquat, Karachi", 34, 19);
-                reportDoc.text("+92 21 32421347 | +92 300 2791780 | import.khi@hotmail.com", 34, 23);
+                reportDoc.text("Suite 23, 2nd Floor, R.K. Square Ext, Shahrah-e-Liaquat, Karachi", 34, 16);
+                reportDoc.text("+92 21 32421347 | +92 300 2791780 | import.khi@hotmail.com", 34, 20);
 
                 reportDoc.setDrawColor(226, 232, 240);
                 reportDoc.setLineWidth(0.5);
-                reportDoc.line(14, 28, rPageWidth - 14, 28);
+                reportDoc.line(14, 29, rPageWidth - 14, 29);
 
                 reportDoc.setTextColor(15, 23, 42);
                 reportDoc.setFontSize(16);
                 reportDoc.setFont("helvetica", "bold");
-                reportDoc.text("REPORT", rPageWidth - 14, 18, { align: "right" });
+                reportDoc.text("BALANCE REPORT", rPageWidth - 14, 27, { align: "right" });
 
                 let yPosReport = 36;
                 reportDoc.setFontSize(10);
@@ -398,13 +467,11 @@ export default function BackupPage() {
                 reportDoc.text(`Date Printed: ${formatDate(new Date().toISOString())}`, rPageWidth - 14, yPosReport, { align: "right" });
                 yPosReport += 12;
 
-                const cBills = bills.filter(b => String(b.companyId) === String(company.id));
-                const cPayments = payments.filter(p => String(p.companyId) === String(company.id));
-                const cBilled = cBills.reduce((sum, b) => sum + (Number(b.grandTotal) || 0), 0);
-                const cPaid = cBills.reduce((sum, b) => sum + (Number(b.advancePayment) || 0), 0) + cPayments.reduce((sum, p) => sum + (Number(p.amount) || 0) + (Number(p.adjustment) || 0), 0);
+                const cBilled = companyBills.reduce((sum, b) => sum + (Number(b.grandTotal) || 0), 0);
+                const cPaid = companyBills.reduce((sum, b) => sum + (Number((b as any).advancePayment) || 0), 0) + companyPayments.reduce((sum, p) => sum + (Number(p.amount) || 0) + (Number(p.adjustment) || 0), 0);
                 const cOutstanding = cBilled - cPaid;
 
-                const cUnpaidBills = cBills.filter(b => b.status !== 'Paid').sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+                const cUnpaidBills = companyBills.filter(b => b.status !== 'Paid').sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
                 let cDaysOverdue = 0;
                 let cLastDue = '-';
                 if (cUnpaidBills.length > 0) {
@@ -419,7 +486,7 @@ export default function BackupPage() {
 
                 const reportRows = [[
                     company.name,
-                    cBills.length.toString(),
+                    companyBills.length.toString(),
                     cLastDue,
                     cDaysOverdue > 0 ? `${cDaysOverdue} days` : 'Current',
                     formatCurrency(cBilled),
@@ -450,7 +517,6 @@ export default function BackupPage() {
 
                 // 3. GENERATE BILLS INVOICES & ATTACHMENTS
                 const billsFolder = companyFolder.folder('Bills');
-                const companyBills = bills.filter(b => b.companyId === company.id);
 
                 if (billsFolder && companyBills.length > 0) {
                     for (let j = 0; j < companyBills.length; j++) {
@@ -487,29 +553,44 @@ export default function BackupPage() {
                                 // Save the invoice PDF inside the job-number folder
                                 jobFolder.file(`Invoice_${jobFolderName}.pdf`, invoiceDoc.output('blob'));
 
-                                // Process attachments — also inside the same job-number folder
-                                if (bill.attachment) {
-                                    try {
-                                        const filename = bill.attachment.split('/').pop();
-                                        if (filename) {
-                                            const token = localStorage.getItem('authToken');
-                                            const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000/api/v1';
-                                            const attachUrl = `${apiUrl}/bills/attachment/${filename}`;
+                                // Process attachments — organized into an "attachments" sub-folder
+                                const allAttachments: string[] = [];
+                                if (bill.attachment) allAttachments.push(bill.attachment);
+                                if (bill.attachments && Array.isArray(bill.attachments)) {
+                                    bill.attachments.forEach(a => {
+                                        if (a && !allAttachments.includes(a)) allAttachments.push(a);
+                                    });
+                                }
 
-                                            const attRes = await fetch(attachUrl, {
-                                                headers: { 'Authorization': `Bearer ${token}` }
-                                            });
+                                if (allAttachments.length > 0) {
+                                    const attachmentsFolder = jobFolder.folder('attachments');
+                                    if (attachmentsFolder) {
+                                        for (let k = 0; k < allAttachments.length; k++) {
+                                            const attachmentUrl = allAttachments[k];
+                                            try {
+                                                const filename = attachmentUrl.split('/').pop();
+                                                if (filename) {
+                                                    const token = localStorage.getItem('authToken');
+                                                    const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000/api/v1';
+                                                    const attachUrl = `${apiUrl}/bills/attachment/${filename}`;
 
-                                            if (attRes.ok) {
-                                                const attBlob = await attRes.blob();
-                                                const ext = filename.split('.').pop() || 'pdf';
-                                                jobFolder.file(`Attachment_${bill.jobNumber || bill.id}.${ext}`, attBlob);
-                                            } else {
-                                                console.warn(`Failed to fetch attachment from ${attachUrl}: ${attRes.status}`);
+                                                    const attRes = await fetch(attachUrl, {
+                                                        headers: { 'Authorization': `Bearer ${token}` }
+                                                    });
+
+                                                    if (attRes.ok) {
+                                                        const attBlob = await attRes.blob();
+                                                        // Use original filename or a descriptive name if missing
+                                                        const fileNameToSave = filename || `attachment_${k + 1}.pdf`;
+                                                        attachmentsFolder.file(fileNameToSave, attBlob);
+                                                    } else {
+                                                        console.warn(`Failed to fetch attachment from ${attachUrl}: ${attRes.status}`);
+                                                    }
+                                                }
+                                            } catch (attErr) {
+                                                console.error('Failed to fetch attachment', attErr);
                                             }
                                         }
-                                    } catch (attErr) {
-                                        console.error('Failed to fetch attachment', attErr);
                                     }
                                 }
 

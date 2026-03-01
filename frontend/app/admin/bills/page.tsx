@@ -668,11 +668,7 @@ export default function BillsPage() {
       );
     }
 
-    return filtered.sort((a, b) => {
-      const jobA = a.jobNumber || '';
-      const jobB = b.jobNumber || '';
-      return jobA.localeCompare(jobB, undefined, { numeric: true, sensitivity: 'base' });
-    });
+    return filtered.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
   }, [bills, timeFilter, companyFilter, searchQuery]);
 
   // Dynamic Totals
@@ -702,7 +698,7 @@ export default function BillsPage() {
 
       // Add Logo
       const img = new Image();
-      img.src = '/logo.PNG'; // Ensure this matches the correct path
+      img.src = '/logo.jpeg'; // Ensure this matches the correct path
 
       await new Promise((resolve) => {
         img.onload = resolve;
@@ -1111,7 +1107,7 @@ export default function BillsPage() {
 
                                 {/* Amount Input */}
                                 <div className="w-full md:w-32 space-y-2 text-right">
-                                  <Label className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground/60 block">Amount (PKR)</Label>
+                                  <Label className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground/60 block">Amount</Label>
                                   <Input
                                     type="number"
                                     placeholder="0"
@@ -1480,13 +1476,13 @@ export default function BillsPage() {
                             {formatDate(item.date)}
                           </TableCell>
                           <TableCell className="font-semibold">
-                            PKR {item.grandTotal?.toLocaleString() || '0'}
+                            {item.grandTotal?.toLocaleString() || '0'}
                           </TableCell>
                           <TableCell className="text-sm text-muted-foreground">
-                            PKR {item.paidAmount?.toLocaleString() || '0'}
+                            {item.paidAmount?.toLocaleString() || '0'}
                           </TableCell>
                           <TableCell className="font-semibold text-primary">
-                            PKR {((item.grandTotal || 0) - (item.paidAmount || 0)).toLocaleString()}
+                            {((item.grandTotal || 0) - (item.paidAmount || 0)).toLocaleString()}
                           </TableCell>
                           <TableCell>
                             <DropdownMenu>
@@ -1583,7 +1579,7 @@ export default function BillsPage() {
                 <div className="bg-muted/30 p-4 rounded-2xl border border-border/50 flex items-center justify-between">
                   <div className="space-y-1">
                     <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Filtered Billed</p>
-                    <p className="text-xl font-black text-foreground font-mono">PKR {tableTotals.billed.toLocaleString()}</p>
+                    <p className="text-xl font-black text-foreground font-mono">{tableTotals.billed.toLocaleString()}</p>
                   </div>
                   <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center">
                     <TrendingUp className="w-5 h-5 text-primary" />
@@ -1592,7 +1588,7 @@ export default function BillsPage() {
                 <div className="bg-muted/30 p-4 rounded-2xl border border-border/50 flex items-center justify-between">
                   <div className="space-y-1">
                     <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Filtered Collected</p>
-                    <p className="text-xl font-black text-green-600 dark:text-green-400 font-mono">PKR {tableTotals.paid.toLocaleString()}</p>
+                    <p className="text-xl font-black text-green-600 dark:text-green-400 font-mono">{tableTotals.paid.toLocaleString()}</p>
                   </div>
                   <div className="w-10 h-10 rounded-full bg-green-500/10 flex items-center justify-center">
                     <DollarSign className="w-5 h-5 text-green-600 dark:text-green-400" />
@@ -1601,7 +1597,7 @@ export default function BillsPage() {
                 <div className="bg-muted/30 p-4 rounded-2xl border border-border/50 flex items-center justify-between">
                   <div className="space-y-1">
                     <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Pending Balance</p>
-                    <p className="text-xl font-black text-amber-600 dark:text-amber-400 font-mono">PKR {tableTotals.balance.toLocaleString()}</p>
+                    <p className="text-xl font-black text-amber-600 dark:text-amber-400 font-mono">{tableTotals.balance.toLocaleString()}</p>
                   </div>
                   <div className="w-10 h-10 rounded-full bg-amber-500/10 flex items-center justify-center">
                     <CreditCard className="w-5 h-5 text-amber-600 dark:text-amber-400" />

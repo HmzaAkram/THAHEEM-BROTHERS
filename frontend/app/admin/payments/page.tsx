@@ -37,6 +37,8 @@ import { MultiSearchSelect } from '@/components/multi-search-select';
 import { PinDialog } from '@/components/pin-dialog';
 import { Trash2 } from 'lucide-react';
 import Swal from 'sweetalert2';
+import { jsPDF } from 'jspdf';
+import autoTable from 'jspdf-autotable';
 
 export default function PaymentsPage() {
   const { payments, companies, addPayment, updatePayment, deletePayment, bills } = useData();
@@ -354,6 +356,142 @@ export default function PaymentsPage() {
     }
   };
 
+  const handleExportPDF = async () => {
+    try {
+      const pdf = new jsPDF('p', 'mm', 'a4');
+      const pageWidth = pdf.internal.pageSize.getWidth();
+
+      // Add Logo
+      const img = new Image();
+      img.src = '/logo.jpeg';
+
+      await new Promise((resolve) => {
+        img.onload = resolve;
+        img.onerror = resolve;
+      });
+
+      if (img.width > 0) {
+        const maxLogoHeight = 16;
+        const maxLogoWidth = 16;
+        let logoWidth = img.width;
+        let logoHeight = img.height;
+        const ratio = Math.min(maxLogoWidth / logoWidth, maxLogoHeight / logoHeight);
+        logoWidth *= ratio;
+        logoHeight *= ratio;
+
+        pdf.addImage(img, 'PNG', 14, 10, logoWidth, logoHeight);
+      }
+
+      // Company Info (Thaheem Brothers)
+      pdf.setTextColor(15, 23, 42); // slate-900
+      pdf.setFontSize(14);
+      pdf.setFont("helvetica", "bold");
+      pdf.text("THAHEEM BROTHERS", 34, 12);
+
+      pdf.setTextColor(100, 116, 139); // slate-500
+      pdf.setFontSize(8);
+      pdf.setFont("helvetica", "normal");
+      pdf.text("Suite 23, 2nd Floor, R.K. Square Ext, Shahrah-e-Liaquat, Karachi", 34, 16);
+      pdf.text("+92 21 32421347 | +92 300 2791780 | import.khi@hotmail.com", 34, 20);
+
+      // Line Separator
+      pdf.setDrawColor(226, 232, 240); // slate-200
+      pdf.setLineWidth(0.5);
+      pdf.line(14, 29, pageWidth - 14, 29);
+
+      // Add Title
+      pdf.setTextColor(15, 23, 42); // slate-900
+      pdf.setFontSize(16);
+      pdf.setFont("helvetica", "bold");
+      pdf.text("PAYMENT HISTORY", pageWidth - 14, 27, { align: "right" });
+
+      // Add Filter Info Below Line
+      let yPos = 36;
+      pdf.setFontSize(10);
+      pdf.setFont("helvetica", "bold");
+      pdf.setTextColor(15, 23, 42);
+
+      if (companyFilter !== 'all') {
+        const companyNameStr = companies.find(c => String(c.id) === companyFilter)?.name || 'Unknown';
+        pdf.text(`Client: ${companyNameStr}`, 14, yPos);
+        yPos += 5;
+      }
+
+      pdf.setFontSize(9);
+      pdf.setFont("helvetica", "normal");
+      pdf.setTextColor(100, 116, 139);
+      const timeframeLabel = timeFilter === 'overall' ? 'Overall' :
+        timeFilter === 'monthly' ? 'This Month' :
+          timeFilter === '3months' ? 'Last 3 Months' :
+            timeFilter === '6months' ? 'Last 6 Months' : 'This Year';
+      pdf.text(`Period: ${timeframeLabel}`, 14, yPos);
+      pdf.text(`Date Printed: ${formatDate(new Date().toISOString())}`, pageWidth - 14, yPos, { align: "right" });
+
+      yPos += 10;
+
+      const head = [['Date', 'Company', 'Job No', 'Method', 'Ref/Adv', 'Adj.', 'Cash Paid', 'Total Paid', 'Bill Total']];
+      const body = filteredPayments.map(p => {
+        const linkedBill = bills.find(b => String(b.id) === String(p.billId));
+        const cashPaid = Number(p.amount) || 0;
+        const adjustment = Number(p.adjustment) || 0;
+        const totalPaid = cashPaid + adjustment;
+        const billTotal = linkedBill ? Number(linkedBill.grandTotal) : 0;
+
+        return [
+          formatDate(p.date),
+          p.companyName,
+          linkedBill?.jobNumber || 'N/A',
+          p.method,
+          p.reference || (linkedBill ? 'Payment' : 'Advance'),
+          adjustment > 0 ? Math.round(adjustment).toLocaleString() : '-',
+          cashPaid > 0 ? Math.round(cashPaid).toLocaleString() : '-',
+          Math.round(totalPaid).toLocaleString(),
+          billTotal > 0 ? Math.round(billTotal).toLocaleString() : '-'
+        ];
+      });
+
+      autoTable(pdf, {
+        startY: yPos,
+        head: head,
+        body: body,
+        theme: 'grid',
+        headStyles: { fillColor: [44, 62, 80], textColor: [255, 255, 255], fontStyle: 'bold' },
+        styles: { fontSize: 7, cellPadding: 1.5 },
+        columnStyles: {
+          5: { halign: 'right' },
+          6: { halign: 'right' },
+          7: { halign: 'right', fontStyle: 'bold', textColor: [0, 128, 0] },
+          8: { halign: 'right', fontStyle: 'bold', textColor: [220, 38, 38] }
+        }
+      });
+
+      const finalY = (pdf as any).lastAutoTable.finalY + 10;
+
+      // Totals Summary
+      pdf.setFontSize(10);
+      pdf.setFont("helvetica", "bold");
+      pdf.setTextColor(15, 23, 42);
+      pdf.text("Summary Totals", 14, finalY);
+
+      pdf.setFontSize(8);
+      pdf.setFont("helvetica", "normal");
+      pdf.setTextColor(100, 116, 139);
+      pdf.text(`Filtered Collections: ${formatCurrency(tableTotals.collected)}`, 14, finalY + 6);
+      pdf.text(`Filtered Adjustments: ${formatCurrency(tableTotals.adjustment)}`, 14, finalY + 11);
+      pdf.text(`Filtered Balance: ${formatCurrency(tableTotals.totalBalance)}`, 14, finalY + 16);
+
+      pdf.save(`Payment_History_${new Date().toISOString().split('T')[0]}.pdf`);
+    } catch (err) {
+      console.error('Failed to export PDF', err);
+      Swal.fire({
+        title: 'Error',
+        text: 'Failed to generate PDF. Please try again.',
+        icon: 'error',
+        confirmButtonColor: '#3b82f6'
+      });
+    }
+  };
+
   // Filter bills for selected company
   const companyBills = useMemo(() => {
     if (!companyId) return [];
@@ -408,7 +546,7 @@ export default function PaymentsPage() {
       );
     }
 
-    return filtered.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+    return filtered.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
   }, [payments, timeFilter, companyFilter, searchQuery]);
 
   // Dynamic Totals for Payments and associated Bills
@@ -461,259 +599,269 @@ export default function PaymentsPage() {
               Record and track received payments.
             </p>
           </div>
-          <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-            <DialogTrigger asChild>
-              <Button
-                className="gap-2 shadow-md bg-green-600 hover:bg-green-700"
-                onClick={() => {
-                  setEditingPayment(null);
-                  setCompanyId('');
-                  setLumpsumAmount('');
-                  setSelectedBillIds([]);
-                  setBillPayments({});
-                  setTrackingId('');
-                  setChequeNo('');
-                  setPayOrderNo('');
-                  setDescription('');
-                  setMethod('Bank Transfer');
-                  setPaymentMode('specific');
-                  setIsDialogOpen(true);
-                }}
-              >
-                <Plus className="w-4 h-4" />
-                Record Payment
-              </Button>
-            </DialogTrigger>
-            <DialogContent className="max-w-md max-h-[90vh] overflow-y-auto">
-              <DialogHeader>
-                <DialogTitle>{editingPayment ? 'Edit Payment' : 'Record New Payment'}</DialogTitle>
-              </DialogHeader>
-              <div className="space-y-4 pt-4">
-                <div>
-                  <Label>Select Company</Label>
-                  <CompanySelect
-                    companies={companies}
-                    value={companyId}
-                    onValueChange={(val) => {
-                      setCompanyId(val);
-                      setSelectedBillIds([]); // Reset selection when company changes
-                      setBillPayments({});
-                    }}
-                    className="mt-1"
-                  />
-                </div>
-
-                <div>
-                  <Label>Payment Strategy</Label>
-                  <Select value={paymentMode} onValueChange={(val: any) => setPaymentMode(val)}>
-                    <SelectTrigger className="mt-1">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="specific">Pay Specific Bills</SelectItem>
-                      <SelectItem value="lumpsum">Lumpsum Auto-Allocate</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-
-                {paymentMode === 'specific' ? (
-                  <>
-                    <div>
-                      <Label>Link to Invoice(s) / Job(s) (Required)</Label>
-                      <MultiSearchSelect
-                        options={billOptions}
-                        selectedIds={selectedBillIds}
-                        onValueChange={(ids) => {
-                          setSelectedBillIds(ids);
-                          // Initialize payment data for new IDs
-                          const newBillPayments = { ...billPayments };
-                          ids.forEach(id => {
-                            if (!newBillPayments[id]) {
-                              const bill = bills.find(b => b.id === id);
-                              const due = ((bill?.grandTotal || bill?.totalAmount) || 0) - (bill?.paidAmount || 0);
-                              newBillPayments[id] = { amount: String(due), adjustment: '0' };
-                            }
-                          });
-                          setBillPayments(newBillPayments);
-                        }}
-                        placeholder={companyId ? "Select Invoice(s) to pay..." : "Select company first"}
-                        emptyText={companyId ? "No pending bills found" : "Select company first"}
-                        className="mt-1"
-                      />
-                    </div>
-
-                    {/* Per-Bill Payment Inputs */}
-                    {selectedBillIds.length > 0 && (
-                      <div className="space-y-4 max-h-[300px] overflow-y-auto pr-2 bg-slate-50 dark:bg-slate-900/40 p-3 rounded-lg border border-dashed border-green-200 dark:border-green-900/50">
-                        <p className="text-[10px] font-bold uppercase tracking-widest text-green-600 dark:text-green-500">Payment Allocation</p>
-                        {selectedBillIds.map(id => {
-                          const bill = bills.find(b => b.id === id);
-                          return (
-                            <div key={id} className="space-y-2 pb-3 border-b border-muted last:border-0 last:pb-0">
-                              <div className="flex justify-between items-center">
-                                <span className="text-xs font-bold text-foreground truncate max-w-[150px]">
-                                  {bill?.jobNumber || 'N/A'}
-                                </span>
-                                <span className="text-[10px] text-muted-foreground">
-                                  Due: {formatCurrency(((bill?.grandTotal || bill?.totalAmount) || 0) - (bill?.paidAmount || 0))}
-                                </span>
-                              </div>
-                              <div className="grid grid-cols-2 gap-3">
-                                <div>
-                                  <Label className="text-[10px]">Amount Paid</Label>
-                                  <Input
-                                    type="number"
-                                    size={2}
-                                    className="h-8 text-xs font-mono font-bold"
-                                    value={billPayments[id]?.amount || ''}
-                                    onChange={(e) => setBillPayments(prev => ({
-                                      ...prev,
-                                      [id]: { ...prev[id], amount: e.target.value }
-                                    }))}
-                                  />
-                                </div>
-                                <div>
-                                  <Label className="text-[10px]">Adjustment</Label>
-                                  <Input
-                                    type="number"
-                                    className="h-8 text-xs font-mono"
-                                    value={billPayments[id]?.adjustment || ''}
-                                    onChange={(e) => setBillPayments(prev => ({
-                                      ...prev,
-                                      [id]: { ...prev[id], adjustment: e.target.value }
-                                    }))}
-                                  />
-                                </div>
-                              </div>
-                            </div>
-                          );
-                        })}
-                      </div>
-                    )}
-                  </>
-                ) : (
+          <div className="flex items-center gap-3">
+            <Button
+              variant="outline"
+              className="gap-2 border-slate-200 h-10 px-4 rounded-xl text-xs font-bold uppercase tracking-widest hover:bg-slate-50"
+              onClick={handleExportPDF}
+            >
+              <Download className="w-4 h-4" />
+              Download History (PDF)
+            </Button>
+            <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
+              <DialogTrigger asChild>
+                <Button
+                  className="gap-2 shadow-md bg-green-600 hover:bg-green-700"
+                  onClick={() => {
+                    setEditingPayment(null);
+                    setCompanyId('');
+                    setLumpsumAmount('');
+                    setSelectedBillIds([]);
+                    setBillPayments({});
+                    setTrackingId('');
+                    setChequeNo('');
+                    setPayOrderNo('');
+                    setDescription('');
+                    setMethod('Bank Transfer');
+                    setPaymentMode('specific');
+                    setIsDialogOpen(true);
+                  }}
+                >
+                  <Plus className="w-4 h-4" />
+                  Record Payment
+                </Button>
+              </DialogTrigger>
+              <DialogContent className="max-w-md max-h-[90vh] overflow-y-auto">
+                <DialogHeader>
+                  <DialogTitle>{editingPayment ? 'Edit Payment' : 'Record New Payment'}</DialogTitle>
+                </DialogHeader>
+                <div className="space-y-4 pt-4">
                   <div>
-                    <Label>Lumpsum Amount (PKR)</Label>
-                    <Input
-                      type="number"
-                      placeholder="Example: 5000000"
-                      className="mt-1 h-10 font-mono text-lg font-bold text-green-600"
-                      value={lumpsumAmount}
-                      onChange={(e) => setLumpsumAmount(e.target.value)}
-                    />
-                    <p className="text-[11px] text-muted-foreground mt-2 bg-muted/30 p-2 rounded-lg leading-relaxed">
-                      This amount will be automatically distributed to the oldest unpaid invoices first. Any surplus will be kept as an advance payment toward the company.
-                    </p>
-                  </div>
-                )}
-
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <Label>Date</Label>
-                    <Input
-                      type="date"
+                    <Label>Select Company</Label>
+                    <CompanySelect
+                      companies={companies}
+                      value={companyId}
+                      onValueChange={(val) => {
+                        setCompanyId(val);
+                        setSelectedBillIds([]); // Reset selection when company changes
+                        setBillPayments({});
+                      }}
                       className="mt-1"
-                      value={date}
-                      onChange={(e) => setDate(e.target.value)}
                     />
                   </div>
+
                   <div>
-                    <Label>Payment Method</Label>
-                    <Select onValueChange={setMethod} value={method}>
+                    <Label>Payment Strategy</Label>
+                    <Select value={paymentMode} onValueChange={(val: any) => setPaymentMode(val)}>
                       <SelectTrigger className="mt-1">
                         <SelectValue />
                       </SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="Cash">Cash</SelectItem>
-                        <SelectItem value="Bank Transfer">Bank Transfer</SelectItem>
-                        <SelectItem value="Cheque">Cheque</SelectItem>
-                        <SelectItem value="Pay Order">Pay Order</SelectItem>
-                        <SelectItem value="Advance">Advance</SelectItem>
+                        <SelectItem value="specific">Pay Specific Bills</SelectItem>
+                        <SelectItem value="lumpsum">Lumpsum Auto-Allocate</SelectItem>
                       </SelectContent>
                     </Select>
                   </div>
-                </div>
 
-                {/* Dynamic Fields based on Method */}
-                <div className="bg-secondary/20 p-3 rounded-md border space-y-3">
-                  {method === 'Bank Transfer' && (
+                  {paymentMode === 'specific' ? (
+                    <>
+                      <div>
+                        <Label>Link to Invoice(s) / Job(s) (Required)</Label>
+                        <MultiSearchSelect
+                          options={billOptions}
+                          selectedIds={selectedBillIds}
+                          onValueChange={(ids) => {
+                            setSelectedBillIds(ids);
+                            // Initialize payment data for new IDs
+                            const newBillPayments = { ...billPayments };
+                            ids.forEach(id => {
+                              if (!newBillPayments[id]) {
+                                const bill = bills.find(b => b.id === id);
+                                const due = ((bill?.grandTotal || bill?.totalAmount) || 0) - (bill?.paidAmount || 0);
+                                newBillPayments[id] = { amount: String(due), adjustment: '0' };
+                              }
+                            });
+                            setBillPayments(newBillPayments);
+                          }}
+                          placeholder={companyId ? "Select Invoice(s) to pay..." : "Select company first"}
+                          emptyText={companyId ? "No pending bills found" : "Select company first"}
+                          className="mt-1"
+                        />
+                      </div>
+
+                      {/* Per-Bill Payment Inputs */}
+                      {selectedBillIds.length > 0 && (
+                        <div className="space-y-4 max-h-[300px] overflow-y-auto pr-2 bg-slate-50 dark:bg-slate-900/40 p-3 rounded-lg border border-dashed border-green-200 dark:border-green-900/50">
+                          <p className="text-[10px] font-bold uppercase tracking-widest text-green-600 dark:text-green-500">Payment Allocation</p>
+                          {selectedBillIds.map(id => {
+                            const bill = bills.find(b => b.id === id);
+                            return (
+                              <div key={id} className="space-y-2 pb-3 border-b border-muted last:border-0 last:pb-0">
+                                <div className="flex justify-between items-center">
+                                  <span className="text-xs font-bold text-foreground truncate max-w-[150px]">
+                                    {bill?.jobNumber || 'N/A'}
+                                  </span>
+                                  <span className="text-[10px] text-muted-foreground">
+                                    Due: {formatCurrency(((bill?.grandTotal || bill?.totalAmount) || 0) - (bill?.paidAmount || 0))}
+                                  </span>
+                                </div>
+                                <div className="grid grid-cols-2 gap-3">
+                                  <div>
+                                    <Label className="text-[10px]">Amount Paid</Label>
+                                    <Input
+                                      type="number"
+                                      size={2}
+                                      className="h-8 text-xs font-mono font-bold"
+                                      value={billPayments[id]?.amount || ''}
+                                      onChange={(e) => setBillPayments(prev => ({
+                                        ...prev,
+                                        [id]: { ...prev[id], amount: e.target.value }
+                                      }))}
+                                    />
+                                  </div>
+                                  <div>
+                                    <Label className="text-[10px]">Adjustment</Label>
+                                    <Input
+                                      type="number"
+                                      className="h-8 text-xs font-mono"
+                                      value={billPayments[id]?.adjustment || ''}
+                                      onChange={(e) => setBillPayments(prev => ({
+                                        ...prev,
+                                        [id]: { ...prev[id], adjustment: e.target.value }
+                                      }))}
+                                    />
+                                  </div>
+                                </div>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      )}
+                    </>
+                  ) : (
                     <div>
-                      <Label className="text-xs">Tracking ID</Label>
+                      <Label>Lumpsum Amount</Label>
                       <Input
-                        placeholder="e.g. TRF-123456789"
-                        className="mt-1"
-                        value={trackingId}
-                        onChange={(e) => setTrackingId(e.target.value)}
+                        type="number"
+                        placeholder="Example: 5000000"
+                        className="mt-1 h-10 font-mono text-lg font-bold text-green-600"
+                        value={lumpsumAmount}
+                        onChange={(e) => setLumpsumAmount(e.target.value)}
                       />
+                      <p className="text-[11px] text-muted-foreground mt-2 bg-muted/30 p-2 rounded-lg leading-relaxed">
+                        This amount will be automatically distributed to the oldest unpaid invoices first. Any surplus will be kept as an advance payment toward the company.
+                      </p>
                     </div>
                   )}
-                  {method === 'Cheque' && (
+
+                  <div className="grid grid-cols-2 gap-4">
                     <div>
-                      <Label className="text-xs">Cheque No</Label>
+                      <Label>Date</Label>
                       <Input
-                        placeholder="e.g. CHQ-987654"
+                        type="date"
                         className="mt-1"
-                        value={chequeNo}
-                        onChange={(e) => setChequeNo(e.target.value)}
+                        value={date}
+                        onChange={(e) => setDate(e.target.value)}
                       />
                     </div>
-                  )}
-                  {method === 'Pay Order' && (
                     <div>
-                      <Label className="text-xs">Pay Order No</Label>
+                      <Label>Payment Method</Label>
+                      <Select onValueChange={setMethod} value={method}>
+                        <SelectTrigger className="mt-1">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="Cash">Cash</SelectItem>
+                          <SelectItem value="Bank Transfer">Bank Transfer</SelectItem>
+                          <SelectItem value="Cheque">Cheque</SelectItem>
+                          <SelectItem value="Pay Order">Pay Order</SelectItem>
+                          <SelectItem value="Advance">Advance</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  </div>
+
+                  {/* Dynamic Fields based on Method */}
+                  <div className="bg-secondary/20 p-3 rounded-md border space-y-3">
+                    {method === 'Bank Transfer' && (
+                      <div>
+                        <Label className="text-xs">Tracking ID</Label>
+                        <Input
+                          placeholder="e.g. TRF-123456789"
+                          className="mt-1"
+                          value={trackingId}
+                          onChange={(e) => setTrackingId(e.target.value)}
+                        />
+                      </div>
+                    )}
+                    {method === 'Cheque' && (
+                      <div>
+                        <Label className="text-xs">Cheque No</Label>
+                        <Input
+                          placeholder="e.g. CHQ-987654"
+                          className="mt-1"
+                          value={chequeNo}
+                          onChange={(e) => setChequeNo(e.target.value)}
+                        />
+                      </div>
+                    )}
+                    {method === 'Pay Order' && (
+                      <div>
+                        <Label className="text-xs">Pay Order No</Label>
+                        <Input
+                          placeholder="e.g. PO-554433"
+                          className="mt-1"
+                          value={payOrderNo}
+                          onChange={(e) => setPayOrderNo(e.target.value)}
+                        />
+                      </div>
+                    )}
+                    {/* Always show description as optional note, or mandatory for Advance */}
+                    <div>
+                      <Label className="text-xs">{method === 'Advance' ? 'Description (Required)' : 'Description / Notes'}</Label>
                       <Input
-                        placeholder="e.g. PO-554433"
+                        placeholder="Add details..."
                         className="mt-1"
-                        value={payOrderNo}
-                        onChange={(e) => setPayOrderNo(e.target.value)}
+                        value={description}
+                        onChange={(e) => setDescription(e.target.value)}
                       />
                     </div>
+                  </div>
+
+                  {selectedBillIds.length === 0 && (
+                    <div className="bg-amber-50 dark:bg-amber-950/20 p-3 rounded border border-amber-200 dark:border-amber-900 flex items-center gap-3">
+                      <p className="text-xs text-amber-700 dark:text-amber-400">Please select at least one bill to record a payment.</p>
+                    </div>
                   )}
-                  {/* Always show description as optional note, or mandatory for Advance */}
-                  <div>
-                    <Label className="text-xs">{method === 'Advance' ? 'Description (Required)' : 'Description / Notes'}</Label>
-                    <Input
-                      placeholder="Add details..."
-                      className="mt-1"
-                      value={description}
-                      onChange={(e) => setDescription(e.target.value)}
-                    />
+
+                  <div className="flex gap-2 pt-4">
+                    <Button className="flex-1 bg-green-600 hover:bg-green-700" onClick={handleSubmit} disabled={loading}>
+                      {loading ? (editingPayment ? "Updating..." : "Recording...") : (editingPayment ? "Update Payment" : "Save Payment")}
+                    </Button>
+                    <Button
+                      variant="outline"
+                      className="flex-1"
+                      onClick={() => {
+                        setIsDialogOpen(false);
+                        setEditingPayment(null);
+                        // Reset states
+                        setCompanyId('');
+                        setLumpsumAmount('');
+                        setSelectedBillIds([]);
+                        setBillPayments({});
+                        setTrackingId('');
+                        setChequeNo('');
+                        setPayOrderNo('');
+                        setDescription('');
+                      }}
+                    >
+                      Cancel
+                    </Button>
                   </div>
                 </div>
-
-                {selectedBillIds.length === 0 && (
-                  <div className="bg-amber-50 dark:bg-amber-950/20 p-3 rounded border border-amber-200 dark:border-amber-900 flex items-center gap-3">
-                    <p className="text-xs text-amber-700 dark:text-amber-400">Please select at least one bill to record a payment.</p>
-                  </div>
-                )}
-
-                <div className="flex gap-2 pt-4">
-                  <Button className="flex-1 bg-green-600 hover:bg-green-700" onClick={handleSubmit} disabled={loading}>
-                    {loading ? (editingPayment ? "Updating..." : "Recording...") : (editingPayment ? "Update Payment" : "Save Payment")}
-                  </Button>
-                  <Button
-                    variant="outline"
-                    className="flex-1"
-                    onClick={() => {
-                      setIsDialogOpen(false);
-                      setEditingPayment(null);
-                      // Reset states
-                      setCompanyId('');
-                      setLumpsumAmount('');
-                      setSelectedBillIds([]);
-                      setBillPayments({});
-                      setTrackingId('');
-                      setChequeNo('');
-                      setPayOrderNo('');
-                      setDescription('');
-                    }}
-                  >
-                    Cancel
-                  </Button>
-                </div>
-              </div>
-            </DialogContent>
-          </Dialog>
+              </DialogContent>
+            </Dialog>
+          </div>
         </div>
 
         <Card className="shadow-md border-border/50">
@@ -774,17 +922,21 @@ export default function PaymentsPage() {
                       <TableHead>Job No</TableHead>
                       <TableHead>Method</TableHead>
                       <TableHead>Reference</TableHead>
-                      <TableHead className="text-right">Advance Paid</TableHead>
-                      <TableHead className="text-right">Adjustment</TableHead>
-                      <TableHead className="text-right">Cash Paid</TableHead>
+                      <TableHead className="text-right font-medium text-[10px] text-muted-foreground uppercase">Adv. Paid</TableHead>
+                      <TableHead className="text-right font-medium text-[10px] text-muted-foreground uppercase">Adj.</TableHead>
+                      <TableHead className="text-right font-medium text-[10px] text-muted-foreground uppercase">Current Paid</TableHead>
+                      <TableHead className="text-right font-black">TOTAL Bill</TableHead>
                       <TableHead className="text-right font-black text-primary">Total Paid</TableHead>
-                      <TableHead className="text-right font-black">Bill Total</TableHead>
+                      <TableHead className="text-right font-black text-rose-600">Remaining Balance</TableHead>
                       <TableHead className="text-right">Actions</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
                     {filteredPayments.map((payment) => {
                       const linkedBill = bills.find(b => String(b.id) === String(payment.billId));
+                      const totalBill = linkedBill?.grandTotal || 0;
+                      const totalPaid = Number(linkedBill?.advancePayment || 0) + Number(linkedBill?.paidAmount || 0);
+                      const remainingBalance = totalBill - totalPaid;
 
                       return (
                         <TableRow key={payment.id} className="hover:bg-muted/50 transition-colors">
@@ -812,15 +964,14 @@ export default function PaymentsPage() {
                           <TableCell className="text-right font-bold text-green-600 whitespace-nowrap">
                             {Math.round(payment.amount).toLocaleString()}
                           </TableCell>
-                          <TableCell className="text-right font-black text-green-700 bg-green-50/50 dark:bg-green-900/10 whitespace-nowrap">
-                            {formatCurrency(
-                              Number(linkedBill?.advancePayment || 0) +
-                              Number(payment.amount || 0) +
-                              Number(payment.adjustment || 0)
-                            )}
+                          <TableCell className="text-right font-black text-slate-900 dark:text-slate-100 bg-muted/20 whitespace-nowrap">
+                            {linkedBill ? formatCurrency(totalBill) : '-'}
                           </TableCell>
-                          <TableCell className="text-right font-black text-primary bg-muted/20 whitespace-nowrap">
-                            {linkedBill ? formatCurrency(linkedBill.grandTotal || 0) : '-'}
+                          <TableCell className="text-right font-black text-green-700 bg-green-50/50 dark:bg-green-900/10 whitespace-nowrap">
+                            {linkedBill ? formatCurrency(totalPaid) : '-'}
+                          </TableCell>
+                          <TableCell className={`text-right font-black whitespace-nowrap ${remainingBalance > 0 ? 'text-rose-600 bg-rose-50/50 dark:bg-rose-900/10' : 'text-slate-500'}`}>
+                            {linkedBill ? formatCurrency(remainingBalance) : '-'}
                           </TableCell>
                           <TableCell className="text-right">
                             <div className="flex justify-end gap-1">
@@ -931,6 +1082,6 @@ export default function PaymentsPage() {
         title="Edit Payment"
         description={`Authorize edit action for payment.`}
       />
-    </DashboardLayout>
+    </DashboardLayout >
   );
 }
