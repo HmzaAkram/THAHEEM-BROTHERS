@@ -1,13 +1,13 @@
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { 
-  Award, Target, Users, History, Globe, Mail, Phone, MapPin, 
-  Shield, Ship, Headphones, DollarSign, Activity, CheckCircle 
+import {
+    Award, Target, Users, History, Globe, Mail, Phone, MapPin,
+    Shield, Ship, Headphones, DollarSign, Activity, CheckCircle
 } from 'lucide-react';
 
 export default function AboutPage() {
     return (
         <div className="container px-4 py-16">
-            
+
 
             <div className="max-w-4xl mx-auto space-y-20">
                 {/* Header */}
@@ -28,8 +28,8 @@ export default function AboutPage() {
                             Established to redefine industry standards, we offer comprehensive, tailor-made logistics solutions that combine reliability, cost-effectiveness, and compliance under one roof. With over 10 years of experience and an expanding international footprint, Thaheem Brothers proudly serves a diverse portfolio of national and multinational clients across various industries including textiles, IT, engineering, and more.
                         </p>
                     </div>
-                    <div className="relative h-[400px] rounded-2xl overflow-hidden shadow-xl">
-                        <div className="absolute inset-0 bg-[url('https://images.unsplash.com/photo-1556761175-5973dc0f32e7?ixlib=rb-4.0.3&auto=format&fit=crop&w=1632&q=80')] bg-cover bg-center" />
+                    <div className="relative h-[400px] rounded-2xl overflow-hidden shadow-xl border-4 border-primary/10">
+                        <div className="absolute inset-0 bg-[url('/logo.jpeg')] bg-cover bg-center" />
                     </div>
                 </div>
 
@@ -66,7 +66,7 @@ export default function AboutPage() {
                     <div className="grid grid-cols-1 md:grid-cols-12 gap-12 items-center">
                         <div className="md:col-span-5">
                             <div className="relative h-[500px] bg-muted rounded-2xl overflow-hidden shadow-xl">
-                                <div className="absolute inset-0 bg-cover bg-center" style={{ backgroundImage: `url('https://images.unsplash.com/photo-1560250097-0b93528c311a?ixlib=rb-4.0.3&auto=format&fit=crop&w=687&q=80')` }} />
+                                <div className="absolute inset-0 bg-cover bg-center" style={{ backgroundImage: `url('/ceo.jpeg')` }} />
                             </div>
                         </div>
                         <div className="md:col-span-7 space-y-6">
