@@ -455,7 +455,7 @@ export default function CompaniesPage() {
                                   variant="ghost"
                                   size="sm"
                                   className="h-8 w-8 p-0 hover:bg-blue-100"
-                                  onClick={() => router.push(`/admin/companies/${company.id}`)}
+                                  onClick={() => router.push(`/admin/companies/details?id=${company.id}`)}
                                   title="View Details"
                                 >
                                   <Eye className="w-4 h-4 text-blue-600" />
@@ -558,7 +558,7 @@ export default function CompaniesPage() {
         }}
         onConfirm={() => {
           if (editTargetId) {
-            router.push(`/admin/companies/${editTargetId}`);
+            router.push(`/admin/companies/details?id=${editTargetId}`);
           }
           setIsEditPinDialogOpen(false);
           setEditTargetId(null);
