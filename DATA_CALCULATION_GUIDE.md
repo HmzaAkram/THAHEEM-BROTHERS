@@ -81,8 +81,26 @@ The Ledger provides a chronological history of transactions for a specific compa
 *   **Running Balance**:
     *   Starts from the `Opening Balance`.
     *   `Balance = (Previous Balance) + Debit - Credit`.
-*   **Remaining Opening Balance**:
-    *   Calculated as `Initial Opening Balance - Total Unlinked Payments (Advances)`. This shows how much of the original opening balance is still outstanding.
+
+---
+
+### Bottom Summary Cards (Ledger)
+
+The footer of the Ledger page provides five key financial indicators:
+
+1.  **Opening Balance (Balance b/f)**:
+    *   Includes the inherent `Opening Balance` of the company.
+    *   Plus/Minus the net result of all transactions (Bills vs Payments) occurred **before** the selected "From" date.
+2.  **Total Opening Balance (Remaining OB)**:
+    *   Shows the portion of the company's initial `Opening Balance` that is still unpaid.
+    *   Calculated as: `Initial Opening Balance - Total Unlinked Payments (Advances)`.
+3.  **Total Billed**:
+    *   Sum of all `Bill Grand Totals` generated **within** the selected time period.
+4.  **Total Paid**:
+    *   Sum of all `Advances`, `Payments`, and `Adjustments` recorded **within** the selected time period.
+5.  **Closing Balance**:
+    *   The final standing as of the "To" date.
+    *   Calculated as: `(Opening Balance b/f) + (Total Billed) - (Total Paid)`.
 
 ---
 
