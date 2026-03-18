@@ -35,7 +35,24 @@ The Bills page shows individual job invoices and their cumulative totals.
 
 ---
 
-## 3. Companies Page
+## 3. Payments Page
+
+The Payments page tracks all incoming funds and their application to bills or company balances.
+
+*   **Total Bill**:
+    *   Sum of `Grand Total` for all bills within the filtered period.
+    *   Plus: Sum of `Opening Balance` for all filtered companies.
+*   **Collected (Overall Received)**:
+    *   Sum of `Advance Payment` from all filtered bills.
+    *   Plus: Sum of `Amount` and `Adjustment` from all filtered payment records.
+*   **Total Balance**:
+    *   `Total Bill - Collected (Overall Received)`.
+*   **Individual Payment**:
+    *   `Total Received = Payment Amount + Adjustment`.
+
+---
+
+## 4. Companies Page
 
 The Companies page manages client profiles and their overall standing.
 
@@ -51,7 +68,7 @@ The Companies page manages client profiles and their overall standing.
 
 ---
 
-## 4. Company Ledger
+## 5. Company Ledger (Admin Ledger)
 
 The Ledger provides a chronological history of transactions for a specific company.
 
@@ -69,7 +86,7 @@ The Ledger provides a chronological history of transactions for a specific compa
 
 ---
 
-## 5. Reports Page
+## 6. Reports Page
 
 Reports provide various views of the financial data over time.
 
