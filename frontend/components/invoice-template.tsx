@@ -31,95 +31,86 @@ export const InvoiceTemplate = forwardRef<HTMLDivElement, InvoiceTemplateProps>(
     const displayNote = bill.note?.replace(/\[TR:\d+\]/, '').trim();
 
     return (
-        <div ref={ref} className="bg-white p-6 max-w-[210mm] mx-auto min-h-[297mm] relative text-slate-900" style={{ fontSize: '11px', lineHeight: '1.2' }}>
+        <div ref={ref} className="bg-white p-12 max-w-[210mm] mx-auto min-h-[297mm] relative text-slate-900 border" style={{ fontSize: '11px', lineHeight: '1.2' }}>
 
             {/* Header Section */}
-            <div className="flex justify-between items-start border-b-2 border-slate-800 pb-4 mb-4">
-                <div className="flex gap-3 max-w-[60%]">
-                    <div className="w-14 h-14 object-contain flex-shrink-0">
+            <div className="flex justify-between items-start border-b-2 border-slate-800 pb-4 mb-6">
+                <div className="flex gap-4 max-w-[65%]">
+                    <div className="w-16 h-16 object-contain flex-shrink-0">
                         <img src="/logo.jpeg" alt="Logo" className="w-full h-full" />
                     </div>
                     <div>
-                        <h1 className="text-xl font-bold uppercase tracking-wide leading-tight">Thaheem Brothers</h1>
-                        <div className="mt-2 text-xs text-slate-500 break-words leading-snug font-bold">
+                        <h1 className="text-2xl font-bold uppercase tracking-wide leading-tight">Thaheem Brothers</h1>
+                        <p className="text-[10px] font-bold text-slate-600 mt-0.5">CHALLAN NO. 2083 | NTN NO: 6491648</p>
+                        <div className="mt-2 text-[10px] text-slate-500 break-words leading-relaxed font-semibold">
                             <p>Suite 23, 2nd Floor, R.K. Square Ext, Shahrah-e-Liaquat, Karachi</p>
-                            <p>+92 21 32421347 | +92 300 2791780 | import.khi@hotmail.com</p>
+                            <p>Phone: +92 21 32421347 | Mob: +92 300 2791780 | Email: import.khi@hotmail.com</p>
                         </div>
                     </div>
                 </div>
                 <div className="text-right flex-shrink-0">
-                    <h2 className="text-2xl font-black uppercase text-slate-900 tracking-tighter leading-none">Invoice</h2>
-                    {/* Job Number Highlight */}
-                    <div className="mt-1 text-right">
-                        <p className="text-[10px] font-bold uppercase text-slate-400 leading-none">Job Number</p>
-                        <p className="text-xl font-mono font-black leading-tight">{bill.jobNumber || 'N/A'}</p>
-                    </div>
-                    <div className="mt-2 text-right">
-                        <p className="text-[10px] font-bold uppercase text-slate-400 leading-none">Date</p>
-                        <p className="text-sm font-bold leading-tight">{formatDate(bill.date)}</p>
-                    </div>
-                    <div className="mt-2 bg-slate-100 px-2 py-0.5 rounded inline-block">
-                        <span className="text-[10px] font-bold uppercase text-slate-500 mr-1.5">Status:</span>
-                        <span className={`text-[10px] font-black uppercase ${bill.calculatedStatus === 'Paid' ? 'text-green-600' : 'text-red-600'}`}>
-                            {bill.calculatedStatus || 'Unpaid'}
-                        </span>
+                    <h2 className="text-3xl font-black uppercase text-slate-900 tracking-tighter leading-none mb-2">Invoice</h2>
+                    <div className="space-y-1">
+                        <div>
+                            <p className="text-[9px] font-bold uppercase text-slate-400 leading-none">Job Number</p>
+                            <p className="text-lg font-mono font-black leading-tight text-primary">{bill.jobNumber || 'N/A'}</p>
+                        </div>
+                        <div>
+                            <p className="text-[9px] font-bold uppercase text-slate-400 leading-none">Date</p>
+                            <p className="text-sm font-bold leading-tight">{formatDate(bill.date)}</p>
+                        </div>
                     </div>
                 </div>
             </div>
 
             {/* Bill To & Details Grid */}
-            <div className="grid grid-cols-2 gap-4 mb-4">
-                <div>
-                    <h3 className="text-[10px] font-black uppercase tracking-widest text-slate-400 mb-1 border-b border-slate-200 pb-0.5">Bill To</h3>
-                    <div className="space-y-0.5">
-                        <p className="text-sm font-bold break-words leading-tight">{companyName}</p>
-                        <p className="text-[10px] text-slate-600 whitespace-pre-wrap break-words leading-tight">{companyAddress}</p>
-                        <div className="mt-1 pt-1 border-t border-dashed border-slate-200 text-[10px]">
-                            <p className="flex justify-between flex-wrap gap-1"><span className="text-slate-500 font-semibold">Phone:</span> <span className="break-all">{companyPhone}</span></p>
-                            <p className="flex justify-between flex-wrap gap-1"><span className="text-slate-500 font-semibold">Email:</span> <span className="break-all">{companyEmail}</span></p>
+            <div className="grid grid-cols-2 gap-8 mb-6">
+                <div className="bg-slate-50/50 p-3 rounded-lg border border-slate-100">
+                    <h3 className="text-[10px] font-black uppercase tracking-widest text-slate-400 mb-2 border-b border-slate-200 pb-1">Bill To</h3>
+                    <div className="space-y-1">
+                        <p className="text-sm font-bold break-words leading-tight uppercase text-slate-800">{companyName}</p>
+                        <p className="text-[10px] text-slate-600 whitespace-pre-wrap break-words leading-tight mb-2">{companyAddress}</p>
+
+                        <div className="grid grid-cols-2 gap-2 mt-3 pt-2 border-t border-dashed border-slate-200">
+                            <div>
+                                <p className="text-[8px] font-bold text-slate-400 uppercase leading-none">NTN No</p>
+                                <p className="text-[10px] font-bold text-slate-700">{(bill as any).company?.ntn || 'N/A'}</p>
+                            </div>
+                            <div>
+                                <p className="text-[8px] font-bold text-slate-400 uppercase leading-none">Sales Tax (STRN)</p>
+                                <p className="text-[10px] font-bold text-slate-700">{(bill as any).company?.saleTaxNo || 'N/A'}</p>
+                            </div>
                         </div>
                     </div>
                 </div>
                 <div>
-                    <h3 className="text-[10px] font-black uppercase tracking-widest text-slate-400 mb-1 border-b border-slate-200 pb-0.5">Shipment Details</h3>
-                    <div className="grid grid-cols-3 gap-x-2 gap-y-1 text-[10px]">
+                    <h3 className="text-[10px] font-black uppercase tracking-widest text-slate-400 mb-2 border-b border-slate-200 pb-1">Shipment Details</h3>
+                    <div className="grid grid-cols-2 gap-x-4 gap-y-2 text-[10px]">
                         <div>
-                            <p className="text-[9px] text-slate-500 font-semibold uppercase leading-none">Job No</p>
-                            <p className="font-bold break-words leading-tight">{bill.jobNumber || 'N/A'}</p>
-                        </div>
-                        <div className="col-span-2">
                             <p className="text-[9px] text-slate-500 font-semibold uppercase leading-none">Exporter</p>
                             <p className="font-bold break-words leading-tight">{bill.exporter || '-'}</p>
-                        </div>
-                        <div>
-                            <p className="text-[9px] text-slate-500 font-semibold uppercase leading-none">GD No</p>
-                            <p className="font-bold break-words leading-tight">{bill.gdNumber || '-'}</p>
-                        </div>
-                        <div>
-                            <p className="text-[9px] text-slate-500 font-semibold uppercase leading-none">Weight</p>
-                            <p className="font-bold break-words leading-tight">{bill.weight ? `${bill.weight} KG` : '-'}</p>
-                        </div>
-                        <div>
-                            <p className="text-[9px] text-slate-500 font-semibold uppercase leading-none">Packages</p>
-                            <p className="font-bold break-words leading-tight">{bill.packages || '-'}</p>
                         </div>
                         <div>
                             <p className="text-[9px] text-slate-500 font-semibold uppercase leading-none">VIA</p>
                             <p className="font-bold break-words leading-tight">{bill.via || '-'}</p>
                         </div>
                         <div>
-                            <p className="text-[9px] text-slate-500 font-semibold uppercase leading-none">IGM No</p>
-                            <p className="font-bold break-words leading-tight">{bill.igm || '-'}</p>
+                            <p className="text-[9px] text-slate-500 font-semibold uppercase leading-none">GD No</p>
+                            <p className="font-bold break-words leading-tight font-mono">{bill.gdNumber || '-'}</p>
                         </div>
                         <div>
-                            <p className="text-[9px] text-slate-500 font-semibold uppercase leading-none">Index No</p>
-                            <p className="font-bold break-words leading-tight">{bill.indexNo || '-'}</p>
+                            <p className="text-[9px] text-slate-500 font-semibold uppercase leading-none">Weight / Pkgs</p>
+                            <p className="font-bold leading-tight">{bill.weight ? `${bill.weight} KG` : '-'} / {bill.packages || '-'}</p>
+                        </div>
+                        <div>
+                            <p className="text-[9px] text-slate-500 font-semibold uppercase leading-none">IGM / Index</p>
+                            <p className="font-bold leading-tight">{bill.igm || '-'} / {bill.indexNo || '-'}</p>
                         </div>
                         <div>
                             <p className="text-[9px] text-slate-500 font-semibold uppercase leading-none">HAWB No</p>
-                            <p className="font-bold break-words leading-tight">{bill.hawb || '-'}</p>
+                            <p className="font-bold font-mono leading-tight">{bill.hawb || '-'}</p>
                         </div>
-                        <div className="col-span-3">
+                        <div className="col-span-2">
                             <p className="text-[9px] text-slate-500 font-semibold uppercase leading-none">Container Info</p>
                             <p className="font-bold break-words leading-tight">
                                 {bill.noOfContainers ? `${bill.noOfContainers}x Containers` : ''}
@@ -132,31 +123,26 @@ export const InvoiceTemplate = forwardRef<HTMLDivElement, InvoiceTemplateProps>(
             </div>
 
             {/* Items Table */}
-            <div className="mb-4">
-                <table className="w-full border-collapse table-fixed">
+            <div className="mb-8">
+                <table className="w-full border-collapse">
                     <thead>
-                        <tr className="border-b-2 border-slate-900">
-                            <th className="text-left py-1 text-[10px] font-black uppercase tracking-widest text-slate-600 w-[5%]">#</th>
-                            <th className="text-left py-1 text-[10px] font-black uppercase tracking-widest text-slate-600 w-[35%]">Description</th>
-                            <th className="text-left py-1 text-[10px] font-black uppercase tracking-widest text-slate-600 w-[15%]">Inv. No</th>
-                            <th className="text-left py-1 text-[10px] font-black uppercase tracking-widest text-slate-600 w-[25%]">Notes</th>
-                            <th className="text-right py-1 text-[10px] font-black uppercase tracking-widest text-slate-600 w-[20%]">Amount</th>
+                        <tr className="border-y-2 border-slate-800 bg-slate-50/50">
+                            <th className="text-left p-2 text-[10px] font-black uppercase tracking-widest text-slate-700 w-[8%]">#</th>
+                            <th className="text-left p-2 text-[10px] font-black uppercase tracking-widest text-slate-700">Description of Charges</th>
+                            <th className="text-left p-2 text-[10px] font-black uppercase tracking-widest text-slate-700 w-[15%]">Inv No</th>
+                            <th className="text-right p-2 text-[10px] font-black uppercase tracking-widest text-slate-700 w-[20%]">Amount (PKR)</th>
                         </tr>
                     </thead>
                     <tbody>
                         {bill.items.map((item, index) => (
-                            <tr key={index} className="border-b border-slate-200 text-[10px]">
-                                <td className="py-1 align-top text-slate-500 font-mono">{index + 1}</td>
-                                <td className="py-1 align-top font-bold text-slate-800 pr-2">
-                                    <div className="break-words whitespace-pre-wrap leading-tight">{item.description}</div>
+                            <tr key={index} className="border-b border-slate-100 hover:bg-slate-50/30 transition-colors">
+                                <td className="p-2 align-top text-slate-500 font-mono text-[10px]">{String(index + 1).padStart(2, '0')}</td>
+                                <td className="p-2 align-top">
+                                    <div className="font-bold text-slate-800 text-xs leading-tight mb-1">{item.description}</div>
+                                    {item.notes && <div className="text-[9px] text-slate-500 italic leading-tight">{item.notes}</div>}
                                 </td>
-                                <td className="py-1 align-top text-slate-500 font-mono text-[9px] pr-2">
-                                    <div className="break-words leading-tight">{item.invoiceNo || '-'}</div>
-                                </td>
-                                <td className="py-1 align-top text-slate-500 text-[9px] italic pr-2">
-                                    <div className="break-words whitespace-pre-wrap leading-tight">{item.notes || '-'}</div>
-                                </td>
-                                <td className="py-1 align-top text-right font-mono font-bold text-slate-900 leading-tight">
+                                <td className="p-2 align-top text-slate-500 font-mono text-[10px]">{item.invoiceNo || '-'}</td>
+                                <td className="p-2 align-top text-right font-mono font-bold text-slate-900 text-xs">
                                     {parseFloat(item.amount as any).toLocaleString()}
                                 </td>
                             </tr>
@@ -165,116 +151,89 @@ export const InvoiceTemplate = forwardRef<HTMLDivElement, InvoiceTemplateProps>(
                 </table>
             </div>
 
-            {/* Footer / Totals */}
-            <div className="flex justify-between items-start border-t-2 border-slate-900 pt-3 mt-auto">
-
-                {/* Bank Details / Notes */}
-                <div className="w-1/2 pr-6">
-                    <h4 className="text-[10px] font-black uppercase tracking-widest text-slate-900 mb-1">Bank Details</h4>
-                    <div className="text-[10px] flex flex-col gap-1 text-slate-600">
-                        <div className="p-1.5 bg-slate-50 border border-slate-200 rounded">
-                            <p className="font-bold text-slate-900 leading-none">Dubai Islamic Bank</p>
-                            <p className="font-mono text-[9px]">PK92DUIB000000571507001</p>
+            {/* Bottom Section */}
+            <div className="mt-auto">
+                <div className="flex justify-between items-start pt-6 border-t-2 border-slate-800">
+                    {/* Bank Details & Signature */}
+                    <div className="w-1/2 pr-10 space-y-8">
+                        <div>
+                            <h4 className="text-[10px] font-black uppercase tracking-widest text-slate-900 mb-2">Our Bank Details</h4>
+                            <div className="grid grid-cols-1 gap-1.5">
+                                <div className="p-2 bg-slate-50/80 border border-slate-200 rounded-lg">
+                                    <p className="font-bold text-slate-900 text-[10px] leading-none mb-1">Dubai Islamic Bank</p>
+                                    <p className="font-mono text-[9px] text-slate-600">A/C: PK92DUIB000000571507001</p>
+                                </div>
+                                <div className="p-2 bg-slate-50/80 border border-slate-200 rounded-lg">
+                                    <p className="font-bold text-slate-900 text-[10px] leading-none mb-1">Bank Al-Habib</p>
+                                    <p className="font-mono text-[9px] text-slate-600">A/C: PK14BAHL5028008100103201</p>
+                                </div>
+                            </div>
                         </div>
-                        <div className="p-1.5 bg-slate-50 border border-slate-200 rounded">
-                            <p className="font-bold text-slate-900 leading-none">Bank Al-Habib</p>
-                            <p className="font-mono text-[9px]">PK14BAHL5028008100103201</p>
+
+                        {/* Signature area */}
+                        <div className="flex justify-between items-end pt-12">
+                            <div className="text-center w-36">
+                                <div className="border-b-2 border-slate-300 w-full mb-2 h-10 flex items-center justify-center">
+                                    <span className="text-[8px] text-slate-300 italic">Official Seal here</span>
+                                </div>
+                                <p className="text-[9px] font-black uppercase text-slate-400 tracking-tighter">Official Seal</p>
+                            </div>
+                            <div className="text-center w-36">
+                                <div className="border-b-2 border-slate-300 w-full mb-2 h-10"></div>
+                                <p className="text-[9px] font-black uppercase text-slate-400 tracking-tighter">Authorized Signature</p>
+                            </div>
                         </div>
                     </div>
 
-                    {/* Attachment Links */}
-                    {(bill.attachments && bill.attachments.length > 0) ? (
-                        <div className="mt-3 space-y-1">
-                            {bill.attachments.map((attachmentUrl, idx) => (
-                                <button
-                                    key={idx}
-                                    onClick={(e) => {
-                                        e.preventDefault();
-                                        e.stopPropagation();
-                                        window.open(attachmentUrl, '_blank');
-                                    }}
-                                    className="flex items-center gap-1.5 text-[10px] font-bold text-blue-600 hover:text-blue-800 hover:underline cursor-pointer"
-                                >
-                                    <Download size={12} />
-                                    Download Attached Document {idx + 1} (PDF)
-                                </button>
-                            ))}
-                        </div>
-                    ) : bill.attachment && !hideAttachments ? (
-                        <div className="mt-3">
-                            <button
-                                onClick={(e) => {
-                                    e.preventDefault();
-                                    e.stopPropagation();
-                                    window.open(bill.attachment, '_blank');
-                                }}
-                                className="flex items-center gap-1.5 text-[10px] font-bold text-blue-600 hover:text-blue-800 hover:underline cursor-pointer"
-                            >
-                                <Download size={12} />
-                                Download Attached Document (PDF)
-                            </button>
-                        </div>
-                    ) : null}
-
-                    {/* Conditional Notes */}
-                    <div className="mt-4 space-y-1">
-                        {displayNote && displayNote.trim() !== '' && displayNote !== 'None' && displayNote !== 'No notes have been provided by the admin.' ? (
-                            <p className="text-[10px] text-slate-600 italic font-medium">Note: {displayNote}</p>
-                        ) : (
-                            /* Fallback for old bills without note field or with 'None/No Notes' selected */
-                            <div className="space-y-1">
-                                {bill.attachment && (
-                                    <p className="text-[10px] text-slate-600 italic font-medium">Note: All Necessary documents enclosed.</p>
-                                )}
-                                {advance === 0 && (
-                                    <p className="text-[10px] text-slate-600 italic font-medium">Note: The consignee has not made any advance payment.</p>
-                                )}
-                                {(!bill.attachment && advance !== 0) && (
-                                    <p className="text-[10px] text-slate-600 italic font-medium">Note: No notes have been provided by the admin.</p>
-                                )}
+                    {/* Totals Calculation */}
+                    <div className="w-5/12 ml-auto">
+                        <div className="bg-slate-50 p-4 rounded-xl border border-slate-200 space-y-2">
+                            <div className="flex justify-between text-xs">
+                                <span className="font-semibold text-slate-500">Service Charges</span>
+                                <span className="font-mono font-bold">{serviceCharges.toLocaleString()}</span>
                             </div>
-                        )}
+                            <div className="flex justify-between text-xs pb-1 border-b border-slate-200">
+                                <span className="text-slate-500">SBR Sales Tax ({displayTaxRate}%)</span>
+                                <span className="font-mono font-bold">{salesTax.toLocaleString()}</span>
+                            </div>
+                            <div className="flex justify-between pt-1">
+                                <span className="font-bold text-slate-900 text-xs">Total Bill Amount</span>
+                                <span className="font-mono font-black text-sm">{grandTotal.toLocaleString()}</span>
+                            </div>
+                            <div className="flex justify-between text-green-600 text-xs italic">
+                                <span>Advance Payment</span>
+                                <span className="font-mono font-bold">(-) {advance.toLocaleString()}</span>
+                            </div>
+
+                            <div className="pt-3 mt-1 border-t-2 border-slate-900">
+                                <div className="flex justify-between items-center">
+                                    <span className="font-black uppercase tracking-widest text-slate-900 text-sm">Net Payable</span>
+                                    <div className="text-right">
+                                        <p className="font-mono font-black text-2xl text-slate-900 leading-none">
+                                            {netPayable.toLocaleString()}
+                                        </p>
+                                        <p className="text-[8px] font-bold text-slate-400 uppercase mt-1">Amount in PKR</p>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        {/* Note area */}
+                        <div className="mt-4 p-3 bg-primary/[0.03] border border-primary/10 rounded-lg">
+                            <p className="text-[9px] font-black uppercase text-primary/60 mb-1 tracking-widest">Customer Note</p>
+                            <p className="text-[10px] text-slate-600 italic leading-tight">
+                                {displayNote && displayNote.trim() !== '' && displayNote !== 'None' && displayNote !== 'No notes have been provided by the admin.'
+                                    ? displayNote
+                                    : (bill.attachment ? "All Necessary documents enclosed." : "No specific notes for this invoice.")}
+                            </p>
+                        </div>
                     </div>
                 </div>
 
-                {/* Calculation */}
-                <div className="w-1/2 pl-6">
-                    <div className="space-y-1 text-xs">
-                        <div className="flex justify-between">
-                            <span className="font-semibold text-slate-500">Subtotal</span>
-                            <span className="font-mono font-bold">{subtotal.toLocaleString()}</span>
-                        </div>
-                        <div className="flex justify-between">
-                            <span className="font-semibold text-slate-500">Service Charges</span>
-                            <span className="font-mono font-bold">{serviceCharges.toLocaleString()}</span>
-                        </div>
-                        <div className="flex justify-between border-b border-slate-200">
-                            <span className="text-slate-500">SBR Sales Tax ({displayTaxRate}%)</span>
-                            <span className="font-mono font-bold">{salesTax.toLocaleString()}</span>
-                        </div>
-                        <div className="flex justify-between pt-0.5">
-                            <span className="font-bold text-slate-900">Grand Total</span>
-                            <span className="font-mono font-black text-sm">{grandTotal.toLocaleString()}</span>
-                        </div>
-                        <div className="flex justify-between text-green-600">
-                            <span className="font-semibold">Advance / Paid</span>
-                            <span className="font-mono font-bold">(-) {advance.toLocaleString()}</span>
-                        </div>
-                        <div className="flex justify-between pt-2 border-t-2 border-slate-900 mt-1 items-center">
-                            <span className="font-black uppercase tracking-widest text-slate-900 text-sm">Net Payable</span>
-                            <span className="font-mono font-black text-xl text-slate-900">
-                                {netPayable.toLocaleString()}
-                            </span>
-                        </div>
-                        {/* Paid Date Message */}
-                        {bill.calculatedStatus === 'Paid' && paidDate && (
-                            <div className="pt-2 text-right">
-                                <p className="text-[10px] font-bold text-green-600 uppercase tracking-tight">
-                                    Total Bill is Paid at {formatDate(paidDate)}
-                                </p>
-                            </div>
-                        )}
-                    </div>
+                {/* Print Footer */}
+                <div className="mt-8 pt-4 border-t border-slate-100 flex justify-between items-center text-[8px] text-slate-400 font-bold uppercase tracking-widest">
+                    <span>Generated by Thaheem Brothers Management System</span>
+                    <span>Page 1 of 1</span>
                 </div>
             </div>
         </div>

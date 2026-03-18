@@ -53,6 +53,7 @@ export default function CompaniesPage() {
   const [formData, setFormData] = useState({
     name: '',
     ntn: '',
+    saleTaxNo: '',
     email: '',
     phone: '',
     address: '',
@@ -172,6 +173,7 @@ export default function CompaniesPage() {
       const result = await addCompany({
         name: formData.name,
         ntn: formData.ntn,
+        saleTaxNo: formData.saleTaxNo,
         email: formData.email,
         phone: formData.phone || '',
         address: formData.address || '',
@@ -182,7 +184,7 @@ export default function CompaniesPage() {
       }) as any;
 
       if (result.ok) {
-        setFormData({ name: '', ntn: '', email: '', phone: '', address: '', username: '', password: '', openingBalance: '' });
+        setFormData({ name: '', ntn: '', saleTaxNo: '', email: '', phone: '', address: '', username: '', password: '', openingBalance: '' });
         setIsDialogOpen(false);
       } else {
         Swal.fire({
@@ -209,22 +211,22 @@ export default function CompaniesPage() {
     <DashboardLayout>
       <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
         <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
-          <div>
+          <div className="w-full md:w-auto">
             <h1 className="text-3xl font-bold text-foreground bg-clip-text text-transparent bg-gradient-to-r from-primary to-blue-600">
               Companies
             </h1>
-            <p className="text-muted-foreground mt-1">
+            <p className="text-muted-foreground mt-1 text-sm">
               Manage all client companies and their credentials
             </p>
           </div>
           <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
             <DialogTrigger asChild>
-              <Button className="gap-2 shadow-md hover:scale-105 transition-transform">
+              <Button className="w-full md:w-auto gap-2 shadow-md hover:scale-105 transition-transform">
                 <Plus className="w-4 h-4" />
                 Add Company
               </Button>
             </DialogTrigger>
-            <DialogContent className="sm:max-w-[500px]">
+            <DialogContent className="max-w-[95vw] sm:max-w-[500px] max-h-[90vh] overflow-y-auto">
               <DialogHeader>
                 <DialogTitle>Add New Company</DialogTitle>
               </DialogHeader>
@@ -247,6 +249,16 @@ export default function CompaniesPage() {
                       value={formData.ntn}
                       onChange={handleInputChange}
                       placeholder="Enter NTN number"
+                      className="mt-1"
+                    />
+                  </div>
+                  <div>
+                    <Label htmlFor="saleTaxNo">Sale Tax No</Label>
+                    <Input
+                      id="saleTaxNo"
+                      value={formData.saleTaxNo}
+                      onChange={handleInputChange}
+                      placeholder="Enter Sale Tax No"
                       className="mt-1"
                     />
                   </div>
@@ -286,12 +298,12 @@ export default function CompaniesPage() {
                 </div>
                 <div className="grid grid-cols-2 gap-4">
                   <div>
-                    <Label htmlFor="username">Username</Label>
+                    <Label htmlFor="username">Name</Label>
                     <Input
                       id="username"
                       value={formData.username}
                       onChange={handleInputChange}
-                      placeholder="Login username"
+                      placeholder="Name"
                       className="mt-1"
                     />
                   </div>
@@ -337,18 +349,18 @@ export default function CompaniesPage() {
 
         <Card className="border-0 shadow-xl bg-white/50 dark:bg-slate-900/50 backdrop-blur-md">
           <CardHeader className="pb-2">
-            <div className="flex flex-col md:flex-row items-start md:items-center gap-4 bg-background/50 p-4 rounded-xl border border-border/50">
+            <div className="flex flex-col lg:flex-row items-start lg:items-center gap-4 bg-background/50 p-4 rounded-xl border border-border/50">
               <div className="relative flex-1 w-full">
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground mr-2" />
                 <Input
                   placeholder="Search companies..."
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
-                  className="pl-9 bg-white/50 border-border/40 focus:bg-white transition-all rounded-xl"
+                  className="pl-9 bg-white/50 border-border/40 focus:bg-white transition-all rounded-xl w-full"
                 />
               </div>
-              <div className="flex flex-wrap gap-3 w-full md:w-auto">
-                <div className="flex items-center gap-2">
+              <div className="flex flex-col sm:flex-row flex-wrap gap-3 w-full lg:w-auto">
+                <div className="flex items-center gap-2 w-full sm:w-auto">
                   <Label className="text-[10px] font-bold uppercase text-muted-foreground hidden lg:block">From</Label>
                   <Input
                     type="date"
@@ -357,10 +369,10 @@ export default function CompaniesPage() {
                       setDateFrom(e.target.value);
                       setTimeShortcut('overall');
                     }}
-                    className="h-10 w-[140px] bg-white border-border/40 rounded-xl px-3"
+                    className="h-10 flex-1 sm:w-[140px] bg-white border-border/40 rounded-xl px-3"
                   />
                 </div>
-                <div className="flex items-center gap-2">
+                <div className="flex items-center gap-2 w-full sm:w-auto">
                   <Label className="text-[10px] font-bold uppercase text-muted-foreground hidden lg:block">To</Label>
                   <Input
                     type="date"
@@ -369,11 +381,11 @@ export default function CompaniesPage() {
                       setDateTo(e.target.value);
                       setTimeShortcut('overall');
                     }}
-                    className="h-10 w-[140px] bg-white border-border/40 rounded-xl px-3"
+                    className="h-10 flex-1 sm:w-[140px] bg-white border-border/40 rounded-xl px-3"
                   />
                 </div>
                 <Select value={timeShortcut} onValueChange={handleTimeShortcut}>
-                  <SelectTrigger className="w-[140px] h-10 bg-white border-border/40 rounded-xl">
+                  <SelectTrigger className="w-full sm:w-[140px] h-10 bg-white border-border/40 rounded-xl">
                     <div className="flex items-center gap-2">
                       <Filter className="w-3.5 h-3.5 text-muted-foreground" />
                       <SelectValue placeholder="Period" />
@@ -390,8 +402,9 @@ export default function CompaniesPage() {
           </CardHeader>
           <CardContent>
             <div className="rounded-xl border border-border/50 overflow-hidden shadow-inner bg-slate-50/50">
-              <div className="overflow-x-auto">
-                <Table>
+              <div className="overflow-x-auto custom-scrollbar">
+                <div className="min-w-[1000px]">
+                  <Table>
                   <TableHeader>
                     <TableRow className="hover:bg-transparent">
                       <TableHead className="w-[80px]">ID</TableHead>
@@ -502,7 +515,8 @@ export default function CompaniesPage() {
                       })
                     )}
                   </TableBody>
-                </Table>
+                  </Table>
+                </div>
               </div>
             </div>
             <div className="flex items-center justify-between mt-4 text-sm text-muted-foreground">

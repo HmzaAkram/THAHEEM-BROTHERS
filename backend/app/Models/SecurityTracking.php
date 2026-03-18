@@ -29,6 +29,8 @@ class SecurityTracking extends Model
         'status',
         'paid_by',
         'cheque_name',
+        'deposit_bank',
+        'attachment',
     ];
 
     protected $casts = [

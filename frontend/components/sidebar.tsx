@@ -15,6 +15,7 @@ import {
   ShieldCheck,
   Database,
   MessageSquare,
+  Receipt,
 } from 'lucide-react';
 import { useState } from 'react';
 import { Button } from '@/components/ui/button';
@@ -29,13 +30,14 @@ interface SidebarProps {
 
 export function Sidebar({ user, onLogout }: SidebarProps) {
   const role = user?.role.toLowerCase() || 'user';
-  const [isOpen, setIsOpen] = useState(true);
+  const [isOpen, setIsOpen] = useState(false);
   const pathname = usePathname();
 
   const adminLinks = [
     { href: '/admin/dashboard', label: 'Dashboard', icon: BarChart3 },
     { href: '/admin/companies', label: 'Companies', icon: Building2 },
     { href: '/admin/bills', label: 'Bills', icon: FileText },
+    { href: '/admin/sale-tax', label: 'Sale Tax (SRB)', icon: Receipt },
     { href: '/admin/payments', label: 'Payments', icon: CreditCard },
     { href: '/admin/ledger', label: 'Ledger', icon: BookOpen },
     { href: '/admin/reports', label: 'Reports', icon: FileBarChart },
@@ -56,13 +58,15 @@ export function Sidebar({ user, onLogout }: SidebarProps) {
 
   return (
     <>
-      <div className="lg:hidden fixed top-0 left-0 z-50 p-4">
+      {/* Mobile Menu Toggle - Improved positioning and visibility */}
+      <div className="lg:hidden fixed top-0 left-0 z-[60] p-4">
         <Button
-          variant="ghost"
+          variant="secondary"
           size="icon"
           onClick={() => setIsOpen(!isOpen)}
+          className="shadow-lg bg-slate-900 border-slate-700 text-white hover:bg-slate-800 transition-all rounded-xl w-10 h-10 ring-2 ring-primary/20"
         >
-          {isOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
+          {isOpen ? <X className="w-5 h-5 shadow-sm" /> : <Menu className="w-5 h-5 shadow-sm" />}
         </Button>
       </div>
 

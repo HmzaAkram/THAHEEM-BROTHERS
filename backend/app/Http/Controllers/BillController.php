@@ -200,8 +200,9 @@ class BillController extends Controller
         $extension = 'pdf';
         $fileName = 'bill_' . \Illuminate\Support\Str::uuid() . '.' . $extension;
         \Illuminate\Support\Facades\Storage::disk('public')->put('attachments/' . $fileName, $decodedData);
-        $url = \Illuminate\Support\Facades\Storage::url('attachments/' . $fileName);
-        return str_starts_with($url, 'http') ? $url : config('app.url') . $url;
+        // Force the URL to use our new API fallback route
+        $url = '/api/v1/storage/attachments/' . $fileName;
+        return config('app.url') . $url;
     }
 
     public function update(Request $request, Bill $bill)
@@ -339,7 +340,7 @@ class BillController extends Controller
         }
 
         $validated = $request->validate([
-            'status' => 'required|in:Paid,Unpaid,Partial', // Or whatever statuses you allow
+            'status' => 'required|in:Paid,Unpaid,Partial,Draft', // Or whatever statuses you allow
         ]);
 
         $bill->update(['status' => $validated['status']]);

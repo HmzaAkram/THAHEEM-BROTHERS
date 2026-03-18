@@ -17,6 +17,7 @@ class Company extends Authenticatable
         'address',
         'city',
         'ntn',
+        'sale_tax_no',
         'username',
         'opening_balance',
         'status',

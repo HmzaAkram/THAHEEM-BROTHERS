@@ -170,6 +170,14 @@ function CompanyDetailsContent() {
                                             />
                                         </div>
                                         <div>
+                                            <Label>Sale Tax No</Label>
+                                            <Input
+                                                value={editedCompany.saleTaxNo || ''}
+                                                onChange={(e) => setEditedCompany({ ...editedCompany, saleTaxNo: e.target.value })}
+                                                placeholder="Enter Sale Tax No"
+                                            />
+                                        </div>
+                                        <div>
                                             <Label>Company Email</Label>
                                             <Input
                                                 value={editedCompany.email}
@@ -191,11 +199,11 @@ function CompanyDetailsContent() {
                                             />
                                         </div>
                                         <div>
-                                            <Label>Username</Label>
+                                            <Label>Name</Label>
                                             <Input
                                                 value={editedCompany.username || ''}
                                                 onChange={(e) => setEditedCompany({ ...editedCompany, username: e.target.value })}
-                                                placeholder="Login username"
+                                                placeholder="Name"
                                             />
                                         </div>
                                         <div>
@@ -242,6 +250,11 @@ function CompanyDetailsContent() {
                                                 </div>
                                             </>
                                         )}
+                                        <Separator />
+                                        <div className="space-y-1">
+                                            <p className="text-xs text-muted-foreground uppercase tracking-wider">Sale Tax No</p>
+                                            <p className="font-medium">{company.saleTaxNo || 'N/A'}</p>
+                                        </div>
                                         <Separator />
                                         <div className="space-y-1">
                                             <p className="text-xs text-muted-foreground uppercase tracking-wider">Company Email</p>

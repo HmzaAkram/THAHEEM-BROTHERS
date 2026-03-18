@@ -41,9 +41,18 @@ class SecurityController extends Controller
             'pay_order_no' => 'nullable|string',
             'paid_by' => 'nullable|string',
             'cheque_name' => 'nullable|string',
+            'deposit_bank' => 'nullable|string',
+            'attachment' => 'nullable|file|mimes:jpeg,png,jpg,pdf|max:2048',
         ]);
 
         $validated['total_amount'] = $validated['no_of_containers'] * $validated['amount_per_container'];
+
+        if ($request->hasFile('attachment')) {
+            $path = $request->file('attachment')->store('securities', 'public');
+            $validated['attachment'] = $path;
+        } else {
+            unset($validated['attachment']);
+        }
 
         $security = SecurityTracking::create($validated);
         return response()->json($security, 201);
@@ -68,7 +77,24 @@ class SecurityController extends Controller
             'refund_days' => 'nullable|integer',
             'paid_by' => 'nullable|string',
             'cheque_name' => 'nullable|string',
+            'deposit_bank' => 'nullable|string',
+            'attachment' => 'nullable|file|mimes:jpeg,png,jpg,pdf|max:2048',
         ]);
+
+        if ($request->hasFile('attachment')) {
+            $path = $request->file('attachment')->store('securities', 'public');
+            $validated['attachment'] = $path;
+        } else {
+            unset($validated['attachment']);
+        }
+
+        // Convert string booleans from FormData if necessary
+        if (isset($validated['is_document_submitted'])) {
+            $validated['is_document_submitted'] = filter_var($validated['is_document_submitted'], FILTER_VALIDATE_BOOLEAN);
+        }
+        if (isset($validated['is_refund_received'])) {
+            $validated['is_refund_received'] = filter_var($validated['is_refund_received'], FILTER_VALIDATE_BOOLEAN);
+        }
 
         $security->update($validated);
         return response()->json($security);

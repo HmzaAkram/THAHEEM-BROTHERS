@@ -581,37 +581,44 @@ export default function PaymentsPage() {
       relevantPayments = relevantPayments.filter(p => new Date(p.date) >= startDate);
     }
 
-    const totalBill = relevantBills.reduce((sum, b) => sum + (Number(b.grandTotal) || 0), 0);
-    const paid = relevantBills.reduce((sum, b) => sum + (Number(b.advancePayment) || 0), 0) +
-      relevantPayments.reduce((sum, p) => sum + (Number(p.amount) || 0) + (Number(p.adjustment) || 0), 0);
-    const totalBalance = totalBill - paid;
+    const totalOpeningBalance = relevantBills.length > 0 || relevantPayments.length > 0
+      ? companies
+        .filter(c => companyFilter === 'all' || String(c.id) === companyFilter)
+        .reduce((sum, c) => sum + (Number(c.openingBalance) || 0), 0)
+      : 0;
 
-    return { collected, adjustment, totalBill, totalBalance };
-  }, [filteredPayments, bills, payments, companyFilter, timeFilter]);
+    const totalBill = relevantBills.reduce((sum, b) => sum + (Number(b.grandTotal) || 0), 0) + totalOpeningBalance;
+    const totalAdvances = relevantBills.reduce((sum, b) => sum + (Number(b.advancePayment) || 0), 0);
+    const overallReceived = totalAdvances + relevantPayments.reduce((sum, p) => sum + (Number(p.amount) || 0) + (Number(p.adjustment) || 0), 0);
+    const totalBalance = totalBill - overallReceived;
+
+    return { collected: overallReceived, adjustment, totalBill, totalBalance };
+  }, [filteredPayments, bills, payments, companies, companyFilter, timeFilter]);
 
   return (
     <DashboardLayout>
       <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
-        <div className="flex items-center justify-between">
-          <div>
+        <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+          <div className="w-full md:w-auto">
             <h1 className="text-3xl font-bold text-foreground">Payments</h1>
-            <p className="text-muted-foreground mt-1">
+            <p className="text-muted-foreground mt-1 text-sm">
               Record and track received payments.
             </p>
           </div>
-          <div className="flex items-center gap-3">
+          <div className="flex flex-col sm:flex-row items-center gap-3 w-full md:w-auto">
             <Button
               variant="outline"
-              className="gap-2 border-slate-200 h-10 px-4 rounded-xl text-xs font-bold uppercase tracking-widest hover:bg-slate-50"
+              className="gap-2 border-slate-200 h-10 px-4 rounded-xl text-xs font-bold uppercase tracking-widest hover:bg-slate-50 w-full sm:w-auto"
               onClick={handleExportPDF}
             >
               <Download className="w-4 h-4" />
-              Download History (PDF)
+              <span className="hidden sm:inline">Download History (PDF)</span>
+              <span className="sm:hidden">Download PDF</span>
             </Button>
             <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
               <DialogTrigger asChild>
                 <Button
-                  className="gap-2 shadow-md bg-green-600 hover:bg-green-700"
+                  className="gap-2 shadow-md bg-green-600 hover:bg-green-700 w-full sm:w-auto"
                   onClick={() => {
                     setEditingPayment(null);
                     setCompanyId('');
@@ -867,44 +874,46 @@ export default function PaymentsPage() {
         <Card className="shadow-md border-border/50">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-7">
             <CardTitle>Transaction History</CardTitle>
-            <div className="flex flex-wrap gap-3">
+            <div className="flex flex-col lg:flex-row items-stretch lg:items-center gap-4 w-full">
               {/* Search Bar */}
-              <div className="relative w-64">
+              <div className="relative w-full lg:w-64">
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                 <Input
                   placeholder="Search by Ref, Company, Method..."
-                  className="pl-9 bg-muted/20 border-border/50 h-9 text-xs"
+                  className="pl-9 bg-muted/20 border-border/50 h-9 text-xs w-full"
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
                 />
               </div>
 
-              {/* Company Select */}
-              <CompanySelect
-                companies={companies}
-                value={companyFilter}
-                onValueChange={setCompanyFilter}
-                showAllOption
-                placeholder="All Companies"
-                className="w-[200px] h-9 bg-muted/20 border-border/50 text-xs"
-              />
+              <div className="flex flex-col sm:flex-row items-center gap-3 w-full lg:w-auto">
+                {/* Company Select */}
+                <CompanySelect
+                  companies={companies}
+                  value={companyFilter}
+                  onValueChange={setCompanyFilter}
+                  showAllOption
+                  placeholder="All Companies"
+                  className="w-full sm:w-[200px] h-9 bg-muted/20 border-border/50 text-xs"
+                />
 
-              {/* Time Filter Select */}
-              <Select value={timeFilter} onValueChange={(v: any) => setTimeFilter(v)}>
-                <SelectTrigger className="w-[140px] h-9 bg-muted/20 border-border/50 text-xs">
-                  <div className="flex items-center gap-2">
-                    <Filter className="h-3 w-3" />
-                    <SelectValue placeholder="Overall" />
-                  </div>
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="overall">Overall</SelectItem>
-                  <SelectItem value="monthly">This Month</SelectItem>
-                  <SelectItem value="3months">Last 3 Months</SelectItem>
-                  <SelectItem value="6months">Last 6 Months</SelectItem>
-                  <SelectItem value="yearly">This Year</SelectItem>
-                </SelectContent>
-              </Select>
+                {/* Time Filter Select */}
+                <Select value={timeFilter} onValueChange={(v: any) => setTimeFilter(v)}>
+                  <SelectTrigger className="w-full sm:w-[140px] h-9 bg-muted/20 border-border/50 text-xs text-left">
+                    <div className="flex items-center gap-2">
+                      <Filter className="h-3 w-3" />
+                      <SelectValue placeholder="Overall" />
+                    </div>
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="overall">Overall</SelectItem>
+                    <SelectItem value="monthly">This Month</SelectItem>
+                    <SelectItem value="3months">Last 3 Months</SelectItem>
+                    <SelectItem value="6months">Last 6 Months</SelectItem>
+                    <SelectItem value="yearly">This Year</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
             </div>
           </CardHeader>
           <CardContent>
@@ -913,8 +922,9 @@ export default function PaymentsPage() {
                 No payments recorded yet.
               </div>
             ) : (
-              <div className="overflow-x-auto">
-                <Table>
+              <div className="overflow-x-auto custom-scrollbar">
+                <div className="min-w-[1200px]">
+                  <Table>
                   <TableHeader>
                     <TableRow className="bg-secondary/50">
                       <TableHead>Date</TableHead>
@@ -1007,17 +1017,19 @@ export default function PaymentsPage() {
                   </TableBody>
                 </Table>
               </div>
-            )}
+            </div>
+          )}
 
             {/* Filtering Summary / Totals */}
             <div className="mt-8 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 border-t pt-8">
               <div className="bg-muted/30 p-4 rounded-2xl border border-border/50 flex items-center justify-between hover:bg-muted/50 transition-colors">
                 <div className="space-y-1">
-                  <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Filtered Collections</p>
-                  <p className="text-xl font-black text-green-600 dark:text-green-400 font-mono">{formatCurrency(tableTotals.collected)}</p>
+                  <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Overall Bill Amount</p>
+                  <p className="text-xl font-black text-blue-600 dark:text-blue-400 font-mono">{formatCurrency(tableTotals.totalBill)}</p>
+                  <p className="text-[9px] text-muted-foreground opacity-70">Incl. Opening Balance</p>
                 </div>
-                <div className="w-10 h-10 rounded-full bg-green-500/10 flex items-center justify-center">
-                  <DollarSign className="w-5 h-5 text-green-600 dark:text-green-400" />
+                <div className="w-10 h-10 rounded-full bg-blue-500/10 flex items-center justify-center">
+                  <FileText className="w-5 h-5 text-blue-600 dark:text-blue-400" />
                 </div>
               </div>
               <div className="bg-muted/30 p-4 rounded-2xl border border-border/50 flex items-center justify-between hover:bg-muted/50 transition-colors">
@@ -1031,19 +1043,21 @@ export default function PaymentsPage() {
               </div>
               <div className="bg-muted/30 p-4 rounded-2xl border border-border/50 flex items-center justify-between hover:bg-muted/50 transition-colors">
                 <div className="space-y-1">
-                  <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Filtered Total Bill</p>
-                  <p className="text-xl font-black text-blue-600 dark:text-blue-400 font-mono">{formatCurrency(tableTotals.totalBill)}</p>
+                  <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Total Received Amount</p>
+                  <p className="text-xl font-black text-green-600 dark:text-green-400 font-mono">{formatCurrency(tableTotals.collected)}</p>
+                  <p className="text-[9px] text-muted-foreground opacity-70">Incl. Advance & Adjustments</p>
                 </div>
-                <div className="w-10 h-10 rounded-full bg-blue-500/10 flex items-center justify-center">
-                  <FileText className="w-5 h-5 text-blue-600 dark:text-blue-400" />
+                <div className="w-10 h-10 rounded-full bg-green-500/10 flex items-center justify-center">
+                  <DollarSign className="w-5 h-5 text-green-600 dark:text-green-400" />
                 </div>
               </div>
               <div className="bg-muted/30 p-4 rounded-2xl border border-border/50 flex items-center justify-between hover:bg-muted/50 transition-colors">
                 <div className="space-y-1">
-                  <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Filtered Balance</p>
+                  <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Remaining Balance</p>
                   <p className={`text-xl font-black font-mono ${tableTotals.totalBalance > 0 ? 'text-rose-600 dark:text-rose-400' : 'text-slate-600 dark:text-slate-400'}`}>
                     {formatCurrency(tableTotals.totalBalance)}
                   </p>
+                  <p className="text-[9px] text-muted-foreground opacity-70">Overall Balance to Date</p>
                 </div>
                 <div className={`w-10 h-10 rounded-full flex items-center justify-center ${tableTotals.totalBalance > 0 ? 'bg-rose-500/10' : 'bg-slate-500/10'}`}>
                   <Scale className={`w-5 h-5 ${tableTotals.totalBalance > 0 ? 'text-rose-600 dark:text-rose-400' : 'text-slate-600 dark:text-slate-400'}`} />

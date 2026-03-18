@@ -5,6 +5,7 @@ import { DashboardCard } from '@/components/dashboard-card';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { useData } from '@/context/data-context';
+import Link from 'next/link';
 import {
   Select,
   SelectContent,
@@ -104,9 +105,9 @@ export default function AdminDashboard() {
       startDate.setFullYear(now.getFullYear() - 1); // Last 365 days
     }
 
-    const filteredBills = startDate
+    const filteredBills = (startDate
       ? bills.filter(b => new Date(b.createdAt) >= startDate!)
-      : bills;
+      : bills).filter(b => b.status !== 'Draft');
 
     const filteredPayments = startDate
       ? payments.filter(p => new Date(p.createdAt) >= startDate!)
@@ -116,7 +117,10 @@ export default function AdminDashboard() {
       ? companies.filter(c => new Date(c.createdAt) >= startDate!)
       : companies;
 
-    const totalBilled = filteredBills.reduce((sum, bill) => sum + (Number(bill.grandTotal) || 0), 0);
+    const totalBilled = 
+      filteredBills.reduce((sum, bill) => sum + (Number(bill.grandTotal) || 0), 0) + 
+      (filterType === 'overall' ? companies.reduce((sum, c) => sum + (Number(c.openingBalance) || 0), 0) : 0);
+
     const totalCollected =
       filteredBills.reduce((sum, bill) => sum + (Number(bill.advancePayment) || 0), 0) +
       filteredPayments.reduce((sum, payment) => sum + (Number(payment.amount) || 0) + (Number(payment.adjustment) || 0), 0);
@@ -146,6 +150,7 @@ export default function AdminDashboard() {
     }
 
     bills.forEach(bill => {
+      if (bill.status === 'Draft') return;
       const billDate = new Date(bill.date);
       const monthData = months.find(m => m.monthIndex === billDate.getMonth() && m.year === billDate.getFullYear());
       if (monthData) {
@@ -213,7 +218,7 @@ export default function AdminDashboard() {
 
   const companyFinancials = useMemo(() => {
     return companies.map(company => {
-      const companyBills = bills.filter(b => String(b.companyId) === String(company.id));
+      const companyBills = bills.filter(b => String(b.companyId) === String(company.id) && b.status !== 'Draft');
       const companyPayments = payments.filter(p => String(p.companyId) === String(company.id));
 
       const debit = companyBills.reduce((sum, b) => sum + (Number(b.grandTotal) || 0), 0) + (Number(company.openingBalance) || 0);
@@ -569,35 +574,43 @@ export default function AdminDashboard() {
             </div>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-            <DashboardCard
-              title={filterType === 'overall' ? "Total Companies" : "New Companies"}
-              value={filteredStats.activeCompanies.toString()}
-              icon={Users}
-              change={filterLabel}
-              changeType="neutral"
-            />
-            <DashboardCard
-              title={filterType === 'overall' ? "Total Billed" : "Billed"}
-              value={formatCurrency(filteredStats.totalBilled)}
-              icon={FileText}
-              change={filterLabel}
-              changeType="neutral"
-            />
-            <DashboardCard
-              title={filterType === 'overall' ? "Total Collected" : "Collected"}
-              value={formatCurrency(filteredStats.totalCollected)}
-              icon={CreditCard}
-              change={filterLabel}
-              changeType="positive"
-            />
-            <DashboardCard
-              title={filterType === 'overall' ? "Outstanding Balance" : "Outstanding"}
-              value={formatCurrency(filteredStats.outstanding)}
-              icon={DollarSign}
-              change={filterLabel}
-              changeType={filteredStats.outstanding > 0 ? "negative" : "positive"}
-            />
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 md:gap-6">
+            <Link href="/admin/companies" className="block h-full cursor-pointer">
+              <DashboardCard
+                title={filterType === 'overall' ? "Total Companies" : "New Companies"}
+                value={filteredStats.activeCompanies.toString()}
+                icon={Users}
+                change={filterLabel}
+                changeType="neutral"
+              />
+            </Link>
+            <Link href="/admin/bills" className="block h-full cursor-pointer">
+              <DashboardCard
+                title={filterType === 'overall' ? "Total Billed" : "Billed"}
+                value={formatCurrency(filteredStats.totalBilled)}
+                icon={FileText}
+                change={filterLabel}
+                changeType="neutral"
+              />
+            </Link>
+            <Link href="/admin/payments" className="block h-full cursor-pointer">
+              <DashboardCard
+                title={filterType === 'overall' ? "Total Collected" : "Collected"}
+                value={formatCurrency(filteredStats.totalCollected)}
+                icon={CreditCard}
+                change={filterLabel}
+                changeType="positive"
+              />
+            </Link>
+            <Link href="/admin/reports" className="block h-full cursor-pointer">
+              <DashboardCard
+                title={filterType === 'overall' ? "Outstanding Balance" : "Outstanding"}
+                value={formatCurrency(filteredStats.outstanding)}
+                icon={DollarSign}
+                change={filterLabel}
+                changeType={filteredStats.outstanding > 0 ? "negative" : "positive"}
+              />
+            </Link>
           </div>
 
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
@@ -622,8 +635,9 @@ export default function AdminDashboard() {
                   </div>
                 </div>
               </CardHeader>
-              <CardContent className="flex-1 p-0 overflow-auto">
-                <div className="min-w-[600px]">
+              <CardContent className="flex-1 p-0 overflow-hidden">
+                <div className="overflow-x-auto custom-scrollbar">
+                  <div className="min-w-[700px]">
                   <Table>
                     <TableHeader className="bg-muted/30 sticky top-0 z-10">
                       <TableRow className="hover:bg-transparent border-b-0">
@@ -683,8 +697,9 @@ export default function AdminDashboard() {
                     </TableBody>
                   </Table>
                 </div>
-              </CardContent>
-            </Card>
+              </div>
+            </CardContent>
+          </Card>
 
             <Card className="shadow-xl border-0 bg-white/50 dark:bg-slate-900/50 backdrop-blur-md ring-1 ring-black/5 dark:ring-white/10 flex flex-col h-[600px]">
               <CardHeader className="pb-2 border-b border-border/50">

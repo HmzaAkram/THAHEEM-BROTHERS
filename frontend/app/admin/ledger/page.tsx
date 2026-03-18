@@ -69,7 +69,7 @@ export default function LedgerPage() {
         id: `bill_${bill.id}`,
         date: bill.date,
         type: 'BILL',
-        description: bill.description || `Job #${bill.jobNumber || 'N/A'}`,
+        description: (bill as any).description || `Job #${bill.jobNumber || 'N/A'}`,
         companyName: bill.companyName,
         jobNumber: bill.jobNumber,
         debit: debitAmount,
@@ -151,11 +151,21 @@ export default function LedgerPage() {
       return { ...entry, balance: running };
     });
 
-    return { ledgerData: dataWithBalance, openingBalance: openingBal };
+    // Calculate Remaining Opening Balance (Lifecycle total)
+    const clearedOpeningBal = companyPayments
+      .filter(p => !p.billId)
+      .reduce((sum, p) => sum + Number(p.amount || 0), 0);
+    const remainingOpeningBalance = Math.max(0, baseOpeningBal - clearedOpeningBal);
+
+    // Attach remainingOpeningBalance to the array so we can access it in the UI easily
+    const result: any = [...dataWithBalance];
+    result.remainingOpeningBalance = remainingOpeningBalance;
+
+    return { ledgerData: result, openingBalance: openingBal, remainingOpeningBalance };
   }, [selectedCompanyId, companies, bills, payments, startDate, endDate]);
 
   const totals = useMemo(() => {
-    return ledgerData.reduce((acc, item) => {
+    return ledgerData.reduce((acc: any, item: any) => {
       // Do not sum the explicit "Opening Balance" injected entry into "Total Billed" (debit), 
       // as it's already represented in the "Opening Balance" card.
       if (item.description === 'Opening Balance') return acc;
@@ -236,6 +246,26 @@ export default function LedgerPage() {
       }
 
       pdf.text(`Date Printed: ${formatDate(new Date().toISOString())}`, pageWidth - 14, yPos, { align: "right" });
+      
+      const { remainingOpeningBalance } = ledgerData.length > 0 ? (ledgerData[0] as any)._meta || { remainingOpeningBalance: 0 } : { remainingOpeningBalance: 0 }; 
+      // Note: I need to make sure remainingOpeningBalance is accessible here. 
+      // Actually, I'll just use the calculated one from the scope if possible, but handleExportPDF is outside useMemo.
+      // I'll calculate it again inside handleExportPDF for simplicity or pass it.
+      
+      // Better approach: Calculate it right here.
+      const companyPaymentsForPDF = selectedCompanyId === 'all' ? payments : payments.filter(p => String(p.companyId) === selectedCompanyId);
+      let baseOpeningBalPDF = 0;
+      if (selectedCompanyId === 'all') {
+        companies.forEach(c => baseOpeningBalPDF += (Number(c.openingBalance) || 0));
+      } else {
+        const comp = companies.find(c => String(c.id) === selectedCompanyId);
+        if (comp) baseOpeningBalPDF = (Number(comp.openingBalance) || 0);
+      }
+      const clearedOpeningBalPDF = companyPaymentsForPDF.filter(p => !p.billId).reduce((sum, p) => sum + Number(p.amount || 0), 0);
+      const remainingOpeningBalPDF = Math.max(0, baseOpeningBalPDF - clearedOpeningBalPDF);
+
+      pdf.text(`Opening Balance: ${formatCurrency(remainingOpeningBalPDF)}`, pageWidth - 14, yPos + 5, { align: "right" });
+      
       yPos += 12;
 
       // Prepare Table Data
@@ -257,7 +287,7 @@ export default function LedgerPage() {
       }
 
       // Map Ledger Data
-      const exportData = ledgerData.map(entry => {
+      const exportData = ledgerData.map((entry: any) => {
         let desc = entry.description;
         if (entry.type === 'PAYMENT') {
           desc = entry.method ? `Payment Received (${entry.method})` : 'Advance Received';
@@ -333,11 +363,25 @@ export default function LedgerPage() {
   return (
     <DashboardLayout>
       <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
-        <div>
-          <h1 className="text-3xl font-bold text-foreground">Summary</h1>
-          <p className="text-muted-foreground mt-1">
-            View transaction history and running balances.
-          </p>
+        <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+          <div className="w-full md:w-auto">
+            <h1 className="text-3xl font-bold text-foreground bg-clip-text text-transparent bg-gradient-to-r from-primary to-blue-600">
+              Company Ledger
+            </h1>
+            <p className="text-muted-foreground mt-1 text-sm">
+              View transaction history and running balances.
+            </p>
+          </div>
+          <div className="flex flex-col sm:flex-row gap-3 w-full md:w-auto">
+            <Button
+              variant="outline"
+              onClick={handleExportPDF}
+              className="w-full sm:w-auto gap-2 border-primary/20 hover:bg-primary/5 hover:border-primary/40 transition-all rounded-xl shadow-sm"
+            >
+              <Download className="w-4 h-4 text-primary" />
+              <span className="text-sm font-bold text-primary">Export PDF</span>
+            </Button>
+          </div>
         </div>
 
         {/* Report Style Filter Card */}
@@ -346,9 +390,8 @@ export default function LedgerPage() {
             <CardTitle className="text-base">Ledger Filters</CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
-            <div className="grid grid-cols-1 md:grid-cols-4 gap-4 items-end">
-              <div>
-                <Label className="text-sm font-medium mb-1.5 block">Select Client Company</Label>
+            <div className="flex flex-col lg:flex-row items-center gap-4 bg-background/50 p-4 rounded-xl border border-border/50">
+              <div className="w-full lg:w-64">
                 <CompanySelect
                   companies={companies}
                   value={selectedCompanyId}
@@ -358,31 +401,25 @@ export default function LedgerPage() {
                   className="w-full justify-between bg-white border-border/40 rounded-xl"
                 />
               </div>
-
-              <div>
-                <Label className="text-sm font-medium mb-1.5 block">From Date</Label>
-                <Input
-                  type="date"
-                  value={startDate}
-                  onChange={(e) => setStartDate(e.target.value)}
-                />
-              </div>
-
-              <div>
-                <Label className="text-sm font-medium mb-1.5 block">To Date</Label>
-                <Input
-                  type="date"
-                  value={endDate}
-                  onChange={(e) => setEndDate(e.target.value)}
-                />
-              </div>
-
-              <div className="flex gap-2">
-                <Button variant="outline" className="flex-1 gap-2 bg-transparent hover:bg-muted" onClick={handleExportPDF}>
-                  <Download className="w-4 h-4" />
-                  Export
-                </Button>
-
+              <div className="flex flex-col sm:flex-row flex-wrap gap-3 w-full lg:w-auto">
+                <div className="flex items-center gap-2 w-full sm:w-auto">
+                  <Label className="text-[10px] font-bold uppercase text-muted-foreground hidden lg:block">From</Label>
+                  <Input
+                    type="date"
+                    value={startDate}
+                    onChange={(e) => setStartDate(e.target.value)}
+                    className="h-10 flex-1 sm:w-40 bg-white"
+                  />
+                </div>
+                <div className="flex items-center gap-2 w-full sm:w-auto">
+                  <Label className="text-[10px] font-bold uppercase text-muted-foreground hidden lg:block">To</Label>
+                  <Input
+                    type="date"
+                    value={endDate}
+                    onChange={(e) => setEndDate(e.target.value)}
+                    className="h-10 flex-1 sm:w-40 bg-white"
+                  />
+                </div>
               </div>
             </div>
           </CardContent>
@@ -391,25 +428,27 @@ export default function LedgerPage() {
         {/* Ledger Table */}
         <Card className="shadow-md border-border/50">
           <CardContent ref={tableRef} className="pt-6">
-            <div className="rounded-md border bg-card overflow-x-auto">
-              <Table>
-                <TableHeader>
-                  <TableRow className="bg-muted/50">
-                    <TableHead className="w-[100px] text-xs">Date</TableHead>
-                    <TableHead className="w-[30px]"></TableHead>
-                    <TableHead className="min-w-[200px] text-xs">Description</TableHead>
-                    <TableHead className="w-[100px] text-xs">Job No</TableHead>
-                    <TableHead className="text-right text-destructive w-[100px] text-xs">Bill Total</TableHead>
-                    <TableHead className="text-right text-muted-foreground w-[90px] text-xs">Advance</TableHead>
-                    <TableHead className="text-right text-green-600 w-[90px] text-xs">Paid</TableHead>
-                    <TableHead className="text-right text-amber-600 w-[80px] text-xs">Adj.</TableHead>
-                    <TableHead className="text-right text-blue-600 w-[100px] text-xs">Outst.</TableHead>
-                    {selectedCompanyId !== 'all' && (
-                      <TableHead className="text-right font-bold bg-muted/30 w-[120px] text-xs">Balance</TableHead>
-                    )}
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
+            <div className="rounded-md border bg-card overflow-hidden">
+              <div className="overflow-x-auto custom-scrollbar">
+                <div className="min-w-[1100px]">
+                  <Table>
+                    <TableHeader>
+                      <TableRow className="bg-muted/50">
+                        <TableHead className="w-[100px] text-xs">Date</TableHead>
+                        <TableHead className="w-[30px]"></TableHead>
+                        <TableHead className="min-w-[200px] text-xs">Description</TableHead>
+                        <TableHead className="w-[100px] text-xs">Job No</TableHead>
+                        <TableHead className="text-right text-destructive w-[100px] text-xs">Bill Total</TableHead>
+                        <TableHead className="text-right text-muted-foreground w-[90px] text-xs">Advance</TableHead>
+                        <TableHead className="text-right text-green-600 w-[90px] text-xs">Paid</TableHead>
+                        <TableHead className="text-right text-amber-600 w-[80px] text-xs">Adj.</TableHead>
+                        <TableHead className="text-right text-blue-600 w-[100px] text-xs">Outst.</TableHead>
+                        {selectedCompanyId !== 'all' && (
+                          <TableHead className="text-right font-bold bg-muted/30 w-[120px] text-xs">Balance</TableHead>
+                        )}
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
                   {/* Opening Balance Row if filtered by date */}
                   {startDate && selectedCompanyId !== 'all' && (
                     <TableRow className="bg-muted/20">
@@ -432,7 +471,7 @@ export default function LedgerPage() {
                       </TableCell>
                     </TableRow>
                   ) : (
-                    ledgerData.map((entry) => (
+                    ledgerData.map((entry: any) => (
                       <React.Fragment key={entry.id}>
                         <TableRow className="hover:bg-muted/30 group">
                           {/* 1. Date */}
@@ -609,19 +648,28 @@ export default function LedgerPage() {
                       </React.Fragment>
                     ))
                   )}
-                </TableBody>
-              </Table>
+                    </TableBody>
+                  </Table>
+                </div>
+              </div>
             </div>
 
             {/* Bottom Summary Totals */}
             {ledgerData.length > 0 && (
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mt-8 pt-8 border-t">
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4 mt-8 pt-8 border-t">
                 <DashboardCard
                   title="Opening Balance"
                   value={formatCurrency(openingBalance)}
                   icon={Scale}
-                  change="Balance b/f"
+                  change={startDate ? "Balance b/f" : "Total Opening"}
                   changeType="neutral"
+                />
+                <DashboardCard
+                  title="Opening Balance"
+                  value={formatCurrency((ledgerData as any).remainingOpeningBalance || 0)}
+                  icon={ArrowDownCircle}
+                  change="Total Opening Balance"
+                  changeType={((ledgerData as any).remainingOpeningBalance || 0) > 0 ? "negative" : "positive"}
                 />
                 <DashboardCard
                   title="Total Billed"

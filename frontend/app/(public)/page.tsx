@@ -15,10 +15,10 @@ export default function HomePage() {
                 </div>
 
                 <div className="container relative z-20 px-4 text-center">
-                    <h1 className="text-4xl md:text-6xl font-extrabold tracking-tight text-white mb-6 animate-in slide-in-from-bottom-5 duration-700">
-                        Global Logistics <span className="text-primary">Partner</span>
+                    <h1 className="text-4xl sm:text-5xl md:text-7xl font-extrabold tracking-tighter text-white mb-6 animate-in slide-in-from-bottom-5 duration-700">
+                        Global Logistics <span className="text-primary bg-clip-text text-transparent bg-gradient-to-r from-blue-400 to-indigo-400">Partner</span>
                     </h1>
-                    <p className="text-lg md:text-xl text-slate-200 mb-8 max-w-2xl mx-auto animate-in slide-in-from-bottom-5 duration-1000 delay-200">
+                    <p className="text-base sm:text-lg md:text-xl text-slate-300 mb-10 max-w-3xl mx-auto animate-in slide-in-from-bottom-5 duration-1000 delay-200 leading-relaxed">
                         Pakistan's leading licensed customs brokerage and freight forwarding company, built on a decade of excellence and client trust.
                     </p>
                     <div className="flex flex-col sm:flex-row gap-4 justify-center animate-in zoom-in duration-1000 delay-300">
@@ -37,11 +37,12 @@ export default function HomePage() {
             </section>
 
             {/* Feature Section */}
-            <section className="py-24 bg-background">
-                <div className="container px-4">
-                    <div className="text-center max-w-3xl mx-auto mb-16">
-                        <h2 className="text-3xl font-bold mb-4">Why Choose Thaheem Brothers?</h2>
-                        <p className="text-muted-foreground">
+            <section className="py-20 md:py-32 bg-background relative overflow-hidden">
+                <div className="absolute top-0 right-0 w-[500px] h-[500px] bg-primary/5 rounded-full blur-[100px] -mr-64 -mt-64" />
+                <div className="container px-4 relative z-10">
+                    <div className="text-center max-w-3xl mx-auto mb-16 md:mb-24">
+                        <h2 className="text-3xl md:text-5xl font-extrabold mb-6 tracking-tight">Why Choose Thaheem Brothers?</h2>
+                        <p className="text-lg text-muted-foreground leading-relaxed">
                             We leverage decades of experience and a global network to ensure your cargo reaches its destination safely and on time.
                         </p>
                     </div>
@@ -92,18 +93,18 @@ export default function HomePage() {
             </section>
 
             {/* Stats Section */}
-            <section className="py-20 bg-primary/5">
+            <section className="py-20 bg-slate-50 dark:bg-slate-900/50 border-y border-border/50">
                 <div className="container px-4">
-                    <div className="grid grid-cols-2 lg:grid-cols-4 gap-8 text-center">
+                    <div className="grid grid-cols-2 lg:grid-cols-4 gap-8 md:gap-12 text-center">
                         {[
                             { label: "Years Experience", value: "10+" },
                             { label: "Global Partners", value: "50+" },
                             { label: "Happy Clients", value: "2000+" },
                             { label: "Customs Clearances", value: "15k+" }
                         ].map((stat, idx) => (
-                            <div key={idx}>
-                                <p className="text-4xl lg:text-5xl font-bold text-primary mb-2">{stat.value}</p>
-                                <p className="text-muted-foreground font-medium">{stat.label}</p>
+                            <div key={idx} className="space-y-2">
+                                <p className="text-4xl sm:text-5xl md:text-6xl font-black text-primary tracking-tighter">{stat.value}</p>
+                                <p className="text-xs sm:text-sm md:text-base text-muted-foreground font-black uppercase tracking-widest">{stat.label}</p>
                             </div>
                         ))}
                     </div>

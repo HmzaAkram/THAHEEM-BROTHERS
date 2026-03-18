@@ -12,7 +12,8 @@ import {
     AlertTriangle,
     CheckCircle2,
     Loader2,
-    History
+    History,
+    FileText
 } from 'lucide-react';
 import { useState, useRef } from 'react';
 import { useAuth } from '@/context/auth-context';
@@ -35,6 +36,7 @@ export default function BackupPage() {
     const [importLoading, setImportLoading] = useState(false);
     const [zipLoading, setZipLoading] = useState(false);
     const [zipProgressText, setZipProgressText] = useState('');
+    const [reportLoading, setReportLoading] = useState(false);
     const [selectedFile, setSelectedFile] = useState<File | null>(null);
 
     // State to mount the invoice template dynamically for capturing
@@ -98,6 +100,32 @@ export default function BackupPage() {
             return;
         }
 
+        const pinResult = await Swal.fire({
+            title: 'Enter Admin PIN',
+            text: 'Please enter the Admin PIN to authorize the database restore.',
+            input: 'password',
+            inputPlaceholder: 'Enter PIN',
+            inputAttributes: {
+                autocapitalize: 'off',
+                autocorrect: 'off'
+            },
+            showCancelButton: true,
+            confirmButtonColor: '#10b981',
+            cancelButtonColor: '#64748b',
+            confirmButtonText: 'Authorize',
+            preConfirm: (pin) => {
+                if (pin !== '036409') {
+                    Swal.showValidationMessage('Incorrect PIN. Authorization denied.');
+                    return false;
+                }
+                return true;
+            }
+        });
+
+        if (!pinResult.isConfirmed) {
+            return;
+        }
+
         setImportLoading(true);
         try {
             const token = localStorage.getItem('authToken');
@@ -156,7 +184,8 @@ export default function BackupPage() {
                 const company = companies[i];
                 setZipProgressText(`Processing Company: ${company.name} (${i + 1}/${companies.length})`);
 
-                const companyFolder = zip.folder(`${company.name}_${company.identifier}`);
+                const safeCompanyName = company.name.replace(/[^a-zA-Z0-9_-]/g, '_').replace(/_+/g, '_');
+                const companyFolder = zip.folder(`C${i + 1}_${safeCompanyName}`);
                 if (!companyFolder) continue;
 
                 // Pre-filter company specific data
@@ -380,11 +409,10 @@ export default function BackupPage() {
                 paymentDoc.text(`Date Printed: ${formatDate(new Date().toISOString())}`, pPageWidth - 14, yPosPayment, { align: "right" });
                 yPosPayment += 12;
 
-                // Sort by date desc for history
                 const sortedPayments = [...companyPayments].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
 
                 const paymentRows = sortedPayments.map(p => {
-                    const linkedBill = p.billId ? bills.find(b => b.id.toString() === p.billId.toString()) : null;
+                    const linkedBill = p.billId ? bills.find(b => String(b.id) === String(p.billId)) : null;
                     const cashPaid = Number(p.amount) || 0;
                     const adjustment = Number(p.adjustment) || 0;
                     const totalPaid = cashPaid + adjustment;
@@ -620,6 +648,292 @@ export default function BackupPage() {
         }
     };
 
+    const handleFullReportDownload = async () => {
+        setReportLoading(true);
+        try {
+            const doc = new jsPDF('l', 'mm', 'a4');
+            const pageWidth = doc.internal.pageSize.getWidth();
+
+            // Load logo
+            const img = new Image();
+            img.src = '/logo.jpeg';
+            await new Promise((resolve) => {
+                img.onload = resolve;
+                img.onerror = resolve;
+            });
+
+            let logoWidth = 0, logoHeight = 0;
+            if (img.width > 0) {
+                const maxLogoHeight = 20, maxLogoWidth = 60;
+                logoWidth = img.width;
+                logoHeight = img.height;
+                const ratio = Math.min(maxLogoWidth / logoWidth, maxLogoHeight / logoHeight);
+                logoWidth *= ratio;
+                logoHeight *= ratio;
+            }
+
+            // 1. GENERATE SUMMARY PAGE
+            const summaryData: any[] = [];
+            let grandOpening = 0;
+            let grandBilled = 0;
+            let grandReceived = 0;
+            let grandOutstanding = 0;
+            let grandBalance = 0;
+
+            companies.forEach(company => {
+                const companyBills = bills.filter(b => String(b.companyId) === String(company.id));
+                const companyPayments = payments.filter(p => String(p.companyId) === String(company.id));
+
+                const openingTableBal = Number(company.openingBalance) || 0;
+                const totalBilled = companyBills.reduce((sum, b) => sum + (Number(b.grandTotal) || 0), 0);
+                const totalReceived = companyBills.reduce((sum, b) => sum + (Number((b as any).advancePayment) || 0), 0) +
+                    companyPayments.reduce((sum, p) => sum + (Number(p.amount) || 0) + (Number(p.adjustment) || 0), 0);
+                const netOutstanding = totalBilled - totalReceived;
+                const netBalance = openingTableBal + netOutstanding;
+
+                summaryData.push([
+                    company.name,
+                    formatCurrency(openingTableBal),
+                    formatCurrency(totalBilled),
+                    formatCurrency(totalReceived),
+                    formatCurrency(netOutstanding),
+                    formatCurrency(netBalance)
+                ]);
+
+                grandOpening += openingTableBal;
+                grandBilled += totalBilled;
+                grandReceived += totalReceived;
+                grandOutstanding += netOutstanding;
+                grandBalance += netBalance;
+            });
+
+            // Header for Summary Page
+            if (logoWidth > 0) {
+                const maxLogoHeight = 16;
+                const maxLogoWidth = 16;
+                let newLogoWidth = logoWidth;
+                let newLogoHeight = logoHeight;
+                const ratio = Math.min(maxLogoWidth / newLogoWidth, maxLogoHeight / newLogoHeight);
+                newLogoWidth *= ratio;
+                newLogoHeight *= ratio;
+                doc.addImage(img, 'PNG', 14, 10, newLogoWidth, newLogoHeight);
+            }
+
+            doc.setTextColor(15, 23, 42);
+            doc.setFontSize(14);
+            doc.setFont("helvetica", "bold");
+            doc.text("THAHEEM BROTHERS", 34, 12);
+
+            doc.setTextColor(100, 116, 139);
+            doc.setFontSize(8);
+            doc.setFont("helvetica", "normal");
+            doc.text("Suite 23, 2nd Floor, R.K. Square Ext, Shahrah-e-Liaquat, Karachi", 34, 16);
+            doc.text("+92 21 32421347 | +92 300 2791780 | import.khi@hotmail.com", 34, 20);
+
+            doc.setDrawColor(226, 232, 240);
+            doc.setLineWidth(0.5);
+            doc.line(14, 29, pageWidth - 14, 29);
+
+            doc.setTextColor(15, 23, 42);
+            doc.setFontSize(16);
+            doc.setFont("helvetica", "bold");
+            doc.text("MASTER SUMMARY REPORT", pageWidth - 14, 27, { align: "right" });
+
+            doc.setFontSize(10);
+            doc.text(`Date Printed: ${formatDate(new Date().toISOString())}`, 14, 38);
+
+            autoTable(doc, {
+                startY: 44,
+                head: [['Company Name', 'Opening Balance', 'Total Billed', 'Total Received', 'Outstanding', 'Net Balance']],
+                body: [
+                    ...summaryData,
+                    [
+                        { content: 'GRAND TOTAL', styles: { fontStyle: 'bold', fillColor: [241, 245, 249] } },
+                        { content: formatCurrency(grandOpening), styles: { fontStyle: 'bold', fillColor: [241, 245, 249], halign: 'right' } },
+                        { content: formatCurrency(grandBilled), styles: { fontStyle: 'bold', fillColor: [241, 245, 249], halign: 'right' } },
+                        { content: formatCurrency(grandReceived), styles: { fontStyle: 'bold', fillColor: [241, 245, 249], halign: 'right' } },
+                        { content: formatCurrency(grandOutstanding), styles: { fontStyle: 'bold', fillColor: [241, 245, 249], halign: 'right' } },
+                        { content: formatCurrency(grandBalance), styles: { fontStyle: 'bold', fillColor: [241, 245, 249], halign: 'right' } }
+                    ]
+                ],
+                theme: 'grid',
+                headStyles: { fillColor: [15, 23, 42], textColor: [255, 255, 255], fontStyle: 'bold' },
+                styles: { fontSize: 9, cellPadding: 3 },
+                columnStyles: {
+                    1: { halign: 'right' },
+                    2: { halign: 'right' },
+                    3: { halign: 'right' },
+                    4: { halign: 'right' },
+                    5: { halign: 'right', fontStyle: 'bold' }
+                }
+            });
+
+            // 2. INDIVIDUAL COMPANY PAGES
+            for (let i = 0; i < companies.length; i++) {
+                const company = companies[i];
+                doc.addPage('a4', 'l');
+
+                // Header logic
+                if (logoWidth > 0) {
+                    const maxLogoHeight = 16;
+                    const maxLogoWidth = 16;
+                    let newLogoWidth = logoWidth;
+                    let newLogoHeight = logoHeight;
+                    const ratio = Math.min(maxLogoWidth / newLogoWidth, maxLogoHeight / newLogoHeight);
+                    newLogoWidth *= ratio;
+                    newLogoHeight *= ratio;
+                    doc.addImage(img, 'PNG', 14, 10, newLogoWidth, newLogoHeight);
+                }
+
+                doc.setTextColor(15, 23, 42);
+                doc.setFontSize(14);
+                doc.setFont("helvetica", "bold");
+                doc.text("THAHEEM BROTHERS", 34, 12);
+
+                doc.setTextColor(100, 116, 139);
+                doc.setFontSize(8);
+                doc.setFont("helvetica", "normal");
+                doc.text("Suite 23, 2nd Floor, R.K. Square Ext, Shahrah-e-Liaquat, Karachi", 34, 16);
+                doc.text("+92 21 32421347 | +92 300 2791780 | import.khi@hotmail.com", 34, 20);
+
+                doc.setDrawColor(226, 232, 240);
+                doc.setLineWidth(0.5);
+                doc.line(14, 29, pageWidth - 14, 29);
+
+                doc.setTextColor(15, 23, 42);
+                doc.setFontSize(16);
+                doc.setFont("helvetica", "bold");
+                doc.text("MASTER LEDGER REPORT", pageWidth - 14, 27, { align: "right" });
+
+                let yPos = 36;
+                doc.setFontSize(11);
+                doc.setFont("helvetica", "bold");
+                doc.text(`Company: ${company.name}`, 14, yPos);
+                doc.text(`ID: ${company.identifier || 'N/A'}`, pageWidth - 14, yPos, { align: "right" });
+
+                doc.setFontSize(9);
+                doc.setFont("helvetica", "normal");
+                doc.setTextColor(100, 116, 139);
+                doc.text(`Date Printed: ${formatDate(new Date().toISOString())}`, 14, yPos + 5);
+                yPos += 12;
+
+                // Consolidate Data
+                const companyBills = bills.filter(b => String(b.companyId) === String(company.id));
+                const companyPayments = payments.filter(p => String(p.companyId) === String(company.id));
+                let consolidated: any[] = [];
+
+                companyBills.forEach(bill => {
+                    const linkedPayments = payments.filter(p => String(p.billId) === String(bill.id));
+                    const totalPaid = linkedPayments.reduce((sum, p) => sum + Number(p.amount || 0), 0);
+                    const totalAdjustment = linkedPayments.reduce((sum, p) => sum + Number(p.adjustment || 0), 0);
+                    const debitAmount = bill.grandTotal || bill.totalAmount || 0;
+                    const advanceAmount = bill.advancePayment || 0;
+
+                    consolidated.push({
+                        date: bill.date,
+                        type: 'BILL',
+                        description: (bill as any).description || `Job #${bill.jobNumber || 'N/A'}`,
+                        jobNumber: bill.jobNumber,
+                        debit: debitAmount,
+                        advance: advanceAmount,
+                        paid: totalPaid,
+                        adjustment: totalAdjustment,
+                        credit: advanceAmount + totalPaid + totalAdjustment,
+                    });
+                });
+
+                companyPayments.forEach(p => {
+                    if (!p.billId) {
+                        consolidated.push({
+                            date: p.date,
+                            type: 'PAYMENT',
+                            description: p.description ? `Payment: ${p.description}` : 'Payment Received',
+                            jobNumber: null,
+                            debit: 0,
+                            advance: 0,
+                            paid: Number(p.amount || 0),
+                            adjustment: Number(p.adjustment || 0),
+                            credit: Number(p.amount || 0) + Number(p.adjustment || 0),
+                            method: p.method,
+                            paymentRef: p.reference,
+                        });
+                    }
+                });
+
+                consolidated.sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+
+                let openingBal = Number(company.openingBalance) || 0;
+                let running = openingBal;
+                const tableRows = consolidated.map(entry => {
+                    let desc = entry.description;
+                    if (entry.type === 'PAYMENT') {
+                        desc = entry.method ? `Payment Received (${entry.method})` : 'Advance Received';
+                        if (entry.paymentRef) desc += ` - Ref: ${entry.paymentRef}`;
+                    }
+                    const entryOutstanding = entry.debit - entry.credit;
+                    running += (entry.debit - entry.credit);
+                    return [
+                        formatDate(entry.date),
+                        desc,
+                        entry.jobNumber || '-',
+                        entry.debit > 0 ? formatCurrency(entry.debit) : '-',
+                        entry.advance > 0 ? formatCurrency(entry.advance) : '-',
+                        entry.paid > 0 ? formatCurrency(entry.paid) : '-',
+                        entry.adjustment > 0 ? formatCurrency(entry.adjustment) : '-',
+                        entryOutstanding !== 0 ? formatCurrency(entryOutstanding) : '-',
+                        formatCurrency(running)
+                    ];
+                });
+
+                tableRows.unshift([
+                    '-',
+                    'Opening Balance b/f',
+                    '-',
+                    '-',
+                    '-',
+                    '-',
+                    '-',
+                    formatCurrency(openingBal)
+                ]);
+
+                autoTable(doc, {
+                    startY: yPos,
+                    head: [['Date', 'Description', 'Job No', 'Bill Total', 'Advance', 'Paid', 'Adj.', 'Outst.', 'Balance']],
+                    body: tableRows,
+                    theme: 'grid',
+                    headStyles: { fillColor: [15, 23, 42], textColor: [255, 255, 255], fontStyle: 'bold' },
+                    styles: { fontSize: 8, cellPadding: 2 },
+                    columnStyles: {
+                        3: { halign: 'right' },
+                        4: { halign: 'right' },
+                        5: { halign: 'right' },
+                        6: { halign: 'right' },
+                        7: { halign: 'right' },
+                        8: { halign: 'right', fontStyle: 'bold' }
+                    },
+                    margin: { left: 14, right: 14 },
+                    didParseCell: function (data) {
+                        if (data.section === 'body' && data.column.index === 8) {
+                            const val = parseFloat((data.cell.text[0] || '').replace(/[^0-9.-]/g, ''));
+                            if (!isNaN(val)) {
+                                if (val > 0) data.cell.styles.textColor = [220, 38, 38];
+                                else if (val <= 0) data.cell.styles.textColor = [0, 128, 0];
+                            }
+                        }
+                    }
+                });
+            }
+
+            doc.save(`Thaheem_Brothers_Master_Backup_${new Date().toISOString().split('T')[0]}.pdf`);
+            Swal.fire({ title: 'Success!', text: 'Master Backup PDF generated successfully!', icon: 'success', confirmButtonColor: '#10b981' });
+        } catch (error) {
+            console.error(error);
+            Swal.fire({ title: 'Error', text: 'Failed to generate Master PDF.', icon: 'error', confirmButtonColor: '#3b82f6' });
+        } finally {
+            setReportLoading(false);
+        }
+    };
+
     return (
         <DashboardLayout>
             <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-700">
@@ -674,7 +988,7 @@ export default function BackupPage() {
                                 </div>
                                 <div>
                                     <CardTitle className="text-xl font-bold">ZIP Backup</CardTitle>
-                                    <CardDescription>All Companies & Invoices.</CardDescription>
+                                    <CardDescription>Separate PDFs in ZIP.</CardDescription>
                                 </div>
                             </div>
                         </CardHeader>
@@ -682,15 +996,43 @@ export default function BackupPage() {
                             <div className="rounded-2xl border-2 border-dashed border-amber-200 dark:border-amber-800 p-6 flex flex-col items-center justify-center text-center space-y-4 bg-amber-50/20 dark:bg-amber-900/5 hover:bg-amber-50/40 transition-colors group h-48">
                                 <Button
                                     onClick={handleZipExport}
-                                    disabled={zipLoading || exportLoading}
+                                    disabled={zipLoading || exportLoading || reportLoading}
                                     className="w-full h-12 gap-2 font-black shadow-lg shadow-amber-500/20 bg-amber-600 hover:bg-amber-700 text-white border-0"
                                 >
                                     {zipLoading ? <Loader2 className="w-5 h-5 animate-spin" /> : <Download className="w-5 h-5" />}
                                     Download ZIP
                                 </Button>
                                 <p className="text-xs text-muted-foreground">
-                                    {zipLoading ? zipProgressText || 'Compressing...' : 'Includes individual PDF files.'}
+                                    {zipLoading ? zipProgressText || 'Compressing...' : 'Includes individual job folders.'}
                                 </p>
+                            </div>
+                        </CardContent>
+                    </Card>
+
+                    {/* Master PDF Report */}
+                    <Card className="shadow-xl border-primary/5 bg-white/50 dark:bg-slate-900/50 backdrop-blur-sm ring-1 ring-black/5">
+                        <CardHeader className="pb-4">
+                            <div className="flex items-center gap-3 mb-2">
+                                <div className="p-3 bg-emerald-100 dark:bg-emerald-900/30 rounded-2xl text-emerald-600 shadow-sm transition-transform hover:scale-110">
+                                    <FileText className="w-6 h-6" />
+                                </div>
+                                <div>
+                                    <CardTitle className="text-xl font-bold">Master PDF</CardTitle>
+                                    <CardDescription>Consolidated Backup Report.</CardDescription>
+                                </div>
+                            </div>
+                        </CardHeader>
+                        <CardContent className="space-y-6">
+                            <div className="rounded-2xl border-2 border-dashed border-emerald-200 dark:border-emerald-800 p-6 flex flex-col items-center justify-center text-center space-y-4 bg-emerald-50/20 dark:bg-emerald-900/5 hover:bg-emerald-50/40 transition-colors group h-48">
+                                <Button
+                                    onClick={handleFullReportDownload}
+                                    disabled={reportLoading || exportLoading || zipLoading}
+                                    className="w-full h-12 gap-2 font-black shadow-lg shadow-emerald-500/20 bg-emerald-600 hover:bg-emerald-700 text-white border-0"
+                                >
+                                    {reportLoading ? <Loader2 className="w-5 h-5 animate-spin" /> : <Download className="w-5 h-5" />}
+                                    Download Master PDF
+                                </Button>
+                                <p className="text-xs text-muted-foreground">Single PDF with all company ledgers.</p>
                             </div>
                         </CardContent>
                     </Card>

@@ -49,14 +49,14 @@ import {
     Ship,
     Anchor,
     Calendar,
-    User
+    User,
+    Trash2
 } from 'lucide-react';
 import { useState, useMemo, useEffect } from 'react';
 import { useData, SecurityTracking } from '@/context/data-context';
 import { Badge } from '@/components/ui/badge';
 import { formatDate, formatCurrency } from '@/lib/utils';
 import { CompanySelect } from '@/components/company-select';
-import { PinDialog } from '@/components/pin-dialog';
 import Swal from 'sweetalert2';
 
 
@@ -68,7 +68,7 @@ const calculateRefundDueDate = (startDate: string, days: number) => {
 };
 
 export default function SecuritiesPage() {
-    const { securities, companies, bills, addSecurity, updateSecurity } = useData();
+    const { securities, companies, bills, addSecurity, updateSecurity, deleteSecurity } = useData();
     const [isDialogOpen, setIsDialogOpen] = useState(false);
     const [isViewDialogOpen, setIsViewDialogOpen] = useState(false);
     const [selectedSecurity, setSelectedSecurity] = useState<SecurityTracking | null>(null);
@@ -76,43 +76,141 @@ export default function SecuritiesPage() {
     const [searchTerm, setSearchTerm] = useState('');
     const [statusFilter, setStatusFilter] = useState<'all' | 'pending' | 'received'>('all');
 
-    // PIN Dialog State
-    const [isPinDialogOpen, setIsPinDialogOpen] = useState(false);
-    const [pinActionSecurity, setPinActionSecurity] = useState<SecurityTracking | null>(null);
-    const [pinActionType, setPinActionType] = useState<'documents' | 'refund' | null>(null);
+    // Action States
+    const [actionSecurity, setActionSecurity] = useState<SecurityTracking | null>(null);
+    const [isRefundDetailsOpen, setIsRefundDetailsOpen] = useState(false);
+    const [refundDetails, setRefundDetails] = useState({
+        payOrderNo: '',
+        date: new Date().toISOString().split('T')[0],
+        depositBank: '',
+        attachment: null as File | null
+    });
 
-    const handleConfirmPinAction = async () => {
-        if (pinActionSecurity && pinActionType) {
-            try {
-                const updateData = pinActionType === 'documents'
-                    ? { isDocumentSubmitted: true }
-                    : { isRefundReceived: true, status: 'Completed' as const };
+    const handleConfirmActionDirectly = async (securityToUpdate: SecurityTracking, type: 'documents' | 'refund') => {
+        if (type === 'refund') {
+            setActionSecurity(securityToUpdate);
+            setRefundDetails({
+                payOrderNo: securityToUpdate.payOrderNo || '',
+                date: new Date().toISOString().split('T')[0],
+                depositBank: securityToUpdate.depositBank || '',
+                attachment: null
+            });
+            setIsRefundDetailsOpen(true);
+            return;
+        }
 
-                const result = await updateSecurity(pinActionSecurity.id, updateData);
+        try {
+            const updateData = { isDocumentSubmitted: true };
+            const result = await updateSecurity(securityToUpdate.id, updateData);
 
+            if (result.ok) {
                 Swal.fire({
                     title: 'Success!',
-                    text: pinActionType === 'documents'
-                        ? 'Documents marked as Submitted successfully.'
-                        : 'Security refund marked as Received successfully.',
+                    text: 'Documents marked as Submitted successfully.',
                     icon: 'success',
                     confirmButtonColor: '#10b981',
                     timer: 2000,
                     showConfirmButton: false
                 });
-            } catch (err) {
-                console.error("Failed to update security:", err);
-                Swal.fire({
-                    title: 'Error',
-                    text: 'Failed to update security record.',
-                    icon: 'error',
-                    confirmButtonColor: '#3b82f6'
-                });
-            } finally {
-                setIsPinDialogOpen(false);
-                setPinActionSecurity(null);
-                setPinActionType(null);
+            } else {
+                throw new Error(result.message || 'Failed to update');
             }
+        } catch (err) {
+            console.error("Failed to update security:", err);
+            Swal.fire({
+                title: 'Error',
+                text: 'Failed to update security record.',
+                icon: 'error',
+                confirmButtonColor: '#3b82f6'
+            });
+        }
+    };
+
+    const handleRefundSubmit = async () => {
+        if (!actionSecurity) return;
+
+        setLoading(true);
+        try {
+            const updateObject = {
+                isRefundReceived: 1, // Use 1 for boolean in FormData/JSON consistency
+                status: 'Completed',
+                payOrderNo: refundDetails.payOrderNo,
+                receivedAmountDate: refundDetails.date,
+                depositBank: refundDetails.depositBank,
+                attachment: refundDetails.attachment
+            };
+
+            const result = await updateSecurity(actionSecurity.id, updateObject);
+
+            if (result.ok) {
+                Swal.fire({
+                    title: 'Refund Received!',
+                    text: 'Security refund details saved successfully.',
+                    icon: 'success',
+                    confirmButtonColor: '#10b981',
+                    timer: 2000,
+                    showConfirmButton: false
+                });
+                setIsRefundDetailsOpen(false);
+                setActionSecurity(null);
+            } else {
+                throw new Error(result.message || 'Failed to save refund details');
+            }
+        } catch (err) {
+            console.error("Failed to update refund:", err);
+            Swal.fire({
+                title: 'Error',
+                text: 'Failed to save refund details.',
+                icon: 'error',
+                confirmButtonColor: '#3b82f6'
+            });
+        } finally {
+            setLoading(false);
+        }
+    };
+    
+    const handleDeleteSecurity = async (id: string) => {
+        const { value: pin } = await Swal.fire({
+            title: 'Enter PIN to Delete',
+            input: 'password',
+            inputLabel: 'Permanent Deletion requires authorization',
+            inputPlaceholder: 'Enter PIN code',
+            inputAttributes: {
+                autocapitalize: 'off',
+                autocorrect: 'off'
+            },
+            showCancelButton: true,
+            confirmButtonColor: '#ef4444',
+            confirmButtonText: 'Verify & Delete'
+        });
+
+        if (pin === '036409') {
+            const confirm = await Swal.fire({
+                title: 'Are you sure?',
+                text: "This security record will be permanently deleted from the database!",
+                icon: 'warning',
+                showCancelButton: true,
+                confirmButtonColor: '#ef4444',
+                cancelButtonColor: '#64748b',
+                confirmButtonText: 'Yes, delete it!'
+            });
+
+            if (confirm.isConfirmed) {
+                try {
+                    await deleteSecurity(id);
+                    Swal.fire({
+                        title: 'Deleted!',
+                        text: 'Security record has been removed.',
+                        icon: 'success',
+                        timer: 2000,
+                        showConfirmButton: false
+                    });
+                } catch (err) {
+                    Swal.fire('Error', 'Failed to delete record', 'error');
+                }
+            }
+        } else if (pin) {
+            Swal.fire('Invalid PIN', 'The authorization code is incorrect.', 'error');
         }
     };
 
@@ -248,8 +346,8 @@ export default function SecuritiesPage() {
         <DashboardLayout role="admin">
             <div className="space-y-6 max-w-[1600px] mx-auto">
                 {/* Header Section */}
-                <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
-                    <div>
+                <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-4">
+                    <div className="w-full lg:w-auto">
                         <h1 className="text-3xl font-black text-slate-900 dark:text-white tracking-tight flex items-center gap-3">
                             <ShieldCheck className="w-8 h-8 text-primary" />
                             Securities Tracking
@@ -257,8 +355,8 @@ export default function SecuritiesPage() {
                         <p className="text-muted-foreground mt-1 font-medium">Manage and track container refund securities</p>
                     </div>
 
-                    <div className="flex items-center gap-3 w-full md:w-auto flex-wrap">
-                        <Tabs value={statusFilter} onValueChange={(v) => setStatusFilter(v as any)} className="w-full md:w-auto">
+                    <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 w-full lg:w-auto">
+                        <Tabs value={statusFilter} onValueChange={(v) => setStatusFilter(v as any)} className="w-full sm:w-auto">
                             <TabsList className="grid w-full grid-cols-3 h-10 bg-muted/50">
                                 <TabsTrigger value="all" className="text-xs font-bold uppercase">All</TabsTrigger>
                                 <TabsTrigger value="pending" className="text-xs font-bold uppercase">Pending</TabsTrigger>
@@ -266,11 +364,11 @@ export default function SecuritiesPage() {
                             </TabsList>
                         </Tabs>
 
-                        <div className="relative flex-1 md:w-64">
+                        <div className="relative w-full sm:w-64">
                             <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
                             <Input
                                 placeholder="Search GD, Company..."
-                                className="pl-9 bg-white/50 border-border/40 focus:bg-white transition-all rounded-xl"
+                                className="pl-9 bg-white/50 border-border/40 focus:bg-white transition-all rounded-xl w-full"
                                 value={searchTerm}
                                 onChange={(e) => setSearchTerm(e.target.value)}
                             />
@@ -278,7 +376,7 @@ export default function SecuritiesPage() {
 
                         <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
                             <DialogTrigger asChild>
-                                <Button className="rounded-xl px-6 bg-primary hover:bg-primary/90 shadow-lg shadow-primary/20 transition-all active:scale-95 flex gap-2">
+                                <Button className="rounded-xl px-6 bg-primary hover:bg-primary/90 shadow-lg shadow-primary/20 transition-all active:scale-95 flex gap-2 w-full sm:w-auto justify-center">
                                     <Plus className="w-4 h-4" />
                                     Record New Security
                                 </Button>
@@ -557,8 +655,9 @@ export default function SecuritiesPage() {
                         </CardTitle>
                     </CardHeader>
                     <CardContent className="px-0">
-                        <div className="overflow-x-auto">
-                            <Table>
+                        <div className="overflow-x-auto custom-scrollbar">
+                            <div className="min-w-[1000px]">
+                                <Table>
                                 <TableHeader>
                                     <TableRow className="hover:bg-transparent border-border/40 bg-slate-50/50 dark:bg-white/5">
                                         <TableHead className="w-[200px] pl-8 font-black uppercase tracking-widest text-[10px] text-muted-foreground/70">Company</TableHead>
@@ -655,13 +754,9 @@ export default function SecuritiesPage() {
                                                                 });
 
                                                                 if (action === true) { // Documents Submitted
-                                                                    setPinActionSecurity(security);
-                                                                    setPinActionType('documents');
-                                                                    setIsPinDialogOpen(true);
+                                                                    handleConfirmActionDirectly(security, 'documents');
                                                                 } else if (action === false) { // Refund Received (Swal Deny returns false)
-                                                                    setPinActionSecurity(security);
-                                                                    setPinActionType('refund');
-                                                                    setIsPinDialogOpen(true);
+                                                                    handleConfirmActionDirectly(security, 'refund');
                                                                 }
                                                             }}
                                                             disabled={security.isRefundReceived && security.isDocumentSubmitted}
@@ -681,6 +776,15 @@ export default function SecuritiesPage() {
                                                         >
                                                             <Eye className="w-4 h-4" />
                                                         </Button>
+                                                        <Button
+                                                            variant="ghost"
+                                                            size="icon"
+                                                            className="h-9 w-9 rounded-xl text-rose-500 hover:bg-rose-50 hover:text-rose-600 transition-all active:scale-95"
+                                                            onClick={() => handleDeleteSecurity(security.id)}
+                                                            title="Delete Security"
+                                                        >
+                                                            <Trash2 className="w-4 h-4" />
+                                                        </Button>
                                                     </div>
                                                 </TableCell>
                                             </TableRow>
@@ -689,8 +793,9 @@ export default function SecuritiesPage() {
                                 </TableBody>
                             </Table>
                         </div>
-                    </CardContent>
-                </Card>
+                    </div>
+                </CardContent>
+            </Card>
 
                 {/* Totaling Section */}
                 {securities.length > 0 && (
@@ -827,8 +932,12 @@ export default function SecuritiesPage() {
                                         <p className="font-mono font-bold text-foreground">{formatDate(selectedSecurity.refundDueDate)}</p>
                                     </div>
                                     <div>
-                                        <p className="text-xs text-muted-foreground font-semibold mb-1">Pay Order Number</p>
-                                        <p className="font-mono font-bold text-foreground">{selectedSecurity.payOrderNo || 'N/A'}</p>
+                                        <p className="text-xs text-muted-foreground font-semibold mb-1">Check/Payorder No</p>
+                                        <p className="font-mono font-bold text-foreground text-primary">{selectedSecurity.payOrderNo || 'N/A'}</p>
+                                    </div>
+                                    <div>
+                                        <p className="text-xs text-muted-foreground font-semibold mb-1">Deposit Bank</p>
+                                        <p className="font-bold text-foreground">{selectedSecurity.depositBank || 'N/A'}</p>
                                     </div>
                                     <div>
                                         <p className="text-xs text-muted-foreground font-semibold mb-1">Payment Made By</p>
@@ -838,6 +947,32 @@ export default function SecuritiesPage() {
                                         <p className="text-xs text-muted-foreground font-semibold mb-1">Cheque Issued To</p>
                                         <p className="font-bold text-foreground">{selectedSecurity.chequeName || 'N/A'}</p>
                                     </div>
+                                    {selectedSecurity.attachment && (
+                                        <div className="col-span-2 mt-4 pt-4 border-t border-border/50">
+                                            <p className="text-xs text-muted-foreground font-semibold mb-3 flex items-center gap-2">
+                                                <ClipboardList className="w-4 h-4" /> Evidence Picture
+                                            </p>
+                                            <div className="space-y-4">
+                                                <div className="relative aspect-video w-full max-w-sm rounded-2xl overflow-hidden border border-border/50 shadow-inner bg-slate-100 group">
+                                                    <img 
+                                                        src={`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'}/storage/${selectedSecurity.attachment}`}
+                                                        alt="Refund Evidence"
+                                                        className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
+                                                    />
+                                                    <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                                                        <a 
+                                                            href={`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'}/storage/${selectedSecurity.attachment}`} 
+                                                            target="_blank" 
+                                                            rel="noopener noreferrer"
+                                                            className="px-4 py-2 bg-white text-black rounded-lg font-bold flex items-center gap-2 transform translate-y-2 group-hover:translate-y-0 transition-transform"
+                                                        >
+                                                            <Eye className="w-4 h-4" /> Full View
+                                                        </a>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    )}
                                 </div>
                             </div>
 
@@ -900,17 +1035,79 @@ export default function SecuritiesPage() {
                 </DialogContent>
             </Dialog>
 
-            <PinDialog
-                isOpen={isPinDialogOpen}
-                onClose={() => {
-                    setIsPinDialogOpen(false);
-                    setPinActionSecurity(null);
-                    setPinActionType(null);
-                }}
-                onConfirm={handleConfirmPinAction}
-                title={`Confirm ${pinActionType === 'documents' ? 'Documents Submission' : 'Refund Received'}`}
-                description={`This will mark ${pinActionType === 'documents' ? 'documents as submitted' : 'security refund as received'} for GD No. ${pinActionSecurity?.gdNumber}.`}
-            />
+
+            <Dialog open={isRefundDetailsOpen} onOpenChange={setIsRefundDetailsOpen}>
+                <DialogContent className="max-w-md rounded-3xl overflow-hidden p-0 border-none shadow-2xl">
+                    <DialogHeader className="p-6 bg-gradient-to-r from-emerald-500/10 to-transparent">
+                        <DialogTitle className="text-xl font-black flex items-center gap-3 text-emerald-600">
+                            <CheckCircle2 className="w-6 h-6" />
+                            Refund Receipt Details
+                        </DialogTitle>
+                    </DialogHeader>
+                    <div className="p-6 space-y-6">
+                        <div className="space-y-4">
+                            <div className="space-y-2">
+                                <Label className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground/60">Check/Payorder No</Label>
+                                <Input
+                                    placeholder="Enter No..."
+                                    className="h-11 rounded-xl bg-slate-50 border-border/40 font-mono"
+                                    value={refundDetails.payOrderNo}
+                                    onChange={(e) => setRefundDetails(prev => ({ ...prev, payOrderNo: e.target.value }))}
+                                />
+                            </div>
+                            <div className="space-y-2">
+                                <Label className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground/60">Date of Receipt</Label>
+                                <Input
+                                    type="date"
+                                    className="h-11 rounded-xl bg-slate-50 border-border/40 font-mono"
+                                    value={refundDetails.date}
+                                    onChange={(e) => setRefundDetails(prev => ({ ...prev, date: e.target.value }))}
+                                />
+                            </div>
+                            <div className="space-y-2">
+                                <Label className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground/60">Deposit Bank</Label>
+                                <Input
+                                    placeholder="Which bank deposited?"
+                                    className="h-11 rounded-xl bg-slate-50 border-border/40"
+                                    value={refundDetails.depositBank}
+                                    onChange={(e) => setRefundDetails(prev => ({ ...prev, depositBank: e.target.value }))}
+                                />
+                            </div>
+                            <div className="space-y-2">
+                                <Label className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground/60">Evidence Attachment</Label>
+                                <div className="relative group">
+                                    <Input
+                                        type="file"
+                                        accept="image/*,application/pdf"
+                                        className="h-11 rounded-xl bg-slate-50 border-border/40 file:mr-4 file:py-1 file:px-4 file:rounded-full file:border-0 file:text-xs file:font-black file:bg-primary/10 file:text-primary hover:file:bg-primary/20 cursor-pointer"
+                                        onChange={(e) => {
+                                            const file = e.target.files?.[0] || null;
+                                            setRefundDetails(prev => ({ ...prev, attachment: file }));
+                                        }}
+                                    />
+                                </div>
+                            </div>
+                        </div>
+
+                        <div className="flex gap-3 pt-4 border-t">
+                            <Button 
+                                variant="ghost" 
+                                className="flex-1 rounded-xl font-bold h-11"
+                                onClick={() => setIsRefundDetailsOpen(false)}
+                            >
+                                Cancel
+                            </Button>
+                            <Button 
+                                className="flex-2 px-8 rounded-xl font-black bg-emerald-600 hover:bg-emerald-700 h-11 shadow-lg shadow-emerald-200"
+                                onClick={handleRefundSubmit}
+                                disabled={loading}
+                            >
+                                {loading ? "Saving..." : "Submit Refund"}
+                            </Button>
+                        </div>
+                    </div>
+                </DialogContent>
+            </Dialog>
         </DashboardLayout>
     );
 }

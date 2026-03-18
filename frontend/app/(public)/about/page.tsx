@@ -11,9 +11,11 @@ export default function AboutPage() {
 
             <div className="max-w-4xl mx-auto space-y-20">
                 {/* Header */}
-                <div className="text-center space-y-4">
-                    <h1 className="text-4xl font-bold tracking-tight">About Thaheem Brothers</h1>
-                    <p className="text-xl text-muted-foreground">
+                <div className="text-center space-y-6">
+                    <h1 className="text-4xl md:text-6xl font-extrabold tracking-tighter bg-clip-text text-transparent bg-gradient-to-r from-slate-900 to-slate-600 dark:from-white dark:to-slate-400">
+                        About Thaheem Brothers
+                    </h1>
+                    <p className="text-lg md:text-2xl text-muted-foreground max-w-3xl mx-auto leading-relaxed">
                         A decade of excellence, innovation, and client trust in customs brokerage and freight forwarding.
                     </p>
                 </div>
@@ -21,15 +23,16 @@ export default function AboutPage() {
                 {/* Company Overview */}
                 <div className="grid grid-cols-1 lg:grid-cols-2 gap-12 items-center">
                     <div className="prose prose-lg dark:prose-invert">
-                        <p className="text-xl leading-relaxed font-medium text-foreground">
+                        <p className="text-lg md:text-xl leading-relaxed font-semibold text-foreground">
                             Thaheem Brothers is one of Pakistan's leading licensed customs brokerage and freight forwarding companies, built on a decade of excellence, innovation, and client trust.
                         </p>
-                        <p>
+                        <p className="text-muted-foreground">
                             Established to redefine industry standards, we offer comprehensive, tailor-made logistics solutions that combine reliability, cost-effectiveness, and compliance under one roof. With over 10 years of experience and an expanding international footprint, Thaheem Brothers proudly serves a diverse portfolio of national and multinational clients across various industries including textiles, IT, engineering, and more.
                         </p>
                     </div>
-                    <div className="relative h-[400px] rounded-2xl overflow-hidden shadow-xl border-4 border-primary/10">
-                        <div className="absolute inset-0 bg-[url('/logo.jpeg')] bg-cover bg-center" />
+                    <div className="relative h-[300px] md:h-[450px] rounded-[2.5rem] overflow-hidden shadow-2xl border-8 border-primary/5 group">
+                        <div className="absolute inset-0 bg-[url('/logo.jpeg')] bg-cover bg-center transition-transform duration-700 group-hover:scale-110" />
+                        <div className="absolute inset-0 bg-gradient-to-t from-black/20 to-transparent" />
                     </div>
                 </div>
 
@@ -97,38 +100,38 @@ export default function AboutPage() {
                         {
                             title: "Office Team",
                             members: [
-                                { name: "Rana Irfan Ali", role: "CEO", phone: "03002912726" },
-                                { name: "Nadeem Ahmed", role: "General Manager", phone: "0300" },
-                                { name: "Munwar Ali", role: "Accountant", phone: "03002912726" },
-                                { name: "Zakria Owais", role: "IT", phone: "03202017200" },
-                                { name: "Imran Ali", role: "Operations", phone: "0300" },
-                                { name: "Zaeem Ahmed", role: "Operations", phone: "0300" },
-                                { name: "Sohail", role: "Outdoor Incharge", phone: "0300" },
-                                { name: "Bilal", role: "Office Boy", phone: "0300" },
+                                { name: "Rana Irfan Ali", role: "CEO", image: "/Office Staff/Irfan.jpg" },
+                                { name: "Nadeem Ahmed", role: "COO", image: "/Office Staff/Nadeem.jpg" },
+                                { name: "Munwar Ali", role: "GM", image: "/Office Staff/Munwar.png" },
+                                { name: "Zakria Owais", role: "IT" },
+                                { name: "Imran Ali", role: "Operations", image: "/Office Staff/Imran.jpeg" },
+                                { name: "Arbab Ahmed", role: "Operations", image: "/Office Staff/Arbab.jpg" },
+                                { name: "Zaeem Ahmed", role: "Operations", image: "/Office Staff/Zaeem.jpg" },
+                                { name: "Sohail", role: "Outdoor Incharge", image: "/Office Staff/Sohail.jpg" },
+                                { name: "Bilal", role: "Office Boy", image: "/Office Staff/Bilal.jpeg" },
                             ]
                         },
                         {
                             title: "Airport Team",
                             members: [
-                                { name: "Khalid Hussain", role: "Airport Incharge", phone: "0300" },
-                                { name: "Imran Khan", role: "Airport Clerk", phone: "0300" },
-                                { name: "Husnain", role: "Airport Clerk", phone: "0300" },
+                                { name: "Khalid Hussain", role: "Airport Incharge", image: "/Office Staff/Khalid.jpg" },
+                                { name: "Imran Khan", role: "Airport Clerk" },
+                                { name: "Husnain", role: "Airport Clerk", image: "/Office Staff/Husnain.jpg" },
                             ]
                         },
                         {
                             title: "SEA PORT Team",
                             members: [
-                               { name: "Arbab Ahmed", role: "Operations", phone: "0300" },
-                               { name: "Rashid", role: "Operations", phone: "0300" },
-                               { name: "Abdul Rehman", role: "Sea Port Clerk", phone: "0300" },
-                               { name: "Rana Safdar", role: "Sea Port Incharge", phone: "0300" },
+                                { name: "Rashid", role: "Operations", image: "/Office Staff/Rashid.jpg" },
+                                { name: "Abdul Rehman", role: "Sea Port Clerk", image: "/Office Staff/Rehman.jpg" },
+                                { name: "Rana Safdar", role: "Sea Port Incharge", image: "/Office Staff/Safdar.jpeg" },
                             ]
                         },
                         {
                             title: "EPZ Team",
                             members: [
-                                { name: "Rana Murtaza", role: "EPZ Incharge", phone: "0300" },
-                                { name: "Rizwan", role: "EPZ Clerk", phone: "0300" },
+                                { name: "Rana Murtaza", role: "EPZ Incharge", image: "/Office Staff/Murtaza.jpg" },
+                                { name: "Rizwan", role: "EPZ Clerk", image: "/Office Staff/Rizwan.jpg" },
                             ]
                         }
                     ].map((group, idx) => (
@@ -138,9 +141,13 @@ export default function AboutPage() {
                                 {group.members.map((member, mIdx) => (
                                     <Card key={mIdx} className="overflow-hidden group hover:shadow-lg transition-all duration-300 border-none bg-slate-50/50">
                                         <div className="aspect-[4/5] relative bg-slate-200 overflow-hidden">
-                                            <div className="absolute inset-0 flex items-center justify-center text-slate-400 group-hover:scale-110 transition-transform duration-500">
-                                                <Users size={64} strokeWidth={1} />
-                                            </div>
+                                            {member.image ? (
+                                                <div className="absolute inset-0 bg-cover bg-center transition-transform duration-500 group-hover:scale-110" style={{ backgroundImage: `url('${member.image}')` }} />
+                                            ) : (
+                                                <div className="absolute inset-0 flex items-center justify-center text-slate-400 group-hover:scale-110 transition-transform duration-500">
+                                                    <Users size={64} strokeWidth={1} />
+                                                </div>
+                                            )}
                                             {/* Gradient overlay */}
                                             <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
                                         </div>
@@ -217,32 +224,41 @@ export default function AboutPage() {
                 </div>
 
                 {/* Contact Info */}
-                <div className="bg-primary/5 -mx-4 px-4 py-16 rounded-3xl">
-                    <div className="max-w-4xl mx-auto text-center">
-                        <h2 className="text-3xl font-bold mb-8">Head Office</h2>
-                        <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-                            <div className="flex flex-col items-center gap-2">
-                                <MapPin className="h-8 w-8 text-primary" />
-                                <address className="not-italic text-lg">
+                <div className="bg-slate-900 text-white -mx-4 px-6 py-20 rounded-[3rem] shadow-2xl relative overflow-hidden">
+                    <div className="absolute top-0 right-0 w-96 h-96 bg-primary/10 rounded-full blur-[100px] -mr-48 -mt-48" />
+                    <div className="max-w-5xl mx-auto text-center relative z-10">
+                        <h2 className="text-3xl md:text-4xl font-black mb-16 tracking-tight">Our Presence</h2>
+                        <div className="grid grid-cols-1 md:grid-cols-3 gap-12 md:gap-8">
+                            <div className="flex flex-col items-center gap-4 group">
+                                <div className="p-4 bg-white/10 rounded-2xl border border-white/20 group-hover:bg-primary/20 transition-colors">
+                                    <MapPin className="h-8 w-8 text-primary" />
+                                </div>
+                                <h4 className="text-xl font-bold">Head Office</h4>
+                                <address className="not-italic text-slate-300 leading-relaxed">
                                     Suite 23, 2nd Floor, R.K. Square Extension,<br />
                                     Shahrah-e-Liaquat, New Challi,<br />
                                     Karachi, Pakistan
                                 </address>
                             </div>
-                            <div className="flex flex-col items-center gap-2">
-                                <Phone className="h-8 w-8 text-primary" />
-                                <div className="text-lg">
-                                    <div>+92 21 32421347</div>
-                                    <div>+92 300 2791780</div>
-                                    <div>+92 330 2791786</div>
-                                    <div>+92 317 2004257</div>
-                                    <div>+92 320 2017200</div>
-                                    <div className="text-sm text-muted-foreground mt-1">Fax: +92 21 32421347</div>
+                            <div className="flex flex-col items-center gap-4 group">
+                                <div className="p-4 bg-white/10 rounded-2xl border border-white/20 group-hover:bg-primary/20 transition-colors">
+                                    <Phone className="h-8 w-8 text-primary" />
+                                </div>
+                                <h4 className="text-xl font-bold">Call Us</h4>
+                                <div className="text-slate-300 space-y-1">
+                                    <p className="font-mono">+92 21 32421347</p>
+                                    <p className="font-mono">+92 300 2791780</p>
+                                    <p className="font-mono text-xs text-slate-500 pt-2 uppercase font-black">Fax: +92 21 32421347</p>
                                 </div>
                             </div>
-                            <div className="flex flex-col items-center gap-2">
-                                <Mail className="h-8 w-8 text-primary" />
-                                <a href="mailto:import.khi@hotmail.com" className="text-lg hover:underline">import.khi@hotmail.com</a>
+                            <div className="flex flex-col items-center gap-4 group">
+                                <div className="p-4 bg-white/10 rounded-2xl border border-white/20 group-hover:bg-primary/20 transition-colors">
+                                    <Mail className="h-8 w-8 text-primary" />
+                                </div>
+                                <h4 className="text-xl font-bold">Email Us</h4>
+                                <a href="mailto:import.khi@hotmail.com" className="text-slate-300 hover:text-primary transition-colors font-medium">
+                                    import.khi@hotmail.com
+                                </a>
                             </div>
                         </div>
                     </div>

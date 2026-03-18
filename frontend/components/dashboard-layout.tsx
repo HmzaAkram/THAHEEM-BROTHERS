@@ -38,7 +38,7 @@ export function DashboardLayout({ children, role }: DashboardLayoutProps) {
       <Sidebar user={user} onLogout={handleLogout} />
       <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
         <main className="flex-1 overflow-y-auto overflow-x-hidden">
-          <div className="w-full px-4 py-8">{children}</div>
+          <div className="w-full px-2 sm:px-4 py-6 sm:py-8">{children}</div>
         </main>
       </div>
     </div>

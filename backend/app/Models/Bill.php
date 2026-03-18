@@ -65,7 +65,7 @@ class Bill extends Model
     public function getCalculatedStatusAttribute()
     {
         // If status was manually set to one of the final states, respect the override
-        if (in_array($this->status, ['Paid', 'Unpaid', 'Partial'])) {
+        if (in_array($this->status, ['Paid', 'Unpaid', 'Partial', 'Draft'])) {
             return $this->status;
         }
 

@@ -8,6 +8,8 @@ use App\Http\Controllers\PaymentController;
 use App\Http\Controllers\SecurityController;
 use App\Http\Controllers\BackupController;
 use App\Http\Controllers\QueryController;
+use App\Http\Controllers\ExporterController;
+use App\Http\Controllers\SaleTaxController;
 
 // Public routes
 Route::post('/v1/login', [AuthController::class, 'login'])
@@ -24,6 +26,10 @@ Route::prefix('v1')->middleware('auth.token')->group(function () {
     Route::apiResource('bills', BillController::class);
     Route::apiResource('payments', PaymentController::class);
     Route::apiResource('securities', SecurityController::class);
+    Route::apiResource('exporters', ExporterController::class);
+    
+    Route::patch('/sale-taxes/{sale_tax}/status', [SaleTaxController::class, 'updateStatus']);
+    Route::apiResource('sale-taxes', SaleTaxController::class);
     Route::post('/company/request-ledger-email', [CompanyController::class, 'requestLedgerEmail'])
         ->middleware('throttle:3,1');
 

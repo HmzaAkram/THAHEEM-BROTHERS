@@ -58,7 +58,7 @@ import {
   Calculator
 } from 'lucide-react';
 import { useState, useMemo, useRef, useEffect } from 'react';
-import { useData, BillItem, Bill } from '@/context/data-context';
+import { useData, BillItem, Bill, BillStatus } from '@/context/data-context';
 import { cn, formatDate, formatCurrency } from '@/lib/utils';
 import JSZip from 'jszip';
 import { jsPDF } from 'jspdf';
@@ -66,6 +66,7 @@ import autoTable from 'jspdf-autotable';
 import { toJpeg } from 'html-to-image';
 import { InvoiceTemplate } from '@/components/invoice-template';
 import { CompanySelect } from '@/components/company-select';
+import { ExporterSelect } from '@/components/exporter-select';
 import html2canvas from 'html2canvas';
 import { toast } from '@/components/ui/use-toast';
 import { PinDialog } from '@/components/pin-dialog';
@@ -75,12 +76,13 @@ const statusStyles = {
   Paid: 'bg-green-100 text-green-800 border-green-200',
   Partial: 'bg-yellow-100 text-yellow-800 border-yellow-200',
   Unpaid: 'bg-red-100 text-red-800 border-red-200',
+  Draft: 'bg-slate-100 text-slate-800 border-slate-200',
 };
 
 import { PDFDocument } from 'pdf-lib';
 
 export default function BillsPage() {
-  const { bills, companies, addBill, updateBill, updateBillStatus, deleteBill, payments, getCompanyBalance } = useData();
+  const { bills, companies, addBill, updateBill, updateBillStatus, deleteBill, payments, getCompanyBalance, exporters, addExporter } = useData();
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [isViewOpen, setIsViewOpen] = useState(false);
   const [selectedBill, setSelectedBill] = useState<Bill | null>(null);
@@ -308,6 +310,7 @@ export default function BillsPage() {
       "PSW CHARGES",
       "SPEED MONEY",
       "COURIER CHARGES",
+      "PIA",
     ],
     SEA: [
       "DUTY TAXES & ETO",
@@ -425,7 +428,6 @@ export default function BillsPage() {
     setVia(bill.via || '');
     setWeight(String(bill.weight || ''));
     setServiceCharges(String(bill.serviceCharges || ''));
-    setSalesTax(String(bill.salesTax || ''));
     setAdvancePayment(String(bill.advancePayment || ''));
 
     // Handle Note logic
@@ -445,6 +447,10 @@ export default function BillsPage() {
       cleanNote = cleanNote.replace(/\[TR:\d+\]/, '').trim();
     }
     setTaxRate(extractedTaxRate);
+
+    // Reconstruct SBR Sales Tax Input Amount
+    const inputSalesTax = bill.salesTax ? (Number(bill.salesTax) / (extractedTaxRate / 100)) : 0;
+    setSalesTax(String(inputSalesTax > 0 ? Math.round(inputSalesTax) : ''));
 
     if (cleanNote && predefinedNotes.includes(cleanNote)) {
       setNoteType(cleanNote);
@@ -498,7 +504,7 @@ export default function BillsPage() {
     setItems(newItems);
   };
 
-  const handleSubmit = async () => {
+  const handleSubmit = async (statusArg: BillStatus = 'Unpaid') => {
     const errors: Record<string, boolean> = {};
     if (!companyId) errors.companyId = true;
     if (!date) errors.date = true;
@@ -554,6 +560,18 @@ export default function BillsPage() {
     try {
       const attachmentsBase64 = await Promise.all(attachments.map(fileToBase64));
 
+      let finalStatus = statusArg;
+      if (statusArg !== 'Draft') {
+        const adv = Number(advancePayment) || 0;
+        if (adv >= grandTotal && grandTotal > 0) {
+          finalStatus = 'Paid';
+        } else if (adv > 0) {
+          finalStatus = 'Partial';
+        } else {
+          finalStatus = 'Unpaid';
+        }
+      }
+
       const billData = {
         companyId: selectedCompany.id,
         companyName: selectedCompany.name,
@@ -578,6 +596,7 @@ export default function BillsPage() {
         salesTax: calculatedSalesTax,
         advancePayment: Number(advancePayment) || 0,
         grandTotal: grandTotal,
+        status: finalStatus,
         note: (noteType === 'Others' ? customNote : noteType) + (availableCredit > 0 && Number(advancePayment) === availableCredit ? ` [Surplus Applied: ${availableCredit}]` : '') + ` [TR:${taxRate}]`,
       };
 
@@ -684,6 +703,10 @@ export default function BillsPage() {
     });
 
     return filteredBills.reduce((acc, bill) => {
+      // Exclude draft amounts from totals as per user requirement
+      if (bill.status === 'Draft' || bill.calculatedStatus === 'Draft') {
+        return acc;
+      }
       acc.billed += bill.grandTotal;
       acc.paid += bill.paidAmount;
       acc.balance += (bill.grandTotal - bill.paidAmount);
@@ -816,15 +839,15 @@ export default function BillsPage() {
     <>
       <DashboardLayout>
         <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
-          <div className="flex items-center justify-between">
+          <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
             <div>
               <h1 className="text-3xl font-bold text-foreground">Bills & Invoices</h1>
               <p className="text-muted-foreground mt-1">
                 Create and manage invoices for your clients.
               </p>
             </div>
-            <div className="flex gap-2">
-              <Button variant="outline" onClick={handleExportPDF}>
+            <div className="flex flex-col sm:flex-row gap-2 w-full md:w-auto">
+              <Button variant="outline" onClick={handleExportPDF} className="w-full sm:w-auto">
                 <Download className="mr-2 h-4 w-4" />
                 Download List (PDF)
               </Button>
@@ -843,12 +866,12 @@ export default function BillsPage() {
                 }
               }}>
                 <DialogTrigger asChild>
-                  <Button className="gap-2 shadow-md hover:bg-primary/90">
+                  <Button className="gap-2 shadow-md hover:bg-primary/90 w-full sm:w-auto">
                     <Plus className="w-4 h-4" />
                     Create New Bill
                   </Button>
                 </DialogTrigger>
-                <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
+                <DialogContent className="max-w-3xl max-h-[95vh] overflow-y-auto w-[95vw] sm:w-auto p-4 sm:p-6">
                   <DialogHeader>
                     <DialogTitle>{isEditing ? 'Edit Bill' : 'Create New Bill'}</DialogTitle>
                   </DialogHeader>
@@ -916,7 +939,7 @@ export default function BillsPage() {
                             <Ship className="w-5 h-5 text-primary group-hover:scale-110 transition-transform" />
                             <h3 className="text-[10px] font-bold uppercase tracking-[0.2em] text-muted-foreground/80">Shipping Logistics</h3>
                           </div>
-                          <div className="grid grid-cols-2 gap-x-6 gap-y-5">
+                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-5">
                             <div className="col-span-2">
                               <Label className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground mb-1.5 block">VIA (Transport Mode)</Label>
                               <Select onValueChange={setVia} value={via}>
@@ -1008,14 +1031,25 @@ export default function BillsPage() {
                             <FileText className="w-5 h-5 text-primary group-hover:scale-110 transition-transform" />
                             <h3 className="text-[10px] font-bold uppercase tracking-[0.2em] text-muted-foreground/80">Invoice & Customs</h3>
                           </div>
-                          <div className="grid grid-cols-2 gap-x-6 gap-y-5">
+                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-5">
                             <div className="col-span-2">
                               <Label className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground mb-1.5 block">Exporter Name</Label>
-                              <Input
-                                placeholder="Example: Exporter Name"
-                                className="bg-white dark:bg-slate-950 border-border/50 h-10"
+                              <ExporterSelect
+                                exporters={exporters}
                                 value={exporter}
-                                onChange={(e) => setExporter(e.target.value)}
+                                onValueChange={setExporter}
+                                onCreateNew={async (newName) => {
+                                  try {
+                                    setLoading(true);
+                                    await addExporter({ name: newName });
+                                    setExporter(newName);
+                                    toast({ title: 'Success', description: `Exporter "${newName}" added successfully.` });
+                                  } catch (error) {
+                                    toast({ title: 'Error', description: 'Failed to add exporter.', variant: 'destructive' });
+                                  } finally {
+                                    setLoading(false);
+                                  }
+                                }}
                               />
                             </div>
                             <div className="col-span-2">
@@ -1370,20 +1404,28 @@ export default function BillsPage() {
                         )}
                       </div>
 
-                      <div className="flex gap-4 pt-6">
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-6">
                         <Button
-                          className="flex-1 h-12 bg-primary hover:bg-primary/90 text-primary-foreground font-bold shadow-lg shadow-primary/20 rounded-xl transition-all active:scale-[0.98]"
-                          onClick={handleSubmit}
+                          className="h-12 bg-primary hover:bg-primary/90 text-primary-foreground font-black uppercase tracking-widest shadow-lg shadow-primary/20 rounded-xl transition-all active:scale-[0.98]"
+                          onClick={() => handleSubmit('Unpaid')}
                           disabled={loading}
                         >
-                          {loading ? (isEditing ? "Updating..." : "Generating...") : (isEditing ? "Update Invoice" : "Generate Invoice")}
+                          {loading ? (isEditing ? "Updating..." : "Generating...") : (isEditing ? "Generate Invoice" : "Generate Invoice")}
+                        </Button>
+                        <Button
+                          variant="outline"
+                          className="h-12 border-primary/20 text-primary font-black uppercase tracking-widest hover:bg-primary/5 rounded-xl border-2 transition-all"
+                          onClick={() => handleSubmit('Draft')}
+                          disabled={loading}
+                        >
+                          {loading ? "Saving..." : (isEditing && editingId ? "Update Draft" : "Save as Draft")}
                         </Button>
                         <Button
                           variant="ghost"
-                          className="flex-1 h-12 font-semibold text-muted-foreground hover:bg-muted/50 rounded-xl"
+                          className="sm:col-span-2 h-10 font-bold text-muted-foreground hover:bg-muted/50 rounded-xl uppercase text-[10px] tracking-widest"
                           onClick={() => setIsDialogOpen(false)}
                         >
-                          Close Window
+                          Cancel & Close
                         </Button>
                       </div>
                     </div>
@@ -1394,23 +1436,23 @@ export default function BillsPage() {
           </div >
 
           <Card className="shadow-md border-border/50">
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-7">
+            <CardHeader className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 pb-7">
               <CardTitle>All Invoices</CardTitle>
-              <div className="flex flex-wrap gap-3">
+              <div className="flex flex-col sm:flex-row flex-wrap gap-3 w-full lg:w-auto">
                 {/* Search Bar */}
-                <div className="relative w-64">
+                <div className="relative w-full sm:w-64">
                   <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                   <Input
                     placeholder="Search by Bill, Company, Job..."
-                    className="pl-9 bg-muted/20 border-border/50 h-9 text-xs"
+                    className="pl-9 bg-muted/20 border-border/50 h-9 text-xs w-full"
                     value={searchQuery}
                     onChange={(e) => setSearchQuery(e.target.value)}
                   />
                 </div>
-
+ 
                 {/* Company Select */}
                 <Select value={companyFilter} onValueChange={setCompanyFilter}>
-                  <SelectTrigger className="w-[180px] h-9 bg-muted/20 border-border/50 text-xs">
+                  <SelectTrigger className="w-full sm:w-[180px] h-9 bg-muted/20 border-border/50 text-xs">
                     <SelectValue placeholder="All Companies" />
                   </SelectTrigger>
                   <SelectContent>
@@ -1420,10 +1462,10 @@ export default function BillsPage() {
                     ))}
                   </SelectContent>
                 </Select>
-
+ 
                 {/* Time Filter Select */}
                 <Select value={timeFilter} onValueChange={(v: any) => setTimeFilter(v)}>
-                  <SelectTrigger className="w-[140px] h-9 bg-muted/20 border-border/50 text-xs">
+                  <SelectTrigger className="w-full sm:w-[140px] h-9 bg-muted/20 border-border/50 text-xs">
                     <div className="flex items-center gap-2">
                       <Filter className="h-3 w-3" />
                       <SelectValue placeholder="Overall" />
@@ -1449,8 +1491,9 @@ export default function BillsPage() {
                   No bills found. Create one to get started.
                 </div>
               ) : (
-                <div className="overflow-x-auto">
-                  <Table>
+                <div className="overflow-x-auto custom-scrollbar">
+                  <div className="min-w-[900px]">
+                    <Table>
                     <TableHeader>
                       <TableRow className="bg-secondary/50">
                         <TableHead>Job No</TableHead>
@@ -1488,7 +1531,7 @@ export default function BillsPage() {
                             <DropdownMenu>
                               <DropdownMenuTrigger className="focus:outline-none">
                                 <span
-                                  className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium border cursor-pointer hover:opacity-80 transition-opacity ${statusStyles[item.calculatedStatus || 'Unpaid']
+                                  className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium border cursor-pointer hover:opacity-80 transition-opacity ${statusStyles[(item.calculatedStatus || 'Unpaid') as keyof typeof statusStyles]
                                     }`}
                                 >
                                   {item.calculatedStatus || 'Unpaid'}
@@ -1536,9 +1579,13 @@ export default function BillsPage() {
                                 variant="ghost"
                                 size="icon"
                                 className="hover:text-primary hover:bg-primary/5 transition-colors"
-                                onClick={() => {
-                                  setBillToEdit(item);
-                                  setIsEditPinDialogOpen(true);
+                               onClick={() => {
+                                  if (item.status === 'Draft' || item.calculatedStatus === 'Draft') {
+                                    handleEditClick(item);
+                                  } else {
+                                    setBillToEdit(item);
+                                    setIsEditPinDialogOpen(true);
+                                  }
                                 }}
                                 title="Edit Bill"
                               >
@@ -1557,9 +1604,14 @@ export default function BillsPage() {
                                 variant="ghost"
                                 size="icon"
                                 className="text-destructive hover:bg-destructive/10 hover:text-destructive transition-colors"
-                                onClick={() => {
-                                  setBillToDelete(item);
-                                  setIsPinDialogOpen(true);
+                               onClick={() => {
+                                  if (item.status === 'Draft' || item.calculatedStatus === 'Draft') {
+                                    setBillToDelete(item);
+                                    handleDeleteBill();
+                                  } else {
+                                    setBillToDelete(item);
+                                    setIsPinDialogOpen(true);
+                                  }
                                 }}
                                 title="Delete Bill"
                               >
@@ -1570,7 +1622,8 @@ export default function BillsPage() {
                         </TableRow>
                       ))}
                     </TableBody>
-                  </Table>
+                    </Table>
+                  </div>
                 </div>
               )}
 
@@ -1625,6 +1678,43 @@ export default function BillsPage() {
                     attachmentDataUrl={viewDataUrl}
                     paidDate={getPaidDate(selectedBill.id)}
                   />
+
+                  {/* Attachment Links Section */}
+                  {selectedBill && (
+                    <div className="bg-muted/30 p-6 rounded-2xl border border-border/50">
+                      <h3 className="text-sm font-bold uppercase tracking-widest text-muted-foreground mb-4 flex items-center gap-2">
+                        <FileText className="w-4 h-4" />
+                        Attached Documents
+                      </h3>
+                      <div className="flex flex-wrap gap-3">
+                        {selectedBill.attachments && selectedBill.attachments.length > 0 ? (
+                          selectedBill.attachments.map((url, idx) => (
+                            <Button
+                              key={idx}
+                              variant="outline"
+                              className="font-mono text-xs gap-2 bg-white dark:bg-slate-950 border-primary/20 hover:border-primary/40 text-primary hover:bg-primary/5"
+                              onClick={() => window.open(url, '_blank')}
+                            >
+                              <FileText className="w-3.5 h-3.5" />
+                              Attachment Number {idx + 1}
+                            </Button>
+                          ))
+                        ) : selectedBill.attachment ? (
+                          <Button
+                            variant="outline"
+                            className="font-mono text-xs gap-2 bg-white dark:bg-slate-950 border-primary/20 hover:border-primary/40 text-primary hover:bg-primary/5"
+                            onClick={() => window.open(selectedBill.attachment!, '_blank')}
+                          >
+                            <FileText className="w-3.5 h-3.5" />
+                            Attachment Number 1
+                          </Button>
+                        ) : (
+                          <p className="text-sm text-muted-foreground italic">No documents attached.</p>
+                        )}
+                      </div>
+                    </div>
+                  )}
+
                   <div className="flex gap-4 pt-6 border-t">
                     <Button className="flex-1 gap-2 rounded-xl" onClick={() => handleDownloadInvoice(selectedBill)}>
                       <Download className="w-4 h-4" />

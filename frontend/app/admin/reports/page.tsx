@@ -41,7 +41,7 @@ export default function ReportsPage() {
   const { companies, bills, payments } = useData();
   const [dateFrom, setDateFrom] = useState('2026-01-01');
   const [dateTo, setDateTo] = useState(new Date().toISOString().split('T')[0]);
-  const [reportType, setReportType] = useState('outstanding');
+  const [reportType, setReportType] = useState('overall');
   const [selectedCompanyId, setSelectedCompanyId] = useState('all');
   const [searchTerm, setSearchTerm] = useState('');
   const [timeFilter, setTimeFilter] = useState<'custom' | 'overall' | '6months' | '3months'>('overall');
@@ -67,7 +67,7 @@ export default function ReportsPage() {
     setDateTo(end);
   };
 
-  const { outstandingData, totalOutstanding, totalOverdue, timeSeriesData, filteredBills, filteredPayments, companyLedger, ledgerOpeningBalance } = useMemo(() => {
+  const { outstandingData, overallData, overallTotals, totalOutstanding, totalOverdue, timeSeriesData, filteredBills, filteredPayments, companyLedger, ledgerOpeningBalance } = useMemo(() => {
     // 1. Filter raw data based on dates
     const start = new Date(dateFrom);
     const end = new Date(dateTo);
@@ -77,7 +77,7 @@ export default function ReportsPage() {
       const d = new Date(b.date);
       const dateMatch = d >= start && d <= end;
       const searchMatch = searchTerm === '' || b.companyName.toLowerCase().includes(searchTerm.toLowerCase());
-      return dateMatch && searchMatch;
+      return dateMatch && searchMatch && b.status !== 'Draft';
     });
 
     const fPayments = payments.filter(p => {
@@ -96,7 +96,7 @@ export default function ReportsPage() {
       const baseOpeningBal = Number(selectedCompany?.openingBalance) || 0;
 
       let consolidatedEntries: any[] = [];
-      const companyBills = bills.filter(b => String(b.companyId) === selectedCompanyId);
+      const companyBills = bills.filter(b => String(b.companyId) === selectedCompanyId && b.status !== 'Draft');
       const companyPayments = payments.filter(p => String(p.companyId) === selectedCompanyId);
 
       companyBills.forEach(bill => {
@@ -165,21 +165,18 @@ export default function ReportsPage() {
     }
 
     // 3. Calculate Outstanding
-    // Note: For "Outstanding Report", usually we show ALL outstanding, 
-    // but we can filter the "Last Due" or "Bills Count" within range.
     const companyStats = companies
       .filter(c => searchTerm === '' || c.name.toLowerCase().includes(searchTerm.toLowerCase()))
       .map(c => {
         const companyBills = bills.filter(b => b.companyId === c.id);
         const companyPayments = payments.filter(p => p.companyId === c.id);
 
-        const billed = companyBills.reduce((sum, b) => sum + (Number(b.grandTotal) || 0), 0);
+        const billed = companyBills.reduce((sum, b) => sum + (Number(b.grandTotal) || 0), 0) + (Number(c.openingBalance) || 0);
         const paid =
           companyBills.reduce((sum, b) => sum + (Number(b.advancePayment) || 0), 0) +
           companyPayments.reduce((sum, p) => sum + (Number(p.amount) || 0) + (Number(p.adjustment) || 0), 0);
         const outstanding = billed - paid;
 
-        // Unpaid bills within range for report clarity
         const unpaidBills = companyBills.filter(b => b.status !== 'Paid');
         unpaidBills.sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
 
@@ -191,10 +188,8 @@ export default function ReportsPage() {
           const today = new Date();
           unpaidBills.forEach(bill => {
             const d = new Date(bill.date);
-            d.setDate(d.getDate() + 30); // 30 days credit period
-            if (today > d) {
-              overdueCount++;
-            }
+            d.setDate(d.getDate() + 30);
+            if (today > d) overdueCount++;
           });
 
           const oldestUnpaid = unpaidBills[0];
@@ -217,12 +212,12 @@ export default function ReportsPage() {
           lastDueDate,
           overdueCount
         };
-      }).filter(s => s.outstanding > 0 || s.billsCount > 0);
+      });
 
     const total = companyStats.reduce((sum, item) => sum + item.outstanding, 0);
     const totalOverdue = companyStats.reduce((sum, item) => sum + item.overdueCount, 0);
 
-    // 3. Time Series (Monthly Billing Trend)
+    // 4. Time Series
     const monthsData: { month: string; outstanding: number; year: number; monthIdx: number }[] = [];
     const now = new Date();
     for (let i = 5; i >= 0; i--) {
@@ -236,13 +231,43 @@ export default function ReportsPage() {
     }
 
     bills.forEach(b => {
+      if (b.status === 'Draft') return;
       const d = new Date(b.date);
       const m = monthsData.find(mo => mo.monthIdx === d.getMonth() && mo.year === d.getFullYear());
       if (m) m.outstanding += (Number(b.grandTotal) || 0);
     });
 
+    // 5. Overall Report Data
+    const overallData = companies
+      .filter(c => searchTerm === '' || c.name.toLowerCase().includes(searchTerm.toLowerCase()))
+      .map(c => {
+        const companyBills = bills.filter(b => b.companyId === c.id && b.status !== 'Draft');
+        const companyPayments = payments.filter(p => p.companyId === c.id);
+        const billed = companyBills.reduce((sum, b) => sum + (Number(b.grandTotal) || 0), 0) + (Number(c.openingBalance) || 0);
+        const paid =
+          companyBills.reduce((sum, b) => sum + (Number(b.advancePayment) || 0), 0) +
+          companyPayments.reduce((sum, p) => sum + (Number(p.amount) || 0) + (Number(p.adjustment) || 0), 0);
+        return {
+          company: c.name,
+          billsCount: companyBills.length,
+          totalBilled: billed,
+          paidAmount: paid,
+          balance: billed - paid
+        };
+      }).sort((a, b) => b.balance - a.balance);
+
+    const overallTotals = overallData.reduce((acc, item) => {
+      acc.totalBills += item.billsCount;
+      acc.totalBilled += item.totalBilled;
+      acc.totalPaid += item.paidAmount;
+      acc.totalBalance += item.balance;
+      return acc;
+    }, { totalBills: 0, totalBilled: 0, totalPaid: 0, totalBalance: 0 });
+
     return {
       outstandingData: companyStats,
+      overallData,
+      overallTotals,
       totalOutstanding: total,
       totalOverdue: totalOverdue,
       timeSeriesData: monthsData,
@@ -302,7 +327,8 @@ export default function ReportsPage() {
       pdf.setFont("helvetica", "bold");
 
       let reportTitle = "Report";
-      if (reportType === 'outstanding') reportTitle = 'BALANCE REPORT';
+      if (reportType === 'overall') reportTitle = 'OVERALL SUMMARY REPORT';
+      if (reportType === 'outstanding') reportTitle = 'REMAINING BALANCE REPORT';
       if (reportType === 'bills') reportTitle = 'BILLS REPORT';
       if (reportType === 'payments') reportTitle = 'PAYMENTS REPORT';
       if (reportType === 'company') reportTitle = 'LEDGER REPORT';
@@ -329,12 +355,36 @@ export default function ReportsPage() {
       pdf.text(`Date Printed: ${formatDate(new Date().toISOString())}`, pageWidth - 14, yPos, { align: "right" });
 
       yPos = reportType === 'company' ? periodYPos + 10 : periodYPos + 10;
-      let head = [];
+      let head: any[][] = [];
       let body = [];
       let customStyles = {};
 
-      if (reportType === 'outstanding') {
-        head = [['Company Name', 'No Of Bills', 'Last Due', 'Days Overdue', 'Total Debit', 'Received', 'Outstanding Amount', 'Status']];
+      if (reportType === 'overall') {
+        head = [['Company Name', 'No Of Bills', 'Bill Total (Incl. OB)', 'Paid Amount', 'Balance']];
+        body = overallData.map((item: any) => [
+          item.company,
+          item.billsCount.toString(),
+          formatCurrency(item.totalBilled),
+          formatCurrency(item.paidAmount),
+          formatCurrency(item.balance)
+        ]);
+        customStyles = {
+          1: { halign: 'center' },
+          2: { halign: 'right' },
+          3: { halign: 'right' },
+          4: { halign: 'right', fontStyle: 'bold' }
+        };
+
+        // Add Summary Totals Row
+        body.push([
+          'TOTAL',
+          overallTotals.totalBills.toString(),
+          formatCurrency(overallTotals.totalBilled),
+          formatCurrency(overallTotals.totalPaid),
+          formatCurrency(overallTotals.totalBalance)
+        ]);
+      } else if (reportType === 'outstanding') {
+        head = [['Company Name', 'No Of Bills', 'Last Due', 'Days Overdue', 'Total Debit', 'Received', 'Rem. Balance', 'Status']];
         body = outstandingData.map(item => [
           item.company,
           item.billsCount.toString(),
@@ -431,7 +481,7 @@ export default function ReportsPage() {
 
       autoTable(pdf, {
         startY: yPos,
-        head: head,
+        head: head as any[][],
         body: body,
         theme: 'grid',
         headStyles: { fillColor: [44, 62, 80], textColor: [255, 255, 255], fontStyle: 'bold' },
@@ -487,8 +537,8 @@ export default function ReportsPage() {
           </CardTitle>
         </CardHeader>
         <CardContent className="space-y-6 pb-8">
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-6 gap-6">
-            <div className="lg:col-span-2">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-6 gap-4 sm:gap-6">
+            <div className="sm:col-span-2 lg:col-span-2">
               <Label htmlFor="search-company" className="text-[10px] font-black uppercase tracking-widest text-slate-400 mb-1.5 block">
                 Search Company
               </Label>
@@ -502,7 +552,7 @@ export default function ReportsPage() {
               />
             </div>
 
-            <div>
+            <div className="sm:col-span-1">
               <Label htmlFor="report-type" className="text-[10px] font-black uppercase tracking-widest text-slate-400 mb-1.5 block">
                 Report Type
               </Label>
@@ -511,7 +561,8 @@ export default function ReportsPage() {
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="outstanding">Outstanding Balance</SelectItem>
+                  <SelectItem value="overall">Overall Summary Report</SelectItem>
+                  <SelectItem value="outstanding">Remaining Balance Report</SelectItem>
                   <SelectItem value="bills">Bills by Date</SelectItem>
                   <SelectItem value="payments">Payments by Date</SelectItem>
                   <SelectItem value="company">Company Ledger</SelectItem>
@@ -519,7 +570,7 @@ export default function ReportsPage() {
               </Select>
             </div>
 
-            <div>
+            <div className="sm:col-span-1">
               <Label htmlFor="date-from" className="text-[10px] font-black uppercase tracking-widest text-slate-400 mb-1.5 block">
                 From
               </Label>
@@ -535,7 +586,7 @@ export default function ReportsPage() {
               />
             </div>
 
-            <div>
+            <div className="sm:col-span-1">
               <Label htmlFor="date-to" className="text-[10px] font-black uppercase tracking-widest text-slate-400 mb-1.5 block">
                 To
               </Label>
@@ -552,7 +603,7 @@ export default function ReportsPage() {
             </div>
 
             {reportType === 'company' && (
-              <div>
+              <div className="sm:col-span-1">
                 <Label className="text-[10px] font-black uppercase tracking-widest text-slate-400 mb-1.5 block">Select Company</Label>
                 <Select value={selectedCompanyId} onValueChange={setSelectedCompanyId}>
                   <SelectTrigger className="h-11 bg-slate-50 border-slate-100 rounded-xl font-bold">
@@ -605,7 +656,7 @@ export default function ReportsPage() {
         <CardHeader>
           <div className="flex items-center justify-between">
             <CardTitle className="text-base">
-              {reportType === 'outstanding' && 'Outstanding by Company'}
+              {reportType === 'outstanding' && 'Remaining Balance by Company'}
               {reportType === 'bills' && 'Bills Report'}
               {reportType === 'payments' && 'Payments Report'}
               {reportType === 'company' && 'Company Ledger'}
@@ -618,9 +669,49 @@ export default function ReportsPage() {
             </div>
           </div>
         </CardHeader>
-        <CardContent ref={reportRef}>
-          <div className="overflow-x-auto">
-            <Table>
+        <CardContent ref={reportRef} className="p-0 sm:p-6">
+          <div className="overflow-x-auto custom-scrollbar">
+            <div className="min-w-[1000px]">
+              <Table>
+              {reportType === 'overall' && (
+                <>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Company Name</TableHead>
+                      <TableHead className="text-center">No Of Bills</TableHead>
+                      <TableHead className="text-right">Total Billed (Incl. OB)</TableHead>
+                      <TableHead className="text-right">Paid Amount</TableHead>
+                      <TableHead className="text-right text-primary">Balance</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {overallData.map((item: any, idx: number) => (
+                      <TableRow key={idx}>
+                        <TableCell className="font-medium">{item.company}</TableCell>
+                        <TableCell className="text-center font-medium">{item.billsCount}</TableCell>
+                        <TableCell className="text-right font-semibold">
+                          {formatCurrency(item.totalBilled)}
+                        </TableCell>
+                        <TableCell className="text-right font-semibold text-green-600">
+                          {formatCurrency(item.paidAmount)}
+                        </TableCell>
+                        <TableCell className="text-right font-bold text-primary">
+                          {formatCurrency(item.balance)}
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                  <TableHeader>
+                    <TableRow className="bg-muted/50 border-t-2">
+                      <TableCell className="font-black">TOTAL</TableCell>
+                      <TableCell className="text-center font-black">{overallTotals.totalBills}</TableCell>
+                      <TableCell className="text-right font-black">{formatCurrency(overallTotals.totalBilled)}</TableCell>
+                      <TableCell className="text-right font-black text-green-700">{formatCurrency(overallTotals.totalPaid)}</TableCell>
+                      <TableCell className="text-right font-black text-primary border-l-2 bg-primary/5">{formatCurrency(overallTotals.totalBalance)}</TableCell>
+                    </TableRow>
+                  </TableHeader>
+                </>
+              )}
               {reportType === 'outstanding' && (
                 <>
                   <TableHeader>
@@ -631,7 +722,7 @@ export default function ReportsPage() {
                       <TableHead className="text-right">Days Overdue</TableHead>
                       <TableHead className="text-right">Total Debit</TableHead>
                       <TableHead className="text-right">Received</TableHead>
-                      <TableHead className="text-right">Outstanding Amount</TableHead>
+                      <TableHead className="text-right">Remaining Balance</TableHead>
                       <TableHead className="text-right">Status</TableHead>
                     </TableRow>
                   </TableHeader>
@@ -743,44 +834,81 @@ export default function ReportsPage() {
                   <TableHeader>
                     <TableRow>
                       <TableHead>Date</TableHead>
-                      <TableHead>Type</TableHead>
-                      <TableHead>Reference / Job No</TableHead>
-                      <TableHead className="text-right">Debit</TableHead>
-                      <TableHead className="text-right">Credit</TableHead>
+                      <TableHead>Description</TableHead>
+                      <TableHead>Job No</TableHead>
+                      <TableHead className="text-right">Bill Total</TableHead>
+                      <TableHead className="text-right">Advance</TableHead>
+                      <TableHead className="text-right">Paid</TableHead>
+                      <TableHead className="text-right">Adj.</TableHead>
+                      <TableHead className="text-right">Outst.</TableHead>
+                      <TableHead className="text-right text-primary">Balance</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {companyLedger.length === 0 ? (
-                      <TableRow><TableCell colSpan={5} className="text-center py-8 text-muted-foreground">No entries for this company in range</TableCell></TableRow>
+                    {companyLedger.length === 0 && ledgerOpeningBalance === 0 ? (
+                      <TableRow><TableCell colSpan={6} className="text-center py-8 text-muted-foreground">No entries for this company in range</TableCell></TableRow>
                     ) : (
-                      companyLedger.map((entry: any, idx: number) => (
-                        <TableRow key={idx}>
-                          <TableCell>{formatDate(entry.date)}</TableCell>
-                          <TableCell className="text-[10px] uppercase font-black">{entry.type}</TableCell>
-                          <TableCell className="font-mono text-xs">{entry.jobNumber || entry.reference || '-'}</TableCell>
-                          <TableCell className="text-right font-bold text-red-600">
-                            {entry.type === 'BILL' ? formatCurrency(entry.grandTotal) : '-'}
-                          </TableCell>
-                          <TableCell className="text-right font-bold text-green-600">
-                            {entry.type === 'PAYMENT' ? formatCurrency(Number(entry.amount) + (Number(entry.adjustment) || 0)) : '-'}
-                          </TableCell>
+                      <>
+                        {/* Opening Balance Row */}
+                        <TableRow className="bg-muted/30 border-b-2 font-bold">
+                          <TableCell>{formatDate(dateFrom)}</TableCell>
+                          <TableCell colSpan={2}>Opening Balance b/f</TableCell>
+                          <TableCell className="text-right">-</TableCell>
+                          <TableCell className="text-right">-</TableCell>
+                          <TableCell className="text-right">-</TableCell>
+                          <TableCell className="text-right">-</TableCell>
+                          <TableCell className="text-right">-</TableCell>
+                          <TableCell className="text-right font-black text-primary bg-primary/5">{formatCurrency(ledgerOpeningBalance)}</TableCell>
                         </TableRow>
-                      ))
+                        {companyLedger.map((entry: any, idx: number) => {
+                          let desc = entry.description;
+                          if (entry.type === 'PAYMENT') {
+                            desc = entry.method ? `Payment Received (${entry.method})` : 'Advance Received';
+                            if (entry.paymentRef) desc += ` - Ref: ${entry.paymentRef}`;
+                          }
+                          return (
+                            <TableRow key={idx} className="hover:bg-muted/5">
+                              <TableCell className="text-xs">{formatDate(entry.date)}</TableCell>
+                              <TableCell className="text-[10px] font-medium max-w-[150px] truncate">{desc}</TableCell>
+                              <TableCell className="font-mono text-[10px]">{entry.jobNumber || entry.reference || '-'}</TableCell>
+                              <TableCell className="text-right font-bold text-red-600">
+                                {entry.debit > 0 ? formatCurrency(entry.debit) : '-'}
+                              </TableCell>
+                              <TableCell className="text-right font-bold text-blue-600">
+                                {entry.advance > 0 ? formatCurrency(entry.advance) : '-'}
+                              </TableCell>
+                              <TableCell className="text-right font-bold text-green-600">
+                                {entry.paid > 0 ? formatCurrency(entry.paid) : '-'}
+                              </TableCell>
+                              <TableCell className="text-right font-bold text-orange-600">
+                                {entry.adjustment > 0 ? formatCurrency(entry.adjustment) : '-'}
+                              </TableCell>
+                              <TableCell className="text-right font-bold text-destructive">
+                                {entry.outstanding > 0 ? formatCurrency(entry.outstanding) : '-'}
+                              </TableCell>
+                              <TableCell className="text-right font-black border-l-2 bg-slate-50 dark:bg-slate-900 shadow-inner">
+                                {formatCurrency(entry.balance)}
+                              </TableCell>
+                            </TableRow>
+                          );
+                        })}
+                      </>
                     )}
                   </TableBody>
                 </>
               )}
             </Table>
           </div>
-        </CardContent>
-      </Card>
+        </div>
+      </CardContent>
+    </Card>
 
       {/* Swapped: Charts Next */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         <Card>
           <CardHeader>
             <CardTitle className="text-base">
-              Outstanding Balance Trend
+              Remaining Balance Trend
             </CardTitle>
           </CardHeader>
           <CardContent>
@@ -815,7 +943,7 @@ export default function ReportsPage() {
             {reportType === 'outstanding' || reportType === 'company' ? (
               <>
                 <div>
-                  <p className="text-xs text-muted-foreground">Total Outstanding</p>
+                  <p className="text-xs text-muted-foreground">Total Remaining Balance</p>
                   <p className="text-2xl font-bold text-primary mt-1">
                     {totalOutstanding.toLocaleString()}
                   </p>

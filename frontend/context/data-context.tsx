@@ -10,6 +10,7 @@ export interface Company {
   identifier?: string;
   name: string;
   ntn?: string;
+  saleTaxNo?: string;
   email: string;
   phone: string;
   address: string;
@@ -20,7 +21,7 @@ export interface Company {
   createdAt: string;
 }
 
-export type BillStatus = 'Paid' | 'Partial' | 'Unpaid';
+export type BillStatus = 'Paid' | 'Partial' | 'Unpaid' | 'Draft';
 
 export interface BillItem {
   id: string;
@@ -126,7 +127,37 @@ export interface SecurityTracking {
   chequeName?: string | null;
   receiverName?: string | null;
   receiverContact?: string | null;
+  depositBank?: string | null; // New field
+  attachment?: string | null;   // New field (Path or URL)
   status: 'Pending' | 'Completed';
+  createdAt: string;
+}
+
+export interface Exporter {
+  id: string;
+  name: string;
+  createdAt: string;
+}
+
+export interface SaleTax {
+  id: string;
+  companyId: string;
+  companyName: string;
+  date: string;
+  refBillNo?: string;
+  clearingForwardingOf?: string;
+  packages?: string;
+  igmEgm?: string;
+  igmEgmDate?: string;
+  indexNo?: string;
+  gdNo?: string;
+  gdDate?: string;
+  value: number;
+  serviceCharges: number;
+  salesTaxPercentage: number;
+  grandTotal: number;
+  words?: string;
+  status: string;
   createdAt: string;
 }
 
@@ -145,7 +176,7 @@ interface DataContextType {
   updatePayment: (id: string, payment: Partial<Payment>) => Promise<any>;
   deletePayment: (id: string) => Promise<void>;
   addSecurity: (security: Omit<SecurityTracking, 'id' | 'createdAt' | 'status'>) => Promise<any>;
-  updateSecurity: (id: string, data: Partial<SecurityTracking>) => void;
+  updateSecurity: (id: string, data: any) => Promise<any>; // Updated to return result
   deleteSecurity: (id: string) => Promise<void>;
   securities: SecurityTracking[];
   getCompanyLedger: (companyId: string) => LedgerEntry[];
@@ -158,6 +189,12 @@ interface DataContextType {
   };
   refreshData: () => Promise<void>;
   isLoaded: boolean;
+  exporters: Exporter[];
+  addExporter: (exporter: Omit<Exporter, 'id' | 'createdAt'>) => Promise<any>;
+  saleTaxes: SaleTax[];
+  addSaleTax: (data: any) => Promise<any>;
+  updateSaleTax: (id: string, data: any) => Promise<any>;
+  deleteSaleTax: (id: string) => Promise<void>;
 }
 
 const DataContext = createContext<DataContextType | undefined>(undefined);
@@ -173,6 +210,8 @@ export function DataProvider({ children }: { children: ReactNode }) {
   const [bills, setBills] = useState<Bill[]>([]);
   const [payments, setPayments] = useState<Payment[]>([]);
   const [securities, setSecurities] = useState<SecurityTracking[]>([]);
+  const [exporters, setExporters] = useState<Exporter[]>([]);
+  const [saleTaxes, setSaleTaxes] = useState<SaleTax[]>([]);
   const [isLoaded, setIsLoaded] = useState(false);
 
   const refreshData = useCallback(async () => {
@@ -188,10 +227,12 @@ export function DataProvider({ children }: { children: ReactNode }) {
         ApiService.get('/bills', token),
         ApiService.get('/payments', token),
         ApiService.get('/securities', token),
+        ApiService.get('/exporters', token),
+        ApiService.get('/sale-taxes', token),
       ]);
 
       // Handle each result independently
-      const [companiesRes, billsRes, paymentsRes, securitiesRes] = results;
+      const [companiesRes, billsRes, paymentsRes, securitiesRes, exportersRes, saleTaxesRes] = results;
 
       // SECURITY FIX: Remove unsafe 'as any' casts, use proper type checking
       if (companiesRes.status === 'fulfilled' && companiesRes.value.ok) {
@@ -222,6 +263,18 @@ export function DataProvider({ children }: { children: ReactNode }) {
         console.error('Failed to load securities:', securitiesRes);
       }
 
+      if (exportersRes.status === 'fulfilled' && exportersRes.value.ok) {
+        setExporters(exportersRes.value.data || []);
+      } else {
+        console.error('Failed to load exporters:', exportersRes);
+      }
+
+      if (saleTaxesRes.status === 'fulfilled' && saleTaxesRes.value.ok) {
+        setSaleTaxes(saleTaxesRes.value.data || []);
+      } else {
+        console.error('Failed to load sale taxes:', saleTaxesRes);
+      }
+
       setIsLoaded(true);
     } catch (error) {
       console.error('Critical error fetching data:', error);
@@ -246,6 +299,15 @@ export function DataProvider({ children }: { children: ReactNode }) {
       console.error('Failed to add company:', result.message, (result as any).data);
       return { ok: false, message: result.message };
     }
+  };
+
+  const addExporter = async (exporterData: Omit<Exporter, 'id' | 'createdAt'>) => {
+    const token = localStorage.getItem('authToken');
+    const result = await ApiService.post('/exporters', exporterData, token);
+    if (result.ok && result.data) {
+      setExporters(prev => [...prev, result.data]);
+    }
+    return result;
   };
 
   const updateCompany = async (id: string, data: Partial<Company>) => {
@@ -373,12 +435,14 @@ export function DataProvider({ children }: { children: ReactNode }) {
     return result;
   };
 
-  const updateSecurity = async (id: string, data: Partial<SecurityTracking>) => {
+  const updateSecurity = async (id: string, data: any) => {
     const token = localStorage.getItem('authToken');
     const result = await ApiService.put(`/securities/${id}`, data, token);
     if (result.ok && result.data) {
       setSecurities(prev => prev.map(s => s.id === id ? result.data : s));
+      refreshData();
     }
+    return result;
   };
 
   const deleteSecurity = async (id: string) => {
@@ -391,7 +455,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
 
   const getCompanyLedger = (companyId: string): LedgerEntry[] => {
     // BUG FIX: Use numeric equality to prevent type confusion
-    const companyBills = bills.filter(b => Number(b.companyId) === Number(companyId)).flatMap(b => {
+    const companyBills = bills.filter(b => Number(b.companyId) === Number(companyId) && b.status !== 'Draft').flatMap(b => {
       const entries: LedgerEntry[] = [];
 
       // 1. Add Debit Entry (Gross Bill)
@@ -508,6 +572,32 @@ export function DataProvider({ children }: { children: ReactNode }) {
     return { totalBilled, totalCollected, outstanding, activeCompanies };
   };
 
+  const addSaleTax = async (data: any) => {
+    const token = localStorage.getItem('authToken');
+    const result = await ApiService.post('/sale-taxes', data, token);
+    if (result.ok && result.data) {
+      setSaleTaxes(prev => [...prev, result.data]);
+    }
+    return result;
+  };
+
+  const updateSaleTax = async (id: string, data: any) => {
+    const token = localStorage.getItem('authToken');
+    const result = await ApiService.put(`/sale-taxes/${id}`, data, token);
+    if (result.ok && result.data) {
+      setSaleTaxes(prev => prev.map(s => s.id === id ? result.data : s));
+    }
+    return result;
+  };
+
+  const deleteSaleTax = async (id: string) => {
+    const token = localStorage.getItem('authToken');
+    const result = await ApiService.delete(`/sale-taxes/${id}`, token);
+    if (result.ok) {
+      setSaleTaxes(prev => prev.filter(s => s.id !== id));
+    }
+  };
+
   return (
     <DataContext.Provider
       value={{
@@ -533,6 +623,12 @@ export function DataProvider({ children }: { children: ReactNode }) {
         getDashboardStats,
         refreshData,
         isLoaded,
+        exporters,
+        addExporter,
+        saleTaxes,
+        addSaleTax,
+        updateSaleTax,
+        deleteSaleTax,
       }}
     >
       {children}
