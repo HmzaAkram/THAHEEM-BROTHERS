@@ -4,18 +4,21 @@ This document explains how totals and balances are calculated across the differe
 
 ## 1. Dashboard
 
-The Dashboard provides an overall financial summary of the business.
+The Dashboard provides an overall financial summary of the entire business.
 
 *   **Total Billed**:
-    *   Sum of `Grand Total` of all Bills (excluding 'Draft' status).
+    *   Sum of `Grand Total` of all Bills generated (excluding 'Draft').
     *   Plus: Sum of `Opening Balance` of all Companies (only when 'Overall Stats' filter is selected).
 *   **Total Collected**:
     *   Sum of `Advance Payment` from all Bills.
-    *   Plus: Sum of `Amount` and `Adjustment` from all Payment records.
-*   **Outstanding Balance**:
-    *   `Total Billed` minus `Total Collected`.
-*   **New/Total Companies**:
-    *   Count of companies registered within the selected time period.
+    *   Plus: Sum of `Opening Balance Paid` (if payment is recorded against an opening balance).
+    *   Plus: Sum of all regular `Bill Payments`.
+    *   Plus: Sum of any manual `Adjustments` recorded during payment entry.
+*   **Outstanding Balance (Remaining Balance)**:
+    *   Calculated as `Total Billed - Total Collected`.
+    *   Represents the current cumulative debt across all clients.
+*   **Active Companies**:
+    *   Total number of companies registered in the system.
 
 ---
 
