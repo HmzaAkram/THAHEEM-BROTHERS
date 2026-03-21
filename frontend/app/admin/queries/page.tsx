@@ -72,6 +72,14 @@ export default function AdminQueriesPage() {
     const [searchTerm, setSearchTerm] = useState('');
     const [statusFilter, setStatusFilter] = useState<string>('all');
 
+    // Pagination State
+    const [currentPage, setCurrentPage] = useState(1);
+    const itemsPerPage = 50;
+
+    useEffect(() => {
+        setCurrentPage(1);
+    }, [searchTerm, statusFilter]);
+
     const adminQuickReplies = [
         "Okay, I am looking into this right now.",
         "Sorry for the mistake, the charges have been updated.",
@@ -173,6 +181,9 @@ export default function AdminQueriesPage() {
         return matchesSearch && matchesStatus;
     });
 
+    const totalPages = Math.ceil(filteredQueries.length / itemsPerPage);
+    const paginatedQueries = filteredQueries.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage);
+
     if (!authHydrated) {
         return (
             <DashboardLayout role="admin">
@@ -227,8 +238,9 @@ export default function AdminQueriesPage() {
                                 No queries found matching your criteria.
                             </div>
                         ) : (
-                            <div className="rounded-md border overflow-hidden">
-                                <Table>
+                            <>
+                                <div className="rounded-md border overflow-hidden">
+                                    <Table>
                                     <TableHeader className="bg-muted/50">
                                         <TableRow>
                                             <TableHead>Company</TableHead>
@@ -239,7 +251,7 @@ export default function AdminQueriesPage() {
                                         </TableRow>
                                     </TableHeader>
                                     <TableBody>
-                                        {filteredQueries.map((query) => (
+                                        {paginatedQueries.map((query) => (
                                             <TableRow key={query.id} className="cursor-pointer hover:bg-muted/50" onClick={() => openChat(query)}>
                                                 <TableCell>
                                                     <div className="flex flex-col">
@@ -265,6 +277,71 @@ export default function AdminQueriesPage() {
                                     </TableBody>
                                 </Table>
                             </div>
+                            
+                            {/* Pagination Controls */}
+                            {totalPages > 1 && (
+                                <div className="flex flex-col sm:flex-row items-center justify-between gap-4 mt-6">
+                                    <p className="text-sm text-muted-foreground w-full text-center sm:text-left">
+                                        Showing {(currentPage - 1) * itemsPerPage + 1} to {Math.min(currentPage * itemsPerPage, filteredQueries.length)} of {filteredQueries.length} entries
+                                    </p>
+                                    <div className="flex items-center gap-1.5 w-full justify-center sm:justify-end">
+                                        <Button
+                                            variant="outline"
+                                            size="sm"
+                                            onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
+                                            disabled={currentPage === 1}
+                                            className="h-8 shadow-sm rounded-lg"
+                                        >
+                                            Previous
+                                        </Button>
+                                        <div className="flex items-center gap-1 hidden md:flex">
+                                            {Array.from({ length: totalPages }, (_, i) => i + 1)
+                                                .filter(p => p === 1 || p === totalPages || Math.abs(p - currentPage) <= 1)
+                                                .map((p, i, arr) => {
+                                                    if (i > 0 && p - arr[i - 1] > 1) {
+                                                        return (
+                                                            <div key={`ellipsis-${p}`} className="flex items-center gap-1">
+                                                                <span className="px-2 text-muted-foreground">...</span>
+                                                                <Button
+                                                                    variant={currentPage === p ? 'default' : 'outline'}
+                                                                    size="sm"
+                                                                    onClick={() => setCurrentPage(p)}
+                                                                    className={`h-8 w-8 p-0 rounded-lg shadow-sm ${currentPage === p ? 'bg-primary text-primary-foreground font-bold hover:bg-primary/90' : 'text-slate-600 hover:text-slate-900 border-border/50 bg-slate-50'}`}
+                                                                >
+                                                                    {p}
+                                                                </Button>
+                                                            </div>
+                                                        );
+                                                    }
+                                                    return (
+                                                        <Button
+                                                            key={p}
+                                                            variant={currentPage === p ? 'default' : 'outline'}
+                                                            size="sm"
+                                                            onClick={() => setCurrentPage(p)}
+                                                            className={`h-8 w-8 p-0 rounded-lg shadow-sm ${currentPage === p ? 'bg-primary text-primary-foreground font-bold hover:bg-primary/90' : 'text-slate-600 hover:text-slate-900 border-border/50 bg-white'}`}
+                                                        >
+                                                            {p}
+                                                        </Button>
+                                                    );
+                                                })}
+                                        </div>
+                                        <span className="md:hidden text-sm px-2 font-medium">
+                                            Page {currentPage} of {totalPages}
+                                        </span>
+                                        <Button
+                                            variant="outline"
+                                            size="sm"
+                                            onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))}
+                                            disabled={currentPage === totalPages}
+                                            className="h-8 shadow-sm rounded-lg"
+                                        >
+                                            Next
+                                        </Button>
+                                    </div>
+                                </div>
+                            )}
+                        </>
                         )}
                     </CardContent>
                 </Card>

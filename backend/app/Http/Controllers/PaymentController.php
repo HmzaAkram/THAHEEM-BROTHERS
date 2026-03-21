@@ -7,6 +7,24 @@ use Illuminate\Http\Request;
 
 class PaymentController extends Controller
 {
+    private function reevaluateBillStatus($billId)
+    {
+        if (!$billId) return;
+        $bill = \App\Models\Bill::find($billId);
+        if (!$bill) return;
+
+        $paid = $bill->paid_amount;
+        $newStatus = 'Unpaid';
+        if ($paid > 0) $newStatus = 'Partial';
+        if ($paid >= $bill->grand_total && $bill->grand_total > 0) {
+            $newStatus = 'Paid';
+        }
+
+        \Illuminate\Support\Facades\DB::table('bills')
+            ->where('id', $billId)
+            ->update(['status' => $newStatus]);
+    }
+
     public function index()
     {
         $user = auth('sanctum')->user();
@@ -44,19 +62,14 @@ class PaymentController extends Controller
             'pay_order_no' => 'nullable|string',
         ]);
 
-        // If bill_id is provided, proceed with standard single-bill payment logic
-        if (!empty($validated['bill_id'])) {
-            $payment = Payment::create($validated);
-            return response()->json($payment, 201);
-        }
-
-        // Lumpsum payment logic: Clear opening balance first, then bills
         return \Illuminate\Support\Facades\DB::transaction(function () use ($validated) {
             $company = \App\Models\Company::findOrFail($validated['company_id']);
             $totalAmount = (float)$validated['amount'];
             $remainingPayment = $totalAmount;
+            $createdPayments = [];
+            $affectedBillIds = [];
             
-            // 1. Calculate how much of the opening balance is still outstanding
+            // 1. ALWAYS Clear opening balance first if it exists
             $openingBalance = (float)($company->opening_balance ?? 0);
             $clearedOpening = (float)Payment::where('company_id', $company->id)
                 ->whereNull('bill_id')
@@ -64,16 +77,37 @@ class PaymentController extends Controller
             
             $remainingOpening = max(0, $openingBalance - $clearedOpening);
             
-            // 2. If there's an opening balance to clear, use this payment for it
-            $appliedToOpening = 0;
-            if ($remainingOpening > 0) {
+            if ($remainingOpening > 0 && $remainingPayment > 0) {
                 $appliedToOpening = min($remainingPayment, $remainingOpening);
+                
+                $obPaymentData = array_merge($validated, [
+                    'amount' => $appliedToOpening,
+                    'adjustment' => 0, // Adjustment should not apply to OB clearing
+                    'bill_id' => null, // null marks it as OB/General
+                    'description' => ($validated['description'] ?? '') . " (Applied to opening balance)",
+                ]);
+                $createdPayments[] = Payment::create($obPaymentData);
                 $remainingPayment -= $appliedToOpening;
             }
 
-            // 3. Clear outstanding bills with the remaining amount
-            $createdPayments = [];
-            if ($remainingPayment > 0) {
+            // 2. If bill_id is provided, apply the remainder to THAT bill
+            if (!empty($validated['bill_id']) && ($remainingPayment > 0 || (float)($validated['adjustment'] ?? 0) > 0)) {
+                $bill = \App\Models\Bill::findOrFail($validated['bill_id']);
+                $amountNeeded = $bill->grand_total - $bill->paid_amount;
+                // If the payment was hijacked for OB, the remaining amount might be less than originally planned
+                $toApply = min($remainingPayment, $amountNeeded);
+
+                $billPaymentData = array_merge($validated, [
+                    'amount' => $toApply,
+                    'bill_id' => $bill->id,
+                    // Keep the original adjustment here, as it was intended for this bill
+                ]);
+                $createdPayments[] = Payment::create($billPaymentData);
+                $affectedBillIds[] = $bill->id;
+                $remainingPayment -= $toApply;
+            } 
+            // 3. Lumpsum mode (or remainder from specific bill) distributed to other bills oldest first
+            elseif (empty($validated['bill_id']) && $remainingPayment > 0) {
                 // Fetch all bills with outstanding balance, oldest first
                 $bills = \App\Models\Bill::where('company_id', $company->id)
                     ->get()
@@ -91,29 +125,43 @@ class PaymentController extends Controller
                     if ($toApply > 0) {
                         $billPaymentData = array_merge($validated, [
                             'amount' => $toApply,
+                            'adjustment' => 0, // No adjustments in auto-lumpsum distribution
                             'bill_id' => $bill->id,
-                            'description' => ($validated['description'] ?? '') . " (Auto-distributed from Lumpsum)",
+                            'description' => ($validated['description'] ?? '') . " (Auto-distributed)",
                         ]);
                         $createdPayments[] = Payment::create($billPaymentData);
+                        $affectedBillIds[] = $bill->id;
                         $remainingPayment -= $toApply;
                     }
                 }
             }
 
-            // 4. Create the "General" payment record for opening balance + any extra surplus
-            // We combine the opening balance portion and any remaining surplus into one record
-            $generalAmount = $appliedToOpening + $remainingPayment;
-            
-            if ($generalAmount > 0 || (empty($createdPayments) && $totalAmount == 0)) {
+            // 4. Any remaining surplus goes to a General/Advance record
+            // If we already applied the adjustment to a bill (step 2), we should set it to 0 here
+            $finalAdjustment = (empty($validated['bill_id'])) ? (float)($validated['adjustment'] ?? 0) : 0;
+
+            if ($remainingPayment > 0 || (empty($createdPayments) && $totalAmount == 0)) {
                 $generalPaymentData = array_merge($validated, [
-                    'amount' => $generalAmount,
+                    'amount' => $remainingPayment,
+                    'adjustment' => $finalAdjustment,
                     'bill_id' => null,
                 ]);
                 $finalPayment = Payment::create($generalPaymentData);
+                
+                // Reevaluate all affected bills
+                foreach (array_unique($affectedBillIds) as $bId) {
+                    $this->reevaluateBillStatus($bId);
+                }
+                
                 return response()->json($finalPayment, 201);
             }
 
-            // Return the first created payment if no general payment was made
+            // Reevaluate all affected bills
+            foreach (array_unique($affectedBillIds) as $bId) {
+                $this->reevaluateBillStatus($bId);
+            }
+
+            // Return the first created payment or the summary of what happened
             return response()->json($createdPayments[0] ?? null, 201);
         });
     }
@@ -140,7 +188,15 @@ class PaymentController extends Controller
             'pay_order_no' => 'nullable|string',
         ]);
 
+        $oldBillId = $payment->bill_id;
         $payment->update($validated);
+        $newBillId = $payment->bill_id;
+
+        $this->reevaluateBillStatus($oldBillId);
+        if ($oldBillId !== $newBillId) {
+            $this->reevaluateBillStatus($newBillId);
+        }
+
         return response()->json($payment);
     }
 
@@ -151,7 +207,9 @@ class PaymentController extends Controller
             return response()->json(['message' => 'Unauthorized. Admin access required.'], 403);
         }
 
+        $billId = $payment->bill_id;
         $payment->delete();
+        $this->reevaluateBillStatus($billId);
         return response()->json(null, 204);
     }
 }

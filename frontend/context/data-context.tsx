@@ -65,6 +65,14 @@ export interface Bill {
   createdAt: string;
 }
 
+const parseNumber = (val: any) => {
+  if (typeof val === 'number') return val;
+  if (!val) return 0;
+  // Remove commas and other non-numeric chars except period and minus
+  const cleaned = String(val).replace(/[^0-9.-]/g, '');
+  return parseFloat(cleaned) || 0;
+};
+
 export interface Payment {
   id: string;
   companyId: string;
@@ -99,6 +107,9 @@ export interface LedgerEntry {
   jobNumber?: string;
   paymentRef?: string;
   method?: string;
+  trackingId?: string;
+  chequeNo?: string;
+  payOrderNo?: string;
   note?: string;
   // Extra detailed bill fields for expansion
   via?: string;
@@ -455,7 +466,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
 
   const getCompanyLedger = (companyId: string): LedgerEntry[] => {
     // BUG FIX: Use numeric equality to prevent type confusion
-    const companyBills = bills.filter(b => Number(b.companyId) === Number(companyId) && b.status !== 'Draft').flatMap(b => {
+    const companyBills = bills.filter(b => String(b.companyId) === String(companyId) && b.status !== 'Draft').flatMap(b => {
       const entries: LedgerEntry[] = [];
 
       // 1. Add Debit Entry (Gross Bill)
@@ -463,7 +474,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
         id: b.id + '_debit',
         date: b.date,
         description: `Job #${b.jobNumber || 'N/A'}`,
-        debit: b.grandTotal,
+        debit: parseNumber(b.grandTotal),
         credit: 0,
         balance: 0,
         companyId: b.companyId,
@@ -492,7 +503,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
           date: b.date,
           description: description,
           debit: 0,
-          credit: b.advancePayment,
+          credit: parseNumber(b.advancePayment),
           balance: 0,
           companyId: b.companyId,
           companyName: b.companyName,
@@ -506,15 +517,15 @@ export function DataProvider({ children }: { children: ReactNode }) {
       return entries;
     });
 
-    const companyPayments = payments.filter(p => Number(p.companyId) === Number(companyId)).map(p => {
-      const linkedBill = bills.find(b => Number(b.id) === Number(p.billId));
+    const companyPayments = payments.filter(p => String(p.companyId) === String(companyId)).map(p => {
+      const linkedBill = bills.find(b => String(b.id) === String(p.billId));
 
       return {
         id: p.id + '_credit',
         date: p.date,
         description: p.description ? `Payment: ${p.description}` : `Payment Received`,
         debit: 0,
-        credit: Number(p.amount) + (Number(p.adjustment) || 0),
+        credit: parseNumber(p.amount) + parseNumber(p.adjustment),
         balance: 0,
         companyId: p.companyId,
         companyName: p.companyName,
@@ -523,6 +534,9 @@ export function DataProvider({ children }: { children: ReactNode }) {
         timestamp: new Date(p.date).getTime(),
         method: p.method,
         paymentRef: p.reference,
+        trackingId: p.trackingId,
+        chequeNo: p.chequeNo,
+        payOrderNo: p.payOrderNo,
         jobNumber: linkedBill?.jobNumber
       };
     });
@@ -530,8 +544,8 @@ export function DataProvider({ children }: { children: ReactNode }) {
     const allEntries = [...companyBills, ...companyPayments].sort((a, b) => (a.timestamp || 0) - (b.timestamp || 0));
 
     // Inject Opening Balance
-    const company = companies.find(c => Number(c.id) === Number(companyId));
-    const openingBalanceAmount = Number(company?.openingBalance || 0);
+    const company = companies.find(c => String(c.id) === String(companyId));
+    const openingBalanceAmount = parseNumber(company?.openingBalance);
 
     let entriesWithOpening = allEntries;
     if (openingBalanceAmount > 0) {
@@ -564,8 +578,16 @@ export function DataProvider({ children }: { children: ReactNode }) {
   };
 
   const getDashboardStats = () => {
-    const totalBilled = bills.reduce((sum, bill) => sum + bill.totalAmount, 0);
-    const totalCollected = payments.reduce((sum, payment) => sum + payment.amount, 0);
+    const nonDraftBills = bills.filter(b => b.status !== 'Draft');
+    
+    const totalBilled = 
+      nonDraftBills.reduce((sum, bill) => sum + parseNumber(bill.grandTotal), 0) + 
+      companies.reduce((sum, c) => sum + parseNumber(c.openingBalance), 0);
+
+    const totalCollected =
+      nonDraftBills.reduce((sum, bill) => sum + parseNumber(bill.advancePayment), 0) +
+      payments.reduce((sum, payment) => sum + parseNumber(payment.amount) + parseNumber(payment.adjustment), 0);
+
     const outstanding = totalBilled - totalCollected;
     const activeCompanies = companies.length;
 

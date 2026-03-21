@@ -70,9 +70,18 @@ function CompanyDetailsContent() {
     const [isEditing, setIsEditing] = useState(false);
     const [editedCompany, setEditedCompany] = useState<any>(null);
 
+    const parseNumber = (val: any) => {
+        if (typeof val === 'number') return val;
+        if (!val) return 0;
+        const cleaned = String(val).replace(/[^0-9.-]/g, '');
+        return parseFloat(cleaned) || 0;
+    };
+
     const stats = useMemo(() => {
-        const totalBilled = ledger.filter(l => l.type === 'BILL').reduce((sum, l) => sum + l.debit, 0);
-        const totalPaid = ledger.filter(l => l.type === 'PAYMENT').reduce((sum, l) => sum + l.credit, 0);
+        // Since ledger already includes Opening Balance as the first debit entry, 
+        // we just need to sum up the ledger debits.
+        const totalBilled = ledger.reduce((sum, l) => sum + (l.debit || 0), 0);
+        const totalPaid = ledger.reduce((sum, l) => sum + (l.credit || 0), 0);
         const outstanding = totalBilled - totalPaid;
         return { totalBilled, totalPaid, outstanding };
     }, [ledger]);

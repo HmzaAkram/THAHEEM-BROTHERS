@@ -32,8 +32,8 @@ import {
 } from 'recharts';
 import { Download } from 'lucide-react';
 import { useData } from '@/context/data-context';
-import { useMemo, useState, useRef } from 'react';
-import { formatDate, formatCurrency } from '@/lib/utils';
+import { useMemo, useState, useRef, useEffect } from 'react';
+import { formatDate, formatCurrency, parseLocalDate, isWithinDateRange } from '@/lib/utils';
 import { jsPDF } from 'jspdf';
 import autoTable from 'jspdf-autotable';
 
@@ -46,6 +46,14 @@ export default function ReportsPage() {
   const [searchTerm, setSearchTerm] = useState('');
   const [timeFilter, setTimeFilter] = useState<'custom' | 'overall' | '6months' | '3months'>('overall');
   const reportRef = useRef<HTMLDivElement>(null);
+
+  // Robust number parsing to handle commas etc.
+  const parseNumber = (val: any) => {
+    if (typeof val === 'number') return val;
+    if (!val) return 0;
+    const cleaned = String(val).replace(/[^0-9.-]/g, '');
+    return parseFloat(cleaned) || 0;
+  };
 
   // Helper to set timeframe
   const handleTimeframeChange = (filter: 'overall' | '6months' | '3months') => {
@@ -69,20 +77,14 @@ export default function ReportsPage() {
 
   const { outstandingData, overallData, overallTotals, totalOutstanding, totalOverdue, timeSeriesData, filteredBills, filteredPayments, companyLedger, ledgerOpeningBalance } = useMemo(() => {
     // 1. Filter raw data based on dates
-    const start = new Date(dateFrom);
-    const end = new Date(dateTo);
-    end.setHours(23, 59, 59, 999);
-
     const fBills = bills.filter(b => {
-      const d = new Date(b.date);
-      const dateMatch = d >= start && d <= end;
+      const dateMatch = isWithinDateRange(b.date, dateFrom, dateTo);
       const searchMatch = searchTerm === '' || b.companyName.toLowerCase().includes(searchTerm.toLowerCase());
       return dateMatch && searchMatch && b.status !== 'Draft';
     });
 
     const fPayments = payments.filter(p => {
-      const d = new Date(p.date);
-      const dateMatch = d >= start && d <= end;
+      const dateMatch = isWithinDateRange(p.date, dateFrom, dateTo);
       const searchMatch = searchTerm === '' || p.companyName.toLowerCase().includes(searchTerm.toLowerCase());
       return dateMatch && searchMatch;
     });
@@ -92,19 +94,19 @@ export default function ReportsPage() {
     let ledgerOpeningBalance = 0;
 
     if (reportType === 'company' && selectedCompanyId !== 'all') {
-      const selectedCompany = companies.find(c => String(c.id) === selectedCompanyId);
-      const baseOpeningBal = Number(selectedCompany?.openingBalance) || 0;
+      const selectedCompany = companies.find(c => String(c.id) === String(selectedCompanyId));
+      const baseOpeningBal = parseNumber(selectedCompany?.openingBalance);
 
       let consolidatedEntries: any[] = [];
-      const companyBills = bills.filter(b => String(b.companyId) === selectedCompanyId && b.status !== 'Draft');
-      const companyPayments = payments.filter(p => String(p.companyId) === selectedCompanyId);
+      const companyBills = bills.filter(b => String(b.companyId) === String(selectedCompanyId) && b.status !== 'Draft');
+      const companyPayments = payments.filter(p => String(p.companyId) === String(selectedCompanyId));
 
       companyBills.forEach(bill => {
         const linkedPayments = payments.filter(p => String(p.billId) === String(bill.id));
-        const totalPaid = linkedPayments.reduce((sum, p) => sum + Number(p.amount || 0), 0);
-        const totalAdjustment = linkedPayments.reduce((sum, p) => sum + Number(p.adjustment || 0), 0);
-        const debitAmount = bill.grandTotal || bill.totalAmount || 0;
-        const advanceAmount = bill.advancePayment || 0;
+        const totalPaid = linkedPayments.reduce((sum, p) => sum + parseNumber(p.amount), 0);
+        const totalAdjustment = linkedPayments.reduce((sum, p) => sum + parseNumber(p.adjustment), 0);
+        const debitAmount = parseNumber(bill.grandTotal);
+        const advanceAmount = parseNumber(bill.advancePayment);
 
         consolidatedEntries.push({
           date: bill.date,
@@ -117,6 +119,15 @@ export default function ReportsPage() {
           adjustment: totalAdjustment,
           credit: advanceAmount + totalPaid + totalAdjustment,
           outstanding: debitAmount - advanceAmount - totalPaid - totalAdjustment,
+          payments: linkedPayments.map(p => ({
+            method: (p as any).method,
+            reference: p.reference,
+            trackingId: (p as any).trackingId,
+            chequeNo: (p as any).chequeNo,
+            payOrderNo: (p as any).payOrderNo,
+            amount: p.amount,
+            adjustment: p.adjustment
+          }))
         });
       });
 
@@ -129,12 +140,15 @@ export default function ReportsPage() {
             jobNumber: null,
             debit: 0,
             advance: 0,
-            paid: Number(p.amount || 0),
-            adjustment: Number(p.adjustment || 0),
-            credit: Number(p.amount || 0) + Number(p.adjustment || 0),
+            paid: parseNumber(p.amount),
+            adjustment: parseNumber(p.adjustment),
+            credit: parseNumber(p.amount) + parseNumber(p.adjustment),
             outstanding: 0,
             method: (p as any).method,
             paymentRef: p.reference,
+            trackingId: (p as any).trackingId,
+            chequeNo: (p as any).chequeNo,
+            payOrderNo: (p as any).payOrderNo,
           });
         }
       });
@@ -143,17 +157,20 @@ export default function ReportsPage() {
 
       // Filter by period and calculate opening balance for THAT period
       let runningOpening = baseOpeningBal;
-      const startOfPeriod = new Date(dateFrom);
-      startOfPeriod.setHours(0, 0, 0, 0);
+      const startOfPeriod = parseLocalDate(dateFrom);
 
-      const previousEntries = consolidatedEntries.filter(e => new Date(e.date) < startOfPeriod);
-      previousEntries.forEach(e => {
-        runningOpening += (e.debit - e.credit);
-      });
+      if (startOfPeriod) {
+        const previousEntries = consolidatedEntries.filter(e => {
+          const d = parseLocalDate(e.date);
+          return d && d < startOfPeriod;
+        });
+        previousEntries.forEach(e => {
+          runningOpening += (e.debit - e.credit);
+        });
+      }
 
       const periodEntries = consolidatedEntries.filter(e => {
-        const d = new Date(e.date);
-        return d >= startOfPeriod && d <= end;
+        return isWithinDateRange(e.date, dateFrom, dateTo);
       });
 
       let running = runningOpening;
@@ -168,13 +185,13 @@ export default function ReportsPage() {
     const companyStats = companies
       .filter(c => searchTerm === '' || c.name.toLowerCase().includes(searchTerm.toLowerCase()))
       .map(c => {
-        const companyBills = bills.filter(b => b.companyId === c.id);
-        const companyPayments = payments.filter(p => p.companyId === c.id);
+        const companyBills = bills.filter(b => String(b.companyId) === String(c.id) && b.status !== 'Draft');
+        const companyPayments = payments.filter(p => String(p.companyId) === String(c.id));
 
-        const billed = companyBills.reduce((sum, b) => sum + (Number(b.grandTotal) || 0), 0) + (Number(c.openingBalance) || 0);
+        const billed = companyBills.reduce((sum, b) => sum + parseNumber(b.grandTotal), 0) + parseNumber(c.openingBalance);
         const paid =
-          companyBills.reduce((sum, b) => sum + (Number(b.advancePayment) || 0), 0) +
-          companyPayments.reduce((sum, p) => sum + (Number(p.amount) || 0) + (Number(p.adjustment) || 0), 0);
+          companyBills.reduce((sum, b) => sum + parseNumber(b.advancePayment), 0) +
+          companyPayments.reduce((sum, p) => sum + parseNumber(p.amount) + parseNumber(p.adjustment), 0);
         const outstanding = billed - paid;
 
         const unpaidBills = companyBills.filter(b => b.status !== 'Paid');
@@ -234,19 +251,19 @@ export default function ReportsPage() {
       if (b.status === 'Draft') return;
       const d = new Date(b.date);
       const m = monthsData.find(mo => mo.monthIdx === d.getMonth() && mo.year === d.getFullYear());
-      if (m) m.outstanding += (Number(b.grandTotal) || 0);
+      if (m) m.outstanding += parseNumber(b.grandTotal);
     });
 
     // 5. Overall Report Data
     const overallData = companies
       .filter(c => searchTerm === '' || c.name.toLowerCase().includes(searchTerm.toLowerCase()))
       .map(c => {
-        const companyBills = bills.filter(b => b.companyId === c.id && b.status !== 'Draft');
-        const companyPayments = payments.filter(p => p.companyId === c.id);
-        const billed = companyBills.reduce((sum, b) => sum + (Number(b.grandTotal) || 0), 0) + (Number(c.openingBalance) || 0);
+        const companyBills = bills.filter(b => String(b.companyId) === String(c.id) && b.status !== 'Draft');
+        const companyPayments = payments.filter(p => String(p.companyId) === String(c.id));
+        const billed = companyBills.reduce((sum, b) => sum + parseNumber(b.grandTotal), 0) + parseNumber(c.openingBalance);
         const paid =
-          companyBills.reduce((sum, b) => sum + (Number(b.advancePayment) || 0), 0) +
-          companyPayments.reduce((sum, p) => sum + (Number(p.amount) || 0) + (Number(p.adjustment) || 0), 0);
+          companyBills.reduce((sum, b) => sum + parseNumber(b.advancePayment), 0) +
+          companyPayments.reduce((sum, p) => sum + parseNumber(p.amount) + parseNumber(p.adjustment), 0);
         return {
           company: c.name,
           billsCount: companyBills.length,
@@ -277,6 +294,53 @@ export default function ReportsPage() {
       ledgerOpeningBalance
     };
   }, [companies, bills, payments, dateFrom, dateTo, reportType, selectedCompanyId, searchTerm]);
+
+  // Pagination State & Logic
+  const [currentPage, setCurrentPage] = useState(1);
+  const itemsPerPage = 50;
+
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [dateFrom, dateTo, reportType, selectedCompanyId, searchTerm, timeFilter]);
+
+  const {
+    paginatedOverallData,
+    paginatedOutstandingData,
+    paginatedBills,
+    paginatedPayments,
+    paginatedCompanyLedger,
+    totalPages
+  } = useMemo(() => {
+    const startIdx = (currentPage - 1) * itemsPerPage;
+    const endIdx = startIdx + itemsPerPage;
+
+    let targetArray = [];
+    if (reportType === 'overall') targetArray = overallData;
+    else if (reportType === 'outstanding') targetArray = outstandingData;
+    else if (reportType === 'bills') targetArray = filteredBills;
+    else if (reportType === 'payments') targetArray = filteredPayments;
+    else if (reportType === 'company') targetArray = companyLedger;
+
+    const totalPages = Math.ceil(targetArray.length / itemsPerPage);
+
+    return {
+      paginatedOverallData: reportType === 'overall' ? targetArray.slice(startIdx, endIdx) : [],
+      paginatedOutstandingData: reportType === 'outstanding' ? targetArray.slice(startIdx, endIdx) : [],
+      paginatedBills: reportType === 'bills' ? targetArray.slice(startIdx, endIdx) : [],
+      paginatedPayments: reportType === 'payments' ? targetArray.slice(startIdx, endIdx) : [],
+      paginatedCompanyLedger: reportType === 'company' ? targetArray.slice(startIdx, endIdx) : [],
+      totalPages: totalPages || 1 // Avoid 0 pages if empty array
+    };
+  }, [overallData, outstandingData, filteredBills, filteredPayments, companyLedger, reportType, currentPage]);
+
+  const getCurrentTotalItems = () => {
+    if (reportType === 'overall') return overallData.length;
+    if (reportType === 'outstanding') return outstandingData.length;
+    if (reportType === 'bills') return filteredBills.length;
+    if (reportType === 'payments') return filteredPayments.length;
+    if (reportType === 'company') return companyLedger.length;
+    return 0;
+  };
 
   const handleExport = async () => {
     try {
@@ -342,7 +406,7 @@ export default function ReportsPage() {
       pdf.setTextColor(15, 23, 42);
 
       if (reportType === 'company') {
-        const companyNameStr = selectedCompanyId !== 'all' ? companies.find(c => c.id === selectedCompanyId)?.name || 'All Companies' : 'All Companies';
+        const companyNameStr = selectedCompanyId !== 'all' ? companies.find(c => String(c.id) === selectedCompanyId)?.name || 'Unknown Company' : 'All Companies';
         pdf.text(`Client: ${companyNameStr}`, 14, yPos);
       }
 
@@ -424,13 +488,37 @@ export default function ReportsPage() {
           payment.reference || 'N/A',
           payment.companyName,
           payment.method,
-          formatCurrency(Number(payment.amount) + (Number(payment.adjustment) || 0))
+          formatCurrency(parseNumber(payment.amount) + parseNumber(payment.adjustment))
         ]);
         customStyles = {
           4: { halign: 'right', fontStyle: 'bold', textColor: [0, 128, 0] }
         };
       } else if (reportType === 'company') {
-        head = [['Date', 'Description', 'Job No', 'Bill Total', 'Advance', 'Paid', 'Adj.', 'Outst.', 'Balance']];
+        head = [['Date', 'Description', 'Method', 'Job No', 'Bill Total', 'Advance', 'Paid', 'Adj.', 'Outst.', 'Balance']];
+
+        // Helper to format method details for PDF
+        const formatMethodDetails = (entry: any) => {
+          if (entry.type === 'PAYMENT') {
+            let details = entry.method || '-';
+            const parts: string[] = [];
+            if (entry.paymentRef) parts.push(`Ref: ${entry.paymentRef}`);
+            if (entry.trackingId && !parts.some(x => x.includes(entry.trackingId) || entry.trackingId.includes(x))) parts.push(`Trk: ${entry.trackingId}`);
+            if (entry.chequeNo && !parts.some(x => x.includes(entry.chequeNo) || entry.chequeNo.includes(x))) parts.push(`Chq: ${entry.chequeNo}`);
+            if (entry.payOrderNo && !parts.some(x => x.includes(entry.payOrderNo) || entry.payOrderNo.includes(x))) parts.push(`PO: ${entry.payOrderNo}`);
+            return parts.length > 0 ? `${details}\n(${parts.join(', ')})` : details;
+          } else if (entry.type === 'BILL' && entry.payments && entry.payments.length > 0) {
+            return entry.payments.map((p: any) => {
+              let m = p.method || 'Payment';
+              const pParts: string[] = [];
+              if (p.reference) pParts.push(`Ref: ${p.reference}`);
+              if (p.trackingId && !pParts.some(x => x.includes(p.trackingId) || p.trackingId.includes(x))) pParts.push(`Trk: ${p.trackingId}`);
+              if (p.chequeNo && !pParts.some(x => x.includes(p.chequeNo) || p.chequeNo.includes(x))) pParts.push(`Chq: ${p.chequeNo}`);
+              if (p.payOrderNo && !pParts.some(x => x.includes(p.payOrderNo) || p.payOrderNo.includes(x))) pParts.push(`PO: ${p.payOrderNo}`);
+              return pParts.length > 0 ? `${m}\n(${pParts.join(', ')})` : m;
+            }).join('\n\n');
+          }
+          return '-';
+        };
 
         // Opening Balance Row
         body.push([
@@ -442,18 +530,16 @@ export default function ReportsPage() {
           '-',
           '-',
           '-',
+          '-',
           formatCurrency(ledgerOpeningBalance)
         ]);
 
         companyLedger.forEach((entry: any) => {
           let desc = entry.description;
-          if (entry.type === 'PAYMENT') {
-            desc = entry.method ? `Payment Received (${entry.method})` : 'Advance Received';
-            if (entry.paymentRef) desc += ` - Ref: ${entry.paymentRef}`;
-          }
           body.push([
             formatDate(entry.date),
             desc,
+            formatMethodDetails(entry),
             entry.jobNumber || '-',
             entry.debit > 0 ? formatCurrency(entry.debit) : '-',
             entry.advance > 0 ? formatCurrency(entry.advance) : '-',
@@ -464,13 +550,48 @@ export default function ReportsPage() {
           ]);
         });
 
+        // Calculate Totals and append TOTALS row
+        let totalBill = 0;
+        let totalAdvance = 0;
+        let totalPaidAmount = 0;
+        let totalAdj = 0;
+        let totalOutst = 0;
+
+        companyLedger.forEach((entry: any) => {
+          totalBill += entry.debit || 0;
+          totalAdvance += entry.advance || 0;
+          totalPaidAmount += entry.paid || 0;
+          totalAdj += entry.adjustment || 0;
+          if (entry.type === 'BILL') {
+            totalOutst += entry.outstanding || 0;
+          }
+        });
+
+        const closingBalance = companyLedger.length > 0 ? companyLedger[companyLedger.length - 1].balance : ledgerOpeningBalance;
+
+        body.push([
+          '',
+          'TOTALS',
+          '',
+          '',
+          formatCurrency(totalBill),
+          formatCurrency(totalAdvance),
+          formatCurrency(totalPaidAmount),
+          formatCurrency(totalAdj),
+          formatCurrency(totalOutst),
+          formatCurrency(closingBalance)
+        ]);
+
         customStyles = {
-          3: { halign: 'right' },
+          0: { cellWidth: 16 },
+          1: { cellWidth: 25 },
+          2: { cellWidth: 40 },
           4: { halign: 'right' },
           5: { halign: 'right' },
           6: { halign: 'right' },
           7: { halign: 'right' },
-          8: { halign: 'right', fontStyle: 'bold' }
+          8: { halign: 'right' },
+          9: { halign: 'right', fontStyle: 'bold' }
         };
       }
 
@@ -500,7 +621,7 @@ export default function ReportsPage() {
             }
 
             // Color coding for Balance column in Company Ledger
-            if (reportType === 'company' && data.column.index === 8) {
+            if (reportType === 'company' && data.column.index === 9) {
               const numStr = text.replace(/[^0-9.-]/g, '');
               const numVal = parseFloat(numStr);
               if (!isNaN(numVal)) {
@@ -510,6 +631,11 @@ export default function ReportsPage() {
                   data.cell.styles.textColor = [0, 128, 0]; // Green
                 }
               }
+            }
+            if (reportType === 'company' && data.row.index === body.length - 1 && (data.row.raw as any)[1] === 'TOTALS') {
+              data.cell.styles.fontStyle = 'bold';
+              data.cell.styles.fillColor = [241, 245, 249]; // slate-100
+              data.cell.styles.textColor = [15, 23, 42]; // slate-900
             }
           }
         }
@@ -685,7 +811,7 @@ export default function ReportsPage() {
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {overallData.map((item: any, idx: number) => (
+                    {paginatedOverallData.map((item: any, idx: number) => (
                       <TableRow key={idx}>
                         <TableCell className="font-medium">{item.company}</TableCell>
                         <TableCell className="text-center font-medium">{item.billsCount}</TableCell>
@@ -727,7 +853,7 @@ export default function ReportsPage() {
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {outstandingData.map((item, idx) => (
+                    {paginatedOutstandingData.map((item, idx) => (
                       <TableRow key={idx}>
                         <TableCell className="font-medium">{item.company}</TableCell>
                         <TableCell className="text-center font-medium">{item.billsCount}</TableCell>
@@ -783,7 +909,7 @@ export default function ReportsPage() {
                     {filteredBills.length === 0 ? (
                       <TableRow><TableCell colSpan={6} className="text-center py-8 text-muted-foreground">No bills in this range</TableCell></TableRow>
                     ) : (
-                      filteredBills.map((bill) => (
+                      paginatedBills.map((bill) => (
                         <TableRow key={bill.id}>
                           <TableCell>{formatDate(bill.date)}</TableCell>
                           <TableCell className="font-mono font-bold">{bill.jobNumber || 'N/A'}</TableCell>
@@ -816,7 +942,7 @@ export default function ReportsPage() {
                     {filteredPayments.length === 0 ? (
                       <TableRow><TableCell colSpan={5} className="text-center py-8 text-muted-foreground">No payments in this range</TableCell></TableRow>
                     ) : (
-                      filteredPayments.map((payment) => (
+                      paginatedPayments.map((payment) => (
                         <TableRow key={payment.id}>
                           <TableCell>{formatDate(payment.date)}</TableCell>
                           <TableCell className="font-mono font-bold text-xs">{payment.reference || 'N/A'}</TableCell>
@@ -835,6 +961,7 @@ export default function ReportsPage() {
                     <TableRow>
                       <TableHead>Date</TableHead>
                       <TableHead>Description</TableHead>
+                      <TableHead className="text-primary">Method</TableHead>
                       <TableHead>Job No</TableHead>
                       <TableHead className="text-right">Bill Total</TableHead>
                       <TableHead className="text-right">Advance</TableHead>
@@ -846,13 +973,13 @@ export default function ReportsPage() {
                   </TableHeader>
                   <TableBody>
                     {companyLedger.length === 0 && ledgerOpeningBalance === 0 ? (
-                      <TableRow><TableCell colSpan={6} className="text-center py-8 text-muted-foreground">No entries for this company in range</TableCell></TableRow>
+                      <TableRow><TableCell colSpan={10} className="text-center py-8 text-muted-foreground">No entries for this company in range</TableCell></TableRow>
                     ) : (
                       <>
                         {/* Opening Balance Row */}
                         <TableRow className="bg-muted/30 border-b-2 font-bold">
                           <TableCell>{formatDate(dateFrom)}</TableCell>
-                          <TableCell colSpan={2}>Opening Balance b/f</TableCell>
+                          <TableCell colSpan={3}>Opening Balance b/f</TableCell>
                           <TableCell className="text-right">-</TableCell>
                           <TableCell className="text-right">-</TableCell>
                           <TableCell className="text-right">-</TableCell>
@@ -860,17 +987,51 @@ export default function ReportsPage() {
                           <TableCell className="text-right">-</TableCell>
                           <TableCell className="text-right font-black text-primary bg-primary/5">{formatCurrency(ledgerOpeningBalance)}</TableCell>
                         </TableRow>
-                        {companyLedger.map((entry: any, idx: number) => {
+                        {paginatedCompanyLedger.map((entry: any, idx: number) => {
                           let desc = entry.description;
-                          if (entry.type === 'PAYMENT') {
-                            desc = entry.method ? `Payment Received (${entry.method})` : 'Advance Received';
-                            if (entry.paymentRef) desc += ` - Ref: ${entry.paymentRef}`;
-                          }
+                          
+                          const renderMethod = () => {
+                            if (entry.type === 'BILL') {
+                              return (
+                                <div className="space-y-1">
+                                  {entry.payments && entry.payments.length > 0 ? (
+                                    entry.payments.map((p: any, i: number) => (
+                                      <div key={i} className="flex flex-col text-[10px] text-muted-foreground">
+                                        <span className="font-bold text-primary">{p.method || 'Payment'}</span>
+                                        <div className="flex flex-wrap gap-x-1">
+                                          {p.reference && <span>Ref: {p.reference}</span>}
+                                          {p.trackingId && <span>Trk: {p.trackingId}</span>}
+                                          {p.chequeNo && <span>Chq: {p.chequeNo}</span>}
+                                          {p.payOrderNo && <span>PO: {p.payOrderNo}</span>}
+                                        </div>
+                                      </div>
+                                    ))
+                                  ) : (
+                                    <span className="text-[10px] italic text-muted-foreground">No payments</span>
+                                  )}
+                                </div>
+                              );
+                            } else {
+                              return (
+                                <div className="flex flex-col text-[10px] text-muted-foreground">
+                                  <span className="font-bold text-green-600">{entry.method || 'Payment'}</span>
+                                  <div className="flex flex-wrap gap-x-1">
+                                    {entry.paymentRef && <span>Ref: {entry.paymentRef}</span>}
+                                    {entry.trackingId && <span>Trk: {entry.trackingId}</span>}
+                                    {entry.chequeNo && <span>Chq: {entry.chequeNo}</span>}
+                                    {entry.payOrderNo && <span>PO: {entry.payOrderNo}</span>}
+                                  </div>
+                                </div>
+                              );
+                            }
+                          };
+
                           return (
                             <TableRow key={idx} className="hover:bg-muted/5">
                               <TableCell className="text-xs">{formatDate(entry.date)}</TableCell>
                               <TableCell className="text-[10px] font-medium max-w-[150px] truncate">{desc}</TableCell>
-                              <TableCell className="font-mono text-[10px]">{entry.jobNumber || entry.reference || '-'}</TableCell>
+                              <TableCell className="align-top py-2">{renderMethod()}</TableCell>
+                              <TableCell className="font-mono text-[10px]">{entry.jobNumber || '-'}</TableCell>
                               <TableCell className="text-right font-bold text-red-600">
                                 {entry.debit > 0 ? formatCurrency(entry.debit) : '-'}
                               </TableCell>
@@ -886,7 +1047,7 @@ export default function ReportsPage() {
                               <TableCell className="text-right font-bold text-destructive">
                                 {entry.outstanding > 0 ? formatCurrency(entry.outstanding) : '-'}
                               </TableCell>
-                              <TableCell className="text-right font-black border-l-2 bg-slate-50 dark:bg-slate-900 shadow-inner">
+                              <TableCell className="text-right font-black border-l-2 bg-slate-50 shadow-inner">
                                 {formatCurrency(entry.balance)}
                               </TableCell>
                             </TableRow>
@@ -900,6 +1061,69 @@ export default function ReportsPage() {
             </Table>
           </div>
         </div>
+        {/* Pagination Controls */}
+        {totalPages > 1 && (
+          <div className="flex flex-col sm:flex-row items-center justify-between gap-4 mt-6 px-4 pb-4">
+            <p className="text-sm text-muted-foreground w-full text-center sm:text-left">
+              Showing {Math.min((currentPage - 1) * itemsPerPage + 1, getCurrentTotalItems())} to {Math.min(currentPage * itemsPerPage, getCurrentTotalItems())} of {getCurrentTotalItems()} entries
+            </p>
+            <div className="flex items-center gap-1.5 w-full justify-center sm:justify-end">
+                <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
+                    disabled={currentPage === 1}
+                    className="h-8 shadow-sm rounded-lg"
+                >
+                    Previous
+                </Button>
+                <div className="flex items-center gap-1 hidden md:flex">
+                    {Array.from({ length: totalPages }, (_, i) => i + 1)
+                        .filter(p => p === 1 || p === totalPages || Math.abs(p - currentPage) <= 1)
+                        .map((p, i, arr) => {
+                            if (i > 0 && p - arr[i - 1] > 1) {
+                                return (
+                                    <div key={`ellipsis-${p}`} className="flex items-center gap-1">
+                                        <span className="px-2 text-muted-foreground">...</span>
+                                        <Button
+                                            variant={currentPage === p ? 'default' : 'outline'}
+                                            size="sm"
+                                            onClick={() => setCurrentPage(p)}
+                                            className={`h-8 w-8 p-0 rounded-lg shadow-sm ${currentPage === p ? 'bg-primary text-primary-foreground font-bold hover:bg-primary/90' : 'text-slate-600 hover:text-slate-900 border-border/50 bg-slate-50'}`}
+                                        >
+                                            {p}
+                                        </Button>
+                                    </div>
+                                );
+                            }
+                            return (
+                                <Button
+                                    key={p}
+                                    variant={currentPage === p ? 'default' : 'outline'}
+                                    size="sm"
+                                    onClick={() => setCurrentPage(p)}
+                                    className={`h-8 w-8 p-0 rounded-lg shadow-sm ${currentPage === p ? 'bg-primary text-primary-foreground font-bold hover:bg-primary/90' : 'text-slate-600 hover:text-slate-900 border-border/50 bg-white'}`}
+                                >
+                                    {p}
+                                </Button>
+                            );
+                        })}
+                </div>
+                <span className="md:hidden text-sm px-2 font-medium">
+                    Page {currentPage} of {totalPages}
+                </span>
+                <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))}
+                    disabled={currentPage === totalPages}
+                    className="h-8 shadow-sm rounded-lg"
+                >
+                    Next
+                </Button>
+            </div>
+          </div>
+        )}
       </CardContent>
     </Card>
 
@@ -963,8 +1187,8 @@ export default function ReportsPage() {
                   </p>
                   <p className={`text-2xl font-bold mt-1 ${reportType === 'payments' ? 'text-green-600' : 'text-primary'}`}>
                     {reportType === 'bills'
-                      ? formatCurrency(filteredBills.reduce((s: number, b: any) => s + (Number(b.grandTotal) || 0), 0))
-                      : formatCurrency(filteredPayments.reduce((s: number, p: any) => s + (Number(p.amount) || 0) + (Number(p.adjustment) || 0), 0))}
+                      ? formatCurrency(filteredBills.reduce((s: number, b: any) => s + parseNumber(b.grandTotal), 0))
+                      : formatCurrency(filteredPayments.reduce((s: number, p: any) => s + parseNumber(p.amount) + parseNumber(p.adjustment), 0))}
                   </p>
                 </div>
                 <div>

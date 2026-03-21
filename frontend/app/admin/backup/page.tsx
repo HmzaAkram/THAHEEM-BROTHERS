@@ -43,6 +43,14 @@ export default function BackupPage() {
     const [renderingBill, setRenderingBill] = useState<Bill | null>(null);
     const invoiceRef = useRef<HTMLDivElement>(null);
 
+    // Robust number parsing to handle commas etc.
+    const parseNumber = (val: any) => {
+        if (typeof val === 'number') return val;
+        if (!val) return 0;
+        const cleaned = String(val).replace(/[^0-9.-]/g, '');
+        return parseFloat(cleaned) || 0;
+    };
+
     const handleExport = async () => {
         setExportLoading(true);
         try {
@@ -189,7 +197,7 @@ export default function BackupPage() {
                 if (!companyFolder) continue;
 
                 // Pre-filter company specific data
-                const companyBills = bills.filter(b => String(b.companyId) === String(company.id));
+                const companyBills = bills.filter(b => String(b.companyId) === String(company.id) && b.status !== 'Draft');
                 const companyPayments = payments.filter(p => String(p.companyId) === String(company.id));
 
                 // 1. GENERATE LEDGER PDF
@@ -250,10 +258,10 @@ export default function BackupPage() {
 
                 companyBills.forEach(bill => {
                     const linkedPayments = payments.filter(p => String(p.billId) === String(bill.id));
-                    const totalPaid = linkedPayments.reduce((sum, p) => sum + Number(p.amount || 0), 0);
-                    const totalAdjustment = linkedPayments.reduce((sum, p) => sum + Number(p.adjustment || 0), 0);
-                    const debitAmount = bill.grandTotal || bill.totalAmount || 0;
-                    const advanceAmount = bill.advancePayment || 0;
+                    const totalPaid = linkedPayments.reduce((sum, p) => sum + parseNumber(p.amount), 0);
+                    const totalAdjustment = linkedPayments.reduce((sum, p) => sum + parseNumber(p.adjustment), 0);
+                    const debitAmount = parseNumber(bill.grandTotal || bill.totalAmount);
+                    const advanceAmount = parseNumber(bill.advancePayment);
 
                     consolidatedEntries.push({
                         date: bill.date,
@@ -278,9 +286,9 @@ export default function BackupPage() {
                             jobNumber: null,
                             debit: 0,
                             advance: 0,
-                            paid: Number(p.amount || 0),
-                            adjustment: Number(p.adjustment || 0),
-                            credit: Number(p.amount || 0) + Number(p.adjustment || 0),
+                            paid: parseNumber(p.amount),
+                            adjustment: parseNumber(p.adjustment),
+                            credit: parseNumber(p.amount) + parseNumber(p.adjustment),
                             outstanding: 0,
                             method: p.method,
                             paymentRef: p.reference,
@@ -290,7 +298,7 @@ export default function BackupPage() {
 
                 consolidatedEntries.sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
 
-                let openingBal = Number(company.openingBalance) || 0;
+                let openingBal = parseNumber(company.openingBalance);
                 let running = openingBal;
 
                 const tableRows = consolidatedEntries.map(entry => {
@@ -413,10 +421,10 @@ export default function BackupPage() {
 
                 const paymentRows = sortedPayments.map(p => {
                     const linkedBill = p.billId ? bills.find(b => String(b.id) === String(p.billId)) : null;
-                    const cashPaid = Number(p.amount) || 0;
-                    const adjustment = Number(p.adjustment) || 0;
+                    const cashPaid = parseNumber(p.amount);
+                    const adjustment = parseNumber(p.adjustment);
                     const totalPaid = cashPaid + adjustment;
-                    const billTotal = linkedBill ? Number(linkedBill.grandTotal) : 0;
+                    const billTotal = linkedBill ? parseNumber(linkedBill.grandTotal) : 0;
 
                     return [
                         formatDate(p.date),
@@ -495,8 +503,9 @@ export default function BackupPage() {
                 reportDoc.text(`Date Printed: ${formatDate(new Date().toISOString())}`, rPageWidth - 14, yPosReport, { align: "right" });
                 yPosReport += 12;
 
-                const cBilled = companyBills.reduce((sum, b) => sum + (Number(b.grandTotal) || 0), 0);
-                const cPaid = companyBills.reduce((sum, b) => sum + (Number((b as any).advancePayment) || 0), 0) + companyPayments.reduce((sum, p) => sum + (Number(p.amount) || 0) + (Number(p.adjustment) || 0), 0);
+                const cBilled = companyBills.reduce((sum, b) => sum + parseNumber(b.grandTotal || b.totalAmount), 0);
+                const cPaid = companyBills.reduce((sum, b) => sum + parseNumber(b.advancePayment), 0) + 
+                             companyPayments.reduce((sum, p) => sum + parseNumber(p.amount) + parseNumber(p.adjustment), 0);
                 const cOutstanding = cBilled - cPaid;
 
                 const cUnpaidBills = companyBills.filter(b => b.status !== 'Paid').sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
@@ -681,13 +690,13 @@ export default function BackupPage() {
             let grandBalance = 0;
 
             companies.forEach(company => {
-                const companyBills = bills.filter(b => String(b.companyId) === String(company.id));
+                const companyBills = bills.filter(b => String(b.companyId) === String(company.id) && b.status !== 'Draft');
                 const companyPayments = payments.filter(p => String(p.companyId) === String(company.id));
 
-                const openingTableBal = Number(company.openingBalance) || 0;
-                const totalBilled = companyBills.reduce((sum, b) => sum + (Number(b.grandTotal) || 0), 0);
-                const totalReceived = companyBills.reduce((sum, b) => sum + (Number((b as any).advancePayment) || 0), 0) +
-                    companyPayments.reduce((sum, p) => sum + (Number(p.amount) || 0) + (Number(p.adjustment) || 0), 0);
+                const openingTableBal = parseNumber(company.openingBalance);
+                const totalBilled = companyBills.reduce((sum, b) => sum + parseNumber(b.grandTotal || b.totalAmount), 0);
+                const totalReceived = companyBills.reduce((sum, b) => sum + parseNumber(b.advancePayment), 0) +
+                    companyPayments.reduce((sum, p) => sum + parseNumber(p.amount) + parseNumber(p.adjustment), 0);
                 const netOutstanding = totalBilled - totalReceived;
                 const netBalance = openingTableBal + netOutstanding;
 
@@ -818,16 +827,16 @@ export default function BackupPage() {
                 yPos += 12;
 
                 // Consolidate Data
-                const companyBills = bills.filter(b => String(b.companyId) === String(company.id));
+                const companyBills = bills.filter(b => String(b.companyId) === String(company.id) && b.status !== 'Draft');
                 const companyPayments = payments.filter(p => String(p.companyId) === String(company.id));
                 let consolidated: any[] = [];
 
                 companyBills.forEach(bill => {
                     const linkedPayments = payments.filter(p => String(p.billId) === String(bill.id));
-                    const totalPaid = linkedPayments.reduce((sum, p) => sum + Number(p.amount || 0), 0);
-                    const totalAdjustment = linkedPayments.reduce((sum, p) => sum + Number(p.adjustment || 0), 0);
-                    const debitAmount = bill.grandTotal || bill.totalAmount || 0;
-                    const advanceAmount = bill.advancePayment || 0;
+                    const totalPaid = linkedPayments.reduce((sum, p) => sum + parseNumber(p.amount), 0);
+                    const totalAdjustment = linkedPayments.reduce((sum, p) => sum + parseNumber(p.adjustment), 0);
+                    const debitAmount = parseNumber(bill.grandTotal || bill.totalAmount);
+                    const advanceAmount = parseNumber(bill.advancePayment);
 
                     consolidated.push({
                         date: bill.date,
@@ -851,9 +860,9 @@ export default function BackupPage() {
                             jobNumber: null,
                             debit: 0,
                             advance: 0,
-                            paid: Number(p.amount || 0),
-                            adjustment: Number(p.adjustment || 0),
-                            credit: Number(p.amount || 0) + Number(p.adjustment || 0),
+                            paid: parseNumber(p.amount),
+                            adjustment: parseNumber(p.adjustment),
+                            credit: parseNumber(p.amount) + parseNumber(p.adjustment),
                             method: p.method,
                             paymentRef: p.reference,
                         });
@@ -862,7 +871,7 @@ export default function BackupPage() {
 
                 consolidated.sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
 
-                let openingBal = Number(company.openingBalance) || 0;
+                let openingBal = parseNumber(company.openingBalance);
                 let running = openingBal;
                 const tableRows = consolidated.map(entry => {
                     let desc = entry.description;

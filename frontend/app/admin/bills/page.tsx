@@ -103,6 +103,14 @@ export default function BillsPage() {
 
   const [viewDataUrl, setViewDataUrl] = useState<string | null>(null);
 
+  // Robust number parsing to handle commas etc.
+  const parseNumber = (val: any) => {
+    if (typeof val === 'number') return val;
+    if (!val) return 0;
+    const cleaned = String(val).replace(/[^0-9.-]/g, '');
+    return parseFloat(cleaned) || 0;
+  };
+
   // PIN Dialog State for Deletion
   const [isPinDialogOpen, setIsPinDialogOpen] = useState(false);
   const [billToDelete, setBillToDelete] = useState<Bill | null>(null);
@@ -690,6 +698,21 @@ export default function BillsPage() {
     return filtered.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
   }, [bills, timeFilter, companyFilter, searchQuery]);
 
+  // Pagination State & Logic
+  const [currentPage, setCurrentPage] = useState(1);
+  const itemsPerPage = 50;
+
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [timeFilter, companyFilter, searchQuery]);
+
+  const paginatedBills = useMemo(() => {
+    const startIdx = (currentPage - 1) * itemsPerPage;
+    return filteredBills.slice(startIdx, startIdx + itemsPerPage);
+  }, [filteredBills, currentPage]);
+
+  const totalPages = Math.ceil(filteredBills.length / itemsPerPage);
+
   // Dynamic Totals
   const tableTotals = useMemo(() => {
     const uniqueCompanyIds = new Set(filteredBills.map(b => String(b.companyId)));
@@ -698,7 +721,7 @@ export default function BillsPage() {
     uniqueCompanyIds.forEach(id => {
       const comp = companies.find(c => String(c.id) === id);
       if (comp) {
-        totalOpeningBalance += (Number(comp.openingBalance) || 0);
+        totalOpeningBalance += parseNumber(comp.openingBalance);
       }
     });
 
@@ -707,9 +730,9 @@ export default function BillsPage() {
       if (bill.status === 'Draft' || bill.calculatedStatus === 'Draft') {
         return acc;
       }
-      acc.billed += bill.grandTotal;
-      acc.paid += bill.paidAmount;
-      acc.balance += (bill.grandTotal - bill.paidAmount);
+      acc.billed += parseNumber(bill.grandTotal);
+      acc.paid += parseNumber(bill.paidAmount);
+      acc.balance += (parseNumber(bill.grandTotal) - parseNumber(bill.paidAmount));
       return acc;
     }, { billed: 0, paid: 0, balance: totalOpeningBalance });
   }, [filteredBills, companies]);
@@ -772,9 +795,9 @@ export default function BillsPage() {
         formatDate(bill.date),
         bill.jobNumber || 'N/A',
         bill.companyName,
-        formatCurrency(bill.grandTotal),
-        formatCurrency(bill.paidAmount),
-        formatCurrency(bill.grandTotal - bill.paidAmount),
+        formatCurrency(parseNumber(bill.grandTotal)),
+        formatCurrency(parseNumber(bill.paidAmount)),
+        formatCurrency(parseNumber(bill.grandTotal) - parseNumber(bill.paidAmount)),
         bill.calculatedStatus
       ]);
 
@@ -1507,7 +1530,7 @@ export default function BillsPage() {
                       </TableRow>
                     </TableHeader>
                     <TableBody>
-                      {filteredBills.map((item) => (
+                      {paginatedBills.map((item) => (
                         <TableRow key={item.id} className="hover:bg-muted/50 transition-colors">
                           <TableCell className="font-mono text-sm font-medium">
                             {item.jobNumber || 'N/A'}
@@ -1623,6 +1646,70 @@ export default function BillsPage() {
                       ))}
                     </TableBody>
                     </Table>
+                  </div>
+                </div>
+              )}
+
+              {/* Pagination Controls */}
+              {totalPages > 1 && (
+                <div className="flex flex-col sm:flex-row items-center justify-between gap-4 mt-6">
+                  <p className="text-sm text-muted-foreground w-full text-center sm:text-left">
+                    Showing {(currentPage - 1) * itemsPerPage + 1} to {Math.min(currentPage * itemsPerPage, filteredBills.length)} of {filteredBills.length} entries
+                  </p>
+                  <div className="flex items-center gap-1.5 w-full justify-center sm:justify-end">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
+                      disabled={currentPage === 1}
+                      className="h-8 shadow-sm rounded-lg"
+                    >
+                      Previous
+                    </Button>
+                    <div className="flex items-center gap-1 hidden md:flex">
+                      {Array.from({ length: totalPages }, (_, i) => i + 1)
+                        .filter(p => p === 1 || p === totalPages || Math.abs(p - currentPage) <= 1)
+                        .map((p, i, arr) => {
+                          if (i > 0 && p - arr[i - 1] > 1) {
+                            return (
+                              <div key={`ellipsis-${p}`} className="flex items-center gap-1">
+                                <span className="px-2 text-muted-foreground">...</span>
+                                <Button
+                                  variant={currentPage === p ? 'default' : 'outline'}
+                                  size="sm"
+                                  onClick={() => setCurrentPage(p)}
+                                  className={`h-8 w-8 p-0 rounded-lg shadow-sm ${currentPage === p ? 'bg-primary text-primary-foreground font-bold hover:bg-primary/90' : 'text-slate-600 hover:text-slate-900 border-border/50 bg-slate-50'}`}
+                                >
+                                  {p}
+                                </Button>
+                              </div>
+                            );
+                          }
+                          return (
+                            <Button
+                              key={p}
+                              variant={currentPage === p ? 'default' : 'outline'}
+                              size="sm"
+                              onClick={() => setCurrentPage(p)}
+                              className={`h-8 w-8 p-0 rounded-lg shadow-sm ${currentPage === p ? 'bg-primary text-primary-foreground font-bold hover:bg-primary/90' : 'text-slate-600 hover:text-slate-900 border-border/50 bg-white'}`}
+                            >
+                              {p}
+                            </Button>
+                          );
+                        })}
+                    </div>
+                    <span className="md:hidden text-sm px-2 font-medium">
+                      Page {currentPage} of {totalPages}
+                    </span>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))}
+                      disabled={currentPage === totalPages}
+                      className="h-8 shadow-sm rounded-lg"
+                    >
+                      Next
+                    </Button>
                   </div>
                 </div>
               )}

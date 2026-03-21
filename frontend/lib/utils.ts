@@ -14,11 +14,67 @@ export function formatDate(date: string | Date | null | undefined): string {
   const month = String(d.getMonth() + 1).padStart(2, '0');
   const year = d.getFullYear();
 
-  return `${day}/${month}/${year}`;
+  return `${day}-${month}-${year}`;
+}
+
+/**
+ * Parses a date string (YYYY-MM-DD or ISO) into a local Date object at 00:00:00.
+ * This avoids the pitfall where new Date("YYYY-MM-DD") is treated as UTC midnights.
+ */
+export function parseLocalDate(dateStr: string | Date | null | undefined): Date | null {
+  if (!dateStr) return null;
+  if (dateStr instanceof Date) return new Date(dateStr.getFullYear(), dateStr.getMonth(), dateStr.getDate());
+
+  // Try to extract YYYY, MM, DD
+  const match = String(dateStr).match(/^(\d{4})-(\d{2})-(\d{2})/);
+  if (match) {
+    const year = parseInt(match[1]);
+    const month = parseInt(match[2]) - 1; // 0-indexed
+    const day = parseInt(match[3]);
+    return new Date(year, month, day, 0, 0, 0, 0);
+  }
+
+  // Fallback for other formats
+  const d = new Date(dateStr);
+  if (isNaN(d.getTime())) return null;
+  return new Date(d.getFullYear(), d.getMonth(), d.getDate(), 0, 0, 0, 0);
+}
+
+/**
+ * Checks if a target date is within a start and end date range (inclusive).
+ */
+export function isWithinDateRange(
+  target: string | Date | null | undefined,
+  start: string | Date | null | undefined,
+  end: string | Date | null | undefined
+): boolean {
+  const targetDate = parseLocalDate(target);
+  if (!targetDate) return false;
+
+  const startDate = start ? parseLocalDate(start) : null;
+  const endDate = end ? parseLocalDate(end) : null;
+
+  if (startDate && targetDate < startDate) return false;
+  if (endDate) {
+    // Set end date to end of day just in case, though parseLocalDate already sets to start of day
+    const fullEndDate = new Date(endDate);
+    fullEndDate.setHours(23, 59, 59, 999);
+    if (targetDate > fullEndDate) return false;
+  }
+
+  return true;
 }
 export function formatCurrency(amount: number | string | undefined | null): string {
   if (amount === undefined || amount === null) return '0';
-  const num = typeof amount === 'string' ? parseFloat(amount) : amount;
+  
+  let num: number;
+  if (typeof amount === 'string') {
+    const cleaned = amount.replace(/[^0-9.-]/g, '');
+    num = parseFloat(cleaned);
+  } else {
+    num = amount;
+  }
+  
   if (isNaN(num)) return '0';
 
   // Use Math.round to avoid floating point artifacts and get a clean integer

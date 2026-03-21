@@ -21,7 +21,7 @@ import {
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Plus, Edit2, Eye, Trash2, Search, ArrowRight, Calendar, DollarSign, Users, CreditCard, TrendingUp, Filter } from 'lucide-react';
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { useData } from '@/context/data-context';
 import { useRouter } from 'next/navigation';
 import { DashboardCard } from '@/components/dashboard-card';
@@ -48,6 +48,14 @@ export default function CompaniesPage() {
 
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [loading, setLoading] = useState(false);
+
+  // Robust number parsing to handle commas etc.
+  const parseNumber = (val: any) => {
+    if (typeof val === 'number') return val;
+    if (!val) return 0;
+    const cleaned = String(val).replace(/[^0-9.-]/g, '');
+    return parseFloat(cleaned) || 0;
+  };
 
   // New Company Form State
   const [formData, setFormData] = useState({
@@ -105,13 +113,28 @@ export default function CompaniesPage() {
     return filtered;
   }, [companies, searchTerm, dateFrom, dateTo]);
 
+  // Pagination State
+  const [currentPage, setCurrentPage] = useState(1);
+  const itemsPerPage = 50;
+
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [searchTerm, dateFrom, dateTo]);
+
+  const paginatedCompanies = useMemo(() => {
+    const startIdx = (currentPage - 1) * itemsPerPage;
+    return filteredCompanies.slice(startIdx, startIdx + itemsPerPage);
+  }, [filteredCompanies, currentPage]);
+
+  const totalPages = Math.ceil(filteredCompanies.length / itemsPerPage);
+
   // Context Totals for Filtered Companies
   const companyTotals = useMemo(() => {
     return filteredCompanies.reduce((acc, company) => {
       // Find all bills for this company
-      let companyBills = bills.filter(b => b.companyId === company.id);
+      let companyBills = bills.filter(b => String(b.companyId) === String(company.id) && b.status !== 'Draft');
       // Find all payments for this company
-      let companyPayments = payments.filter(p => p.companyId === company.id);
+      let companyPayments = payments.filter(p => String(p.companyId) === String(company.id));
 
       // Apply date filters to the activity if set
       if (dateFrom || dateTo) {
@@ -130,9 +153,9 @@ export default function CompaniesPage() {
       }
 
       // Sum totals
-      const billed = companyBills.reduce((s, b) => s + (Number(b.grandTotal) || 0), 0) + (Number(company.openingBalance) || 0);
-      const advances = companyBills.reduce((s, b) => s + (Number(b.advancePayment) || 0), 0);
-      const paymentReceived = companyPayments.reduce((s, p) => s + (Number(p.amount) || 0) + (Number(p.adjustment) || 0), 0);
+      const billed = companyBills.reduce((s, b) => s + parseNumber(b.grandTotal), 0) + parseNumber(company.openingBalance);
+      const advances = companyBills.reduce((s, b) => s + parseNumber(b.advancePayment), 0);
+      const paymentReceived = companyPayments.reduce((s, p) => s + parseNumber(p.amount) + parseNumber(p.adjustment), 0);
 
       const totalCollected = advances + paymentReceived;
 
@@ -426,7 +449,7 @@ export default function CompaniesPage() {
                         </TableCell>
                       </TableRow>
                     ) : (
-                      filteredCompanies.map((company) => {
+                      paginatedCompanies.map((company) => {
                         const balance = getCompanyBalance(company.id);
                         return (
                           <TableRow key={company.id} className="group hover:bg-muted/30 transition-colors">
@@ -441,12 +464,15 @@ export default function CompaniesPage() {
                             </TableCell>
                             <TableCell>{company.phone}</TableCell>
                             <TableCell className="font-semibold">
-                              {formatCurrency((bills.filter(b => b.companyId === company.id).reduce((s, b) => s + (Number(b.grandTotal) || 0), 0)))}
+                              {formatCurrency(
+                                bills.filter(b => String(b.companyId) === String(company.id) && b.status !== 'Draft').reduce((s, b) => s + parseNumber(b.grandTotal), 0) + 
+                                parseNumber(company.openingBalance)
+                              )}
                             </TableCell>
                             <TableCell className="text-muted-foreground text-sm">
                               {formatCurrency(
-                                bills.filter(b => b.companyId === company.id).reduce((s, b) => s + (Number(b.advancePayment) || 0), 0) +
-                                payments.filter(p => p.companyId === company.id).reduce((s, p) => s + (Number(p.amount) || 0) + (Number(p.adjustment) || 0), 0)
+                                bills.filter(b => String(b.companyId) === String(company.id) && b.status !== 'Draft').reduce((s, b) => s + parseNumber(b.advancePayment), 0) +
+                                payments.filter(p => String(p.companyId) === String(company.id)).reduce((s, p) => s + parseNumber(p.amount) + parseNumber(p.adjustment), 0)
                               )}
                             </TableCell>
                             <TableCell className={`font-bold ${balance > 0 ? 'text-red-600' : 'text-green-600'}`}>
@@ -519,11 +545,78 @@ export default function CompaniesPage() {
                 </div>
               </div>
             </div>
-            <div className="flex items-center justify-between mt-4 text-sm text-muted-foreground">
-              <p>
-                Showing {filteredCompanies.length} company records
-              </p>
-            </div>
+
+            {/* Pagination Controls */}
+            {totalPages > 1 && (
+              <div className="flex flex-col sm:flex-row items-center justify-between gap-4 mt-6">
+                <p className="text-sm text-muted-foreground w-full text-center sm:text-left">
+                  Showing {(currentPage - 1) * itemsPerPage + 1} to {Math.min(currentPage * itemsPerPage, filteredCompanies.length)} of {filteredCompanies.length} entries
+                </p>
+                <div className="flex items-center gap-1.5 w-full justify-center sm:justify-end">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
+                    disabled={currentPage === 1}
+                    className="h-8 shadow-sm rounded-lg"
+                  >
+                    Previous
+                  </Button>
+                  <div className="flex items-center gap-1 hidden md:flex">
+                    {Array.from({ length: totalPages }, (_, i) => i + 1)
+                      .filter(p => p === 1 || p === totalPages || Math.abs(p - currentPage) <= 1)
+                      .map((p, i, arr) => {
+                        if (i > 0 && p - arr[i - 1] > 1) {
+                          return (
+                            <div key={`ellipsis-${p}`} className="flex items-center gap-1">
+                              <span className="px-2 text-muted-foreground">...</span>
+                              <Button
+                                variant={currentPage === p ? 'default' : 'outline'}
+                                size="sm"
+                                onClick={() => setCurrentPage(p)}
+                                className={`h-8 w-8 p-0 rounded-lg shadow-sm ${currentPage === p ? 'bg-primary text-primary-foreground font-bold hover:bg-primary/90' : 'text-slate-600 hover:text-slate-900 border-border/50 bg-slate-50'}`}
+                              >
+                                {p}
+                              </Button>
+                            </div>
+                          );
+                        }
+                        return (
+                          <Button
+                            key={p}
+                            variant={currentPage === p ? 'default' : 'outline'}
+                            size="sm"
+                            onClick={() => setCurrentPage(p)}
+                            className={`h-8 w-8 p-0 rounded-lg shadow-sm ${currentPage === p ? 'bg-primary text-primary-foreground font-bold hover:bg-primary/90' : 'text-slate-600 hover:text-slate-900 border-border/50 bg-white'}`}
+                          >
+                            {p}
+                          </Button>
+                        );
+                      })}
+                  </div>
+                  <span className="md:hidden text-sm px-2 font-medium">
+                    Page {currentPage} of {totalPages}
+                  </span>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))}
+                    disabled={currentPage === totalPages}
+                    className="h-8 shadow-sm rounded-lg"
+                  >
+                    Next
+                  </Button>
+                </div>
+              </div>
+            )}
+
+            {totalPages <= 1 && (
+              <div className="flex items-center justify-between mt-4 text-sm text-muted-foreground">
+                <p>
+                  Showing {filteredCompanies.length} company records
+                </p>
+              </div>
+            )}
 
             {/* Bottom Summary Totals */}
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mt-10 border-t pt-10">

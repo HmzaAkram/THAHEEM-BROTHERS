@@ -81,6 +81,14 @@ export default function AdminDashboard() {
   const [zipProgressText, setZipProgressText] = useState('');
   const [renderingBill, setRenderingBill] = useState<any>(null);
   const invoiceRef = useRef<HTMLDivElement>(null);
+
+  // Robust number parsing to handle commas etc.
+  const parseNumber = (val: any) => {
+    if (typeof val === 'number') return val;
+    if (!val) return 0;
+    const cleaned = String(val).replace(/[^0-9.-]/g, '');
+    return parseFloat(cleaned) || 0;
+  };
   const reportRef = useRef<HTMLDivElement>(null);
   const [securityFilter, setSecurityFilter] = useState<'all' | 'pending' | 'received'>('all');
   const [selectedSecurity, setSelectedSecurity] = useState<any>(null);
@@ -105,6 +113,7 @@ export default function AdminDashboard() {
       startDate.setFullYear(now.getFullYear() - 1); // Last 365 days
     }
 
+    // Filtered data for cards
     const filteredBills = (startDate
       ? bills.filter(b => new Date(b.createdAt) >= startDate!)
       : bills).filter(b => b.status !== 'Draft');
@@ -117,18 +126,31 @@ export default function AdminDashboard() {
       ? companies.filter(c => new Date(c.createdAt) >= startDate!)
       : companies;
 
+    // Robust number parsing to handle commas etc.
+    const parseNumber = (val: any) => {
+      if (typeof val === 'number') return val;
+      if (!val) return 0;
+      const cleaned = String(val).replace(/[^0-9.-]/g, '');
+      return parseFloat(cleaned) || 0;
+    };
+
+    // "Billed" card: Period billing + Opening Balance if overall
     const totalBilled = 
-      filteredBills.reduce((sum, bill) => sum + (Number(bill.grandTotal) || 0), 0) + 
-      (filterType === 'overall' ? companies.reduce((sum, c) => sum + (Number(c.openingBalance) || 0), 0) : 0);
+      filteredBills.reduce((sum, bill) => sum + parseNumber(bill.grandTotal), 0) + 
+      (filterType === 'overall' ? companies.reduce((sum, c) => sum + parseNumber(c.openingBalance), 0) : 0);
 
+    // "Collected" card: Period advances + Period payments + Period adjustments
     const totalCollected =
-      filteredBills.reduce((sum, bill) => sum + (Number(bill.advancePayment) || 0), 0) +
-      filteredPayments.reduce((sum, payment) => sum + (Number(payment.amount) || 0) + (Number(payment.adjustment) || 0), 0);
+      filteredBills.reduce((sum, bill) => sum + parseNumber(bill.advancePayment), 0) +
+      filteredPayments.reduce((sum, payment) => sum + parseNumber(payment.amount) + parseNumber(payment.adjustment), 0);
 
-    const outstanding = totalBilled - totalCollected;
+    // "Outstanding" card: ALWAYS Overall Outstanding for consistency
+    const allNonDraftBills = bills.filter(b => b.status !== 'Draft');
+    const overallBilled = allNonDraftBills.reduce((sum, b) => sum + parseNumber(b.grandTotal), 0) + companies.reduce((sum, c) => sum + parseNumber(c.openingBalance), 0);
+    const overallCollected = allNonDraftBills.reduce((sum, b) => sum + parseNumber(b.advancePayment), 0) + payments.reduce((sum, p) => sum + parseNumber(p.amount) + parseNumber(p.adjustment), 0);
+    
+    const outstanding = overallBilled - overallCollected;
 
-    // For "Total Companies", if filtered, we show "New Companies". If overall, "Total".
-    // We can change the label dynamically.
     const activeCompanies = filteredCompanies.length;
 
     return { totalBilled, totalCollected, outstanding, activeCompanies };
@@ -177,7 +199,7 @@ export default function AdminDashboard() {
       type: 'BILL',
       title: `Job #${b.jobNumber || 'N/A'} Created`,
       subtitle: `${b.companyName} • ${formatDate(b.createdAt)}`,
-      amount: Number(b.totalAmount) || 0,
+      amount: parseNumber(b.totalAmount),
       date: new Date(b.createdAt),
       id: b.id
     }))
@@ -190,7 +212,7 @@ export default function AdminDashboard() {
       type: 'PAYMENT',
       title: `Payment Received`,
       subtitle: `${p.companyName} • ${formatDate(p.createdAt)}`,
-      amount: Number(p.amount) || 0,
+      amount: parseNumber(p.amount),
       date: new Date(p.createdAt),
       id: p.id
     }))
@@ -221,10 +243,10 @@ export default function AdminDashboard() {
       const companyBills = bills.filter(b => String(b.companyId) === String(company.id) && b.status !== 'Draft');
       const companyPayments = payments.filter(p => String(p.companyId) === String(company.id));
 
-      const debit = companyBills.reduce((sum, b) => sum + (Number(b.grandTotal) || 0), 0) + (Number(company.openingBalance) || 0);
+      const debit = companyBills.reduce((sum, b) => sum + parseNumber(b.grandTotal), 0) + parseNumber(company.openingBalance);
       const credit =
-        companyBills.reduce((sum, b) => sum + (Number(b.advancePayment) || 0), 0) +
-        companyPayments.reduce((sum, p) => sum + (Number(p.amount) || 0) + (Number(p.adjustment) || 0), 0);
+        companyBills.reduce((sum, b) => sum + parseNumber(b.advancePayment), 0) +
+        companyPayments.reduce((sum, p) => sum + parseNumber(p.amount) + parseNumber(p.adjustment), 0);
       const balance = debit - credit;
 
       return {
@@ -401,13 +423,14 @@ export default function AdminDashboard() {
         companyPayments.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
 
         const paymentRows = companyPayments.map(p => {
-          const linkedBill = p.billId ? bills.find(b => b.id.toString() === p.billId.toString()) : null;
+          const billId = p.billId;
+          const linkedBill = billId ? bills.find(b => b.id.toString() === billId.toString()) : null;
           return [
             formatDate(p.date),
             formatCurrency(p.amount),
-            p.paymentMethod,
+            p.method,
             p.reference || linkedBill?.jobNumber || 'Advance Payment',
-            p.notes || '-'
+            p.description || '-'
           ];
         });
 
@@ -638,68 +661,68 @@ export default function AdminDashboard() {
               <CardContent className="flex-1 p-0 overflow-hidden">
                 <div className="overflow-x-auto custom-scrollbar">
                   <div className="min-w-[700px]">
-                  <Table>
-                    <TableHeader className="bg-muted/30 sticky top-0 z-10">
-                      <TableRow className="hover:bg-transparent border-b-0">
-                        <TableHead className="py-3 px-6 font-bold text-xs uppercase tracking-wider">Company Name</TableHead>
-                        <TableHead className="py-3 px-4 font-bold text-xs uppercase tracking-wider">Total Debit</TableHead>
-                        <TableHead className="py-3 px-4 font-bold text-xs uppercase tracking-wider">Total Credit</TableHead>
-                        <TableHead className="py-3 px-6 font-bold text-xs uppercase tracking-wider text-right">Balance</TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {filteredCompanies.length === 0 ? (
-                        <TableRow>
-                          <TableCell colSpan={4} className="h-64 text-center">
-                            <div className="flex flex-col items-center justify-center text-muted-foreground/50">
-                              <Users className="w-12 h-12 mb-3 opacity-20" />
-                              <p className="font-semibold">No companies found</p>
-                              <p className="text-xs">Try adjusting your search</p>
-                            </div>
-                          </TableCell>
+                    <Table>
+                      <TableHeader className="bg-muted/30 sticky top-0 z-10">
+                        <TableRow className="hover:bg-transparent border-b-0">
+                          <TableHead className="py-3 px-6 font-bold text-xs uppercase tracking-wider">Company Name</TableHead>
+                          <TableHead className="py-3 px-4 font-bold text-xs uppercase tracking-wider">Total Debit</TableHead>
+                          <TableHead className="py-3 px-4 font-bold text-xs uppercase tracking-wider">Total Credit</TableHead>
+                          <TableHead className="py-3 px-6 font-bold text-xs uppercase tracking-wider text-right">Balance</TableHead>
                         </TableRow>
-                      ) : (
-                        filteredCompanies
-                          .slice(0, companySearch ? undefined : 5)
-                          .map((c) => (
-                            <TableRow key={c.id} className="hover:bg-primary/5 transition-colors border-b border-border/40 group">
-                              <TableCell className="py-4 px-6">
-                                <div>
-                                  <p className="font-bold text-sm text-foreground group-hover:text-primary transition-colors">{c.name}</p>
-                                  {c.identifier && <p className="text-[10px] text-muted-foreground uppercase font-black opacity-60">{c.identifier}</p>}
-                                </div>
-                              </TableCell>
-                              <TableCell className="py-4 px-4 font-mono text-xs font-bold text-slate-700 dark:text-slate-300">
-                                {formatCurrency(c.debit)}
-                              </TableCell>
-                              <TableCell className="py-4 px-4 font-mono text-xs font-bold text-emerald-600">
-                                {formatCurrency(c.credit)}
-                              </TableCell>
-                              <TableCell className="py-4 px-6 text-right">
-                                <div className="flex flex-col items-end">
-                                  <span className={`text-sm font-black font-mono tracking-tighter ${c.balance > 0 ? 'text-rose-600' : 'text-emerald-600'
-                                    }`}>
-                                    {formatCurrency(c.balance)}
-                                  </span>
-                                  <div className={`mt-0.5 flex items-center gap-1 text-[10px] font-bold uppercase ${c.balance > 0 ? 'text-rose-500/70' : 'text-emerald-500/70'
-                                    }`}>
-                                    {c.balance > 0 ? (
-                                      <>Receivable <ArrowUpRight className="w-2.5 h-2.5" /></>
-                                    ) : (
-                                      <>Cleared <ArrowDownRight className="w-2.5 h-2.5" /></>
-                                    )}
+                      </TableHeader>
+                      <TableBody>
+                        {filteredCompanies.length === 0 ? (
+                          <TableRow>
+                            <TableCell colSpan={4} className="h-64 text-center">
+                              <div className="flex flex-col items-center justify-center text-muted-foreground/50">
+                                <Users className="w-12 h-12 mb-3 opacity-20" />
+                                <p className="font-semibold">No companies found</p>
+                                <p className="text-xs">Try adjusting your search</p>
+                              </div>
+                            </TableCell>
+                          </TableRow>
+                        ) : (
+                          filteredCompanies
+                            .slice(0, companySearch ? undefined : 5)
+                            .map((c) => (
+                              <TableRow key={c.id} className="hover:bg-primary/5 transition-colors border-b border-border/40 group">
+                                <TableCell className="py-4 px-6">
+                                  <div>
+                                    <p className="font-bold text-sm text-foreground group-hover:text-primary transition-colors">{c.name}</p>
+                                    {c.identifier && <p className="text-[10px] text-muted-foreground uppercase font-black opacity-60">{c.identifier}</p>}
                                   </div>
-                                </div>
-                              </TableCell>
-                            </TableRow>
-                          ))
-                      )}
-                    </TableBody>
-                  </Table>
+                                </TableCell>
+                                <TableCell className="py-4 px-4 font-mono text-xs font-bold text-slate-700 dark:text-slate-300">
+                                  {formatCurrency(c.debit)}
+                                </TableCell>
+                                <TableCell className="py-4 px-4 font-mono text-xs font-bold text-emerald-600">
+                                  {formatCurrency(c.credit)}
+                                </TableCell>
+                                <TableCell className="py-4 px-6 text-right">
+                                  <div className="flex flex-col items-end">
+                                    <span className={`text-sm font-black font-mono tracking-tighter ${c.balance > 0 ? 'text-rose-600' : 'text-emerald-600'
+                                      }`}>
+                                      {formatCurrency(c.balance)}
+                                    </span>
+                                    <div className={`mt-0.5 flex items-center gap-1 text-[10px] font-bold uppercase ${c.balance > 0 ? 'text-rose-500/70' : 'text-emerald-500/70'
+                                      }`}>
+                                      {c.balance > 0 ? (
+                                        <>Receivable <ArrowUpRight className="w-2.5 h-2.5" /></>
+                                      ) : (
+                                        <>Cleared <ArrowDownRight className="w-2.5 h-2.5" /></>
+                                      )}
+                                    </div>
+                                  </div>
+                                </TableCell>
+                              </TableRow>
+                            ))
+                        )}
+                      </TableBody>
+                    </Table>
+                  </div>
                 </div>
-              </div>
-            </CardContent>
-          </Card>
+              </CardContent>
+            </Card>
 
             <Card className="shadow-xl border-0 bg-white/50 dark:bg-slate-900/50 backdrop-blur-md ring-1 ring-black/5 dark:ring-white/10 flex flex-col h-[600px]">
               <CardHeader className="pb-2 border-b border-border/50">

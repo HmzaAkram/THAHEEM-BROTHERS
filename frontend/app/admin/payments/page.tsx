@@ -28,7 +28,7 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { Plus, Download, Filter, Search, DollarSign, TrendingUp, CreditCard, Pencil, FileText, Scale } from 'lucide-react';
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { useData, Payment } from '@/context/data-context';
 import { formatDate, formatCurrency } from '@/lib/utils';
 import { CompanySelect } from '@/components/company-select';
@@ -94,6 +94,14 @@ export default function PaymentsPage() {
   const [timeFilter, setTimeFilter] = useState<'overall' | 'monthly' | '3months' | '6months' | 'yearly'>('overall');
   const [companyFilter, setCompanyFilter] = useState<string>('all');
   const [searchQuery, setSearchQuery] = useState('');
+
+  // Robust number parsing to handle commas etc.
+  const parseNumber = (val: any) => {
+    if (typeof val === 'number') return val;
+    if (!val) return 0;
+    const cleaned = String(val).replace(/[^0-9.-]/g, '');
+    return parseFloat(cleaned) || 0;
+  };
 
   // Method specific state
   const [trackingId, setTrackingId] = useState('');
@@ -244,72 +252,28 @@ export default function PaymentsPage() {
           }
         }
       } else {
-        // Lumpsum Auto-allocation logic
-        let remainingLumpsum = Number(lumpsumAmount);
+        // Lumpsum Auto-allocation logic: Let the backend handle everything!
+        const paymentData: Omit<Payment, 'id' | 'createdAt'> = {
+          companyId,
+          companyName,
+          date,
+          amount: Number(lumpsumAmount),
+          adjustment: 0,
+          method,
+          // billId: undefined, // Sending no billId triggers Lumpsum logic in backend
+          trackingId: method === 'Bank Transfer' ? trackingId : undefined,
+          chequeNo: method === 'Cheque' ? chequeNo : undefined,
+          payOrderNo: method === 'Pay Order' ? payOrderNo : undefined,
+          description: description || 'Lumpsum Payment',
+          reference: finalReference
+        };
 
-        // Filter and sort unpaid bills by date (oldest first)
-        const unpaidBills = bills.filter(b =>
-          String(b.companyId) === String(companyId) &&
-          (b.status !== 'Paid' && b.calculatedStatus !== 'Paid')
-        ).sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
-
-        for (const bill of unpaidBills) {
-          if (remainingLumpsum <= 0) break;
-
-          const dueAmount = (bill.grandTotal || bill.totalAmount || 0) - (bill.paidAmount || 0);
-          if (dueAmount <= 0) continue;
-
-          const amountToPay = Math.min(dueAmount, remainingLumpsum);
-
-          const paymentData: Omit<Payment, 'id' | 'createdAt'> = {
-            companyId,
-            companyName,
-            date,
-            amount: amountToPay,
-            adjustment: 0, // In lumpsum mode, no manual adjustments for speed
-            method,
-            billId: bill.id,
-            trackingId: method === 'Bank Transfer' ? trackingId : undefined,
-            chequeNo: method === 'Cheque' ? chequeNo : undefined,
-            payOrderNo: method === 'Pay Order' ? payOrderNo : undefined,
-            description: description || 'Auto-allocated Lumpsum Payment',
-            reference: finalReference
-          };
-
-          const result = await addPayment(paymentData);
-          if (result.ok) {
-            successCount++;
-            remainingLumpsum -= amountToPay;
-          } else {
-            errorCount++;
-            console.error(`Failed to record auto-payment for bill ${bill.id}:`, result.message);
-          }
-        }
-
-        // Apply remaining surplus as an Advance
-        if (remainingLumpsum > 0) {
-          const genericPaymentData: Omit<Payment, 'id' | 'createdAt'> = {
-            companyId,
-            companyName,
-            date,
-            amount: remainingLumpsum,
-            adjustment: 0,
-            method,
-            // Intentionally omitting billId to act as advance
-            trackingId: method === 'Bank Transfer' ? trackingId : undefined,
-            chequeNo: method === 'Cheque' ? chequeNo : undefined,
-            payOrderNo: method === 'Pay Order' ? payOrderNo : undefined,
-            description: description || 'Remaining Lumpsum Advance',
-            reference: finalReference
-          };
-
-          const genericResult = await addPayment(genericPaymentData);
-          if (genericResult.ok) {
-            successCount++;
-          } else {
-            errorCount++;
-            console.error(`Failed to record surplus advance payment:`, genericResult.message);
-          }
+        const result = await addPayment(paymentData);
+        if (result.ok) {
+          successCount = 1;
+        } else {
+          errorCount = 1;
+          console.error("Failed to record lumpsum payment:", result.message);
         }
       }
 
@@ -432,10 +396,10 @@ export default function PaymentsPage() {
       const head = [['Date', 'Company', 'Job No', 'Method', 'Ref/Adv', 'Adj.', 'Cash Paid', 'Total Paid', 'Bill Total']];
       const body = filteredPayments.map(p => {
         const linkedBill = bills.find(b => String(b.id) === String(p.billId));
-        const cashPaid = Number(p.amount) || 0;
-        const adjustment = Number(p.adjustment) || 0;
+        const cashPaid = parseNumber(p.amount);
+        const adjustment = parseNumber(p.adjustment);
         const totalPaid = cashPaid + adjustment;
-        const billTotal = linkedBill ? Number(linkedBill.grandTotal) : 0;
+        const billTotal = linkedBill ? parseNumber(linkedBill.grandTotal) : 0;
 
         return [
           formatDate(p.date),
@@ -496,9 +460,10 @@ export default function PaymentsPage() {
   const companyBills = useMemo(() => {
     if (!companyId) return [];
     // Handle both number and string ID types and ensure we filter for non-paid bills
+    // IMPORTANT: Exclude Drafts from payment selection
     return bills.filter(b =>
       (String(b.companyId) === String(companyId)) &&
-      (b.status !== 'Paid' && b.calculatedStatus !== 'Paid')
+      (b.status !== 'Paid' && b.calculatedStatus !== 'Paid' && b.status !== 'Draft')
     );
   }, [companyId, bills]);
 
@@ -533,7 +498,7 @@ export default function PaymentsPage() {
 
     // Company Filter
     if (companyFilter !== 'all') {
-      filtered = filtered.filter(p => p.companyId === companyFilter);
+      filtered = filtered.filter(p => String(p.companyId) === companyFilter);
     }
 
     // Search Query (Reference or specific notes)
@@ -549,14 +514,29 @@ export default function PaymentsPage() {
     return filtered.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
   }, [payments, timeFilter, companyFilter, searchQuery]);
 
+  // Pagination State & Logic
+  const [currentPage, setCurrentPage] = useState(1);
+  const itemsPerPage = 50;
+
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [timeFilter, companyFilter, searchQuery]);
+
+  const paginatedPayments = useMemo(() => {
+    const startIdx = (currentPage - 1) * itemsPerPage;
+    return filteredPayments.slice(startIdx, startIdx + itemsPerPage);
+  }, [filteredPayments, currentPage]);
+
+  const totalPages = Math.ceil(filteredPayments.length / itemsPerPage);
+
   // Dynamic Totals for Payments and associated Bills
   const tableTotals = useMemo(() => {
     let collected = 0;
     let adjustment = 0;
 
     filteredPayments.forEach(p => {
-      collected += Number(p.amount) || 0;
-      adjustment += Number(p.adjustment) || 0;
+      collected += parseNumber(p.amount);
+      adjustment += parseNumber(p.adjustment);
     });
 
     let relevantBills = [...bills];
@@ -583,12 +563,20 @@ export default function PaymentsPage() {
 
     const totalOpeningBalance = relevantBills.length > 0 || relevantPayments.length > 0
       ? companies
-        .filter(c => companyFilter === 'all' || String(c.id) === companyFilter)
-        .reduce((sum, c) => sum + (Number(c.openingBalance) || 0), 0)
+        .filter(c => companyFilter === 'all' || String(c.id) === String(companyFilter))
+        .reduce((sum, c) => sum + parseNumber(c.openingBalance), 0)
       : 0;
 
-    const totalBill = relevantBills.reduce((sum, b) => sum + (Number(b.grandTotal) || 0), 0) + totalOpeningBalance;
-    const totalAdvances = relevantBills.reduce((sum, b) => sum + (Number(b.advancePayment) || 0), 0);
+    // Filter out Drafts for financial totals
+    const totalBill = relevantBills
+      .filter(b => b.status !== 'Draft')
+      .reduce((sum, b) => sum + (Number(b.grandTotal) || 0), 0) + totalOpeningBalance;
+    
+    // Only count advances from non-draft bills
+    const totalAdvances = relevantBills
+      .filter(b => b.status !== 'Draft')
+      .reduce((sum, b) => sum + (Number(b.advancePayment) || 0), 0);
+      
     const overallReceived = totalAdvances + relevantPayments.reduce((sum, p) => sum + (Number(p.amount) || 0) + (Number(p.adjustment) || 0), 0);
     const totalBalance = totalBill - overallReceived;
 
@@ -942,7 +930,7 @@ export default function PaymentsPage() {
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {filteredPayments.map((payment) => {
+                    {paginatedPayments.map((payment) => {
                       const linkedBill = bills.find(b => String(b.id) === String(payment.billId));
                       const totalBill = linkedBill?.grandTotal || 0;
                       const totalPaid = Number(linkedBill?.advancePayment || 0) + Number(linkedBill?.paidAmount || 0);
@@ -1016,6 +1004,70 @@ export default function PaymentsPage() {
                     })}
                   </TableBody>
                 </Table>
+              </div>
+            </div>
+          )}
+
+          {/* Pagination Controls */}
+          {totalPages > 1 && (
+            <div className="flex flex-col sm:flex-row items-center justify-between gap-4 mt-6">
+              <p className="text-sm text-muted-foreground w-full text-center sm:text-left">
+                Showing {(currentPage - 1) * itemsPerPage + 1} to {Math.min(currentPage * itemsPerPage, filteredPayments.length)} of {filteredPayments.length} entries
+              </p>
+              <div className="flex items-center gap-1.5 w-full justify-center sm:justify-end">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
+                  disabled={currentPage === 1}
+                  className="h-8 shadow-sm rounded-lg"
+                >
+                  Previous
+                </Button>
+                <div className="flex items-center gap-1 hidden md:flex">
+                  {Array.from({ length: totalPages }, (_, i) => i + 1)
+                    .filter(p => p === 1 || p === totalPages || Math.abs(p - currentPage) <= 1)
+                    .map((p, i, arr) => {
+                      if (i > 0 && p - arr[i - 1] > 1) {
+                        return (
+                          <div key={`ellipsis-${p}`} className="flex items-center gap-1">
+                            <span className="px-2 text-muted-foreground">...</span>
+                            <Button
+                              variant={currentPage === p ? 'default' : 'outline'}
+                              size="sm"
+                              onClick={() => setCurrentPage(p)}
+                              className={`h-8 w-8 p-0 rounded-lg shadow-sm ${currentPage === p ? 'bg-primary text-primary-foreground font-bold hover:bg-primary/90' : 'text-slate-600 hover:text-slate-900 border-border/50 bg-slate-50'}`}
+                            >
+                              {p}
+                            </Button>
+                          </div>
+                        );
+                      }
+                      return (
+                        <Button
+                          key={p}
+                          variant={currentPage === p ? 'default' : 'outline'}
+                          size="sm"
+                          onClick={() => setCurrentPage(p)}
+                          className={`h-8 w-8 p-0 rounded-lg shadow-sm ${currentPage === p ? 'bg-primary text-primary-foreground font-bold hover:bg-primary/90' : 'text-slate-600 hover:text-slate-900 border-border/50 bg-white'}`}
+                        >
+                          {p}
+                        </Button>
+                      );
+                    })}
+                </div>
+                <span className="md:hidden text-sm px-2 font-medium">
+                  Page {currentPage} of {totalPages}
+                </span>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))}
+                  disabled={currentPage === totalPages}
+                  className="h-8 shadow-sm rounded-lg"
+                >
+                  Next
+                </Button>
               </div>
             </div>
           )}

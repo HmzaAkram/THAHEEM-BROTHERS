@@ -21,11 +21,11 @@ import {
 import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
 import { Download, Filter, Check, ChevronsUpDown, Search, DollarSign, ArrowUpCircle, ArrowDownCircle, Scale, ChevronDown, ChevronUp } from 'lucide-react';
-import { useRef, useState, useMemo } from 'react';
+import { useRef, useState, useMemo, useEffect } from 'react';
 import React from 'react';
 import { useData, LedgerEntry } from '@/context/data-context';
 import { Input } from '@/components/ui/input';
-import { formatDate, cn, formatCurrency } from '@/lib/utils';
+import { formatDate, cn, formatCurrency, parseLocalDate, isWithinDateRange } from '@/lib/utils';
 import { jsPDF } from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import { DashboardCard } from '@/components/dashboard-card';
@@ -53,7 +53,7 @@ export default function LedgerPage() {
     let consolidatedEntries: any[] = [];
 
     // Process Bills
-    const companyBills = selectedCompanyId === 'all' ? bills : bills.filter(b => String(b.companyId) === selectedCompanyId);
+    const companyBills = (selectedCompanyId === 'all' ? bills : bills.filter(b => String(b.companyId) === selectedCompanyId)).filter(b => b.status !== 'Draft');
 
     companyBills.forEach(bill => {
       // Find all payments linked to this bill
@@ -82,7 +82,16 @@ export default function LedgerPage() {
         weight: bill.weight,
         packages: bill.packages,
         igm: bill.igm,
-        gdNumber: bill.gdNumber,
+        igdNumber: bill.gdNumber,
+        payments: linkedPayments.map(p => ({
+          method: p.method,
+          reference: p.reference,
+          trackingId: p.trackingId,
+          chequeNo: p.chequeNo,
+          payOrderNo: p.payOrderNo,
+          amount: p.amount,
+          adjustment: p.adjustment
+        }))
       });
     });
 
@@ -105,6 +114,9 @@ export default function LedgerPage() {
           outstanding: 0,
           method: p.method,
           paymentRef: p.reference,
+          trackingId: p.trackingId,
+          chequeNo: p.chequeNo,
+          payOrderNo: p.payOrderNo,
         });
       }
     });
@@ -113,12 +125,19 @@ export default function LedgerPage() {
     consolidatedEntries.sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
 
     // Calculate exact inherent opening balance for "ALL" time
+    const parseNumber = (val: any) => {
+      if (typeof val === 'number') return val;
+      if (!val) return 0;
+      const cleaned = String(val).replace(/[^0-9.-]/g, '');
+      return parseFloat(cleaned) || 0;
+    };
+
     let baseOpeningBal = 0;
     if (selectedCompanyId === 'all') {
-      companies.forEach(c => baseOpeningBal += (Number(c.openingBalance) || 0));
+      companies.forEach(c => baseOpeningBal += parseNumber(c.openingBalance));
     } else {
       const comp = companies.find(c => String(c.id) === selectedCompanyId);
-      if (comp) baseOpeningBal = (Number(comp.openingBalance) || 0);
+      if (comp) baseOpeningBal = parseNumber(comp.openingBalance);
     }
 
     let openingBal = baseOpeningBal;
@@ -126,22 +145,34 @@ export default function LedgerPage() {
 
     // Filter by Starting Date & Calculate Opening Balance
     if (startDate) {
-      const start = new Date(startDate);
-      start.setHours(0, 0, 0, 0);
+      const start = parseLocalDate(startDate);
+      if (start) {
+        const previousEntries = consolidatedEntries.filter(e => {
+          const d = parseLocalDate(e.date);
+          return d && d < start;
+        });
+        previousEntries.forEach(e => {
+          openingBal += (e.debit - e.credit);
+        });
 
-      const previousEntries = consolidatedEntries.filter(e => new Date(e.date) < start);
-      previousEntries.forEach(e => {
-        openingBal += (e.debit - e.credit);
-      });
-
-      filteredEntries = consolidatedEntries.filter(e => new Date(e.date) >= start);
+        filteredEntries = consolidatedEntries.filter(e => {
+          const d = parseLocalDate(e.date);
+          return d && d >= start;
+        });
+      }
     }
 
     // Filter by End Date
     if (endDate) {
-      const end = new Date(endDate);
-      end.setHours(23, 59, 59, 999);
-      filteredEntries = filteredEntries.filter(e => new Date(e.date) <= end);
+      const end = parseLocalDate(endDate);
+      if (end) {
+        const endOfData = new Date(end);
+        endOfData.setHours(23, 59, 59, 999);
+        filteredEntries = filteredEntries.filter(e => {
+          const d = parseLocalDate(e.date);
+          return d && d <= endOfData;
+        });
+      }
     }
 
     // Recalculate running balance for the view
@@ -163,6 +194,21 @@ export default function LedgerPage() {
 
     return { ledgerData: result, openingBalance: openingBal, remainingOpeningBalance };
   }, [selectedCompanyId, companies, bills, payments, startDate, endDate]);
+
+  // Pagination State & Logic
+  const [currentPage, setCurrentPage] = useState(1);
+  const itemsPerPage = 50;
+
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [selectedCompanyId, startDate, endDate]);
+
+  const paginatedLedgerData = useMemo(() => {
+    const startIdx = (currentPage - 1) * itemsPerPage;
+    return ledgerData.slice(startIdx, startIdx + itemsPerPage);
+  }, [ledgerData, currentPage]);
+
+  const totalPages = Math.ceil(ledgerData.length / itemsPerPage);
 
   const totals = useMemo(() => {
     return ledgerData.reduce((acc: any, item: any) => {
@@ -233,17 +279,20 @@ export default function LedgerPage() {
       pdf.setFontSize(10);
       pdf.setFont("helvetica", "bold");
       pdf.setTextColor(15, 23, 42);
-      const companyNameStr = selectedCompanyId !== 'all' ? companies.find(c => c.id === selectedCompanyId)?.name || 'All Companies' : 'All Companies';
+      const companyNameStr = selectedCompanyId !== 'all' 
+        ? companies.find(c => String(c.id) === selectedCompanyId)?.name || 'Unknown Company' 
+        : 'All Companies';
       pdf.text(`Client: ${companyNameStr}`, 14, yPos);
 
       pdf.setFontSize(9);
       pdf.setFont("helvetica", "normal");
       pdf.setTextColor(100, 116, 139);
-      if (startDate || endDate) {
-        pdf.text(`Period: ${startDate ? formatDate(startDate) : 'Beginning'} to ${endDate ? formatDate(endDate) : 'Present'}`, 14, yPos + 5);
-      } else {
-        pdf.text(`Period: All Time`, 14, yPos + 5);
-      }
+      
+      const periodLabel = (startDate || endDate) 
+        ? `Period: ${startDate ? formatDate(startDate) : 'Beginning'} to ${endDate ? formatDate(endDate) : 'Present'}`
+        : 'Period: All Time';
+        
+      pdf.text(periodLabel, 14, yPos + 5);
 
       pdf.text(`Date Printed: ${formatDate(new Date().toISOString())}`, pageWidth - 14, yPos, { align: "right" });
       
@@ -253,15 +302,22 @@ export default function LedgerPage() {
       // I'll calculate it again inside handleExportPDF for simplicity or pass it.
       
       // Better approach: Calculate it right here.
-      const companyPaymentsForPDF = selectedCompanyId === 'all' ? payments : payments.filter(p => String(p.companyId) === selectedCompanyId);
+      const parseNumber = (val: any) => {
+        if (typeof val === 'number') return val;
+        if (!val) return 0;
+        const cleaned = String(val).replace(/[^0-9.-]/g, '');
+        return parseFloat(cleaned) || 0;
+      };
+
+      const companyPaymentsForPDF = selectedCompanyId === 'all' ? payments : payments.filter(p => String(p.companyId) === String(selectedCompanyId));
       let baseOpeningBalPDF = 0;
       if (selectedCompanyId === 'all') {
-        companies.forEach(c => baseOpeningBalPDF += (Number(c.openingBalance) || 0));
+        companies.forEach(c => baseOpeningBalPDF += parseNumber(c.openingBalance));
       } else {
-        const comp = companies.find(c => String(c.id) === selectedCompanyId);
-        if (comp) baseOpeningBalPDF = (Number(comp.openingBalance) || 0);
+        const comp = companies.find(c => String(c.id) === String(selectedCompanyId));
+        if (comp) baseOpeningBalPDF = parseNumber(comp.openingBalance);
       }
-      const clearedOpeningBalPDF = companyPaymentsForPDF.filter(p => !p.billId).reduce((sum, p) => sum + Number(p.amount || 0), 0);
+      const clearedOpeningBalPDF = companyPaymentsForPDF.filter(p => !p.billId).reduce((sum, p) => sum + parseNumber(p.amount), 0);
       const remainingOpeningBalPDF = Math.max(0, baseOpeningBalPDF - clearedOpeningBalPDF);
 
       pdf.text(`Opening Balance: ${formatCurrency(remainingOpeningBalPDF)}`, pageWidth - 14, yPos + 5, { align: "right" });
@@ -286,17 +342,37 @@ export default function LedgerPage() {
         ]);
       }
 
-      // Map Ledger Data
-      const exportData = ledgerData.map((entry: any) => {
-        let desc = entry.description;
-        if (entry.type === 'PAYMENT') {
-          desc = entry.method ? `Payment Received (${entry.method})` : 'Advance Received';
-          if (entry.paymentRef) desc += ` - Ref: ${entry.paymentRef}`;
-        }
+      // Filter and map already handled by tableRows calculation
 
-        return [
+      // Helper to format method details for PDF
+      const formatMethodDetails = (entry: any) => {
+        if (entry.type === 'PAYMENT') {
+          let details = entry.method || '-';
+          const parts: string[] = [];
+          if (entry.paymentRef) parts.push(`Ref: ${entry.paymentRef}`);
+          if (entry.trackingId && !parts.some(x => x.includes(entry.trackingId) || entry.trackingId.includes(x))) parts.push(`Trk: ${entry.trackingId}`);
+          if (entry.chequeNo && !parts.some(x => x.includes(entry.chequeNo) || entry.chequeNo.includes(x))) parts.push(`Chq: ${entry.chequeNo}`);
+          if (entry.payOrderNo && !parts.some(x => x.includes(entry.payOrderNo) || entry.payOrderNo.includes(x))) parts.push(`PO: ${entry.payOrderNo}`);
+          return parts.length > 0 ? `${details}\n(${parts.join(', ')})` : details;
+        } else if (entry.type === 'BILL' && entry.payments && entry.payments.length > 0) {
+          return entry.payments.map((p: any) => {
+            let m = p.method || 'Payment';
+            const pParts: string[] = [];
+            if (p.reference) pParts.push(`Ref: ${p.reference}`);
+            if (p.trackingId && !pParts.some(x => x.includes(p.trackingId) || p.trackingId.includes(x))) pParts.push(`Trk: ${p.trackingId}`);
+            if (p.chequeNo && !pParts.some(x => x.includes(p.chequeNo) || p.chequeNo.includes(x))) pParts.push(`Chq: ${p.chequeNo}`);
+            if (p.payOrderNo && !pParts.some(x => x.includes(p.payOrderNo) || p.payOrderNo.includes(x))) pParts.push(`PO: ${p.payOrderNo}`);
+            return pParts.length > 0 ? `${m}\n(${pParts.join(', ')})` : m;
+          }).join('\n\n');
+        }
+        return '-';
+      };
+
+      const exportDataWithMethod = ledgerData.map((entry: any) => {
+        const row = [
           new Date(entry.date).toLocaleDateString(),
-          selectedCompanyId === 'all' ? `${entry.companyName}\n${desc}` : desc,
+          selectedCompanyId === 'all' ? `${entry.companyName}\n${entry.description}` : entry.description,
+          formatMethodDetails(entry),
           entry.jobNumber || '-',
           entry.debit > 0 ? formatCurrency(entry.debit) : '-',
           entry.advance > 0 ? formatCurrency(entry.advance) : '-',
@@ -305,29 +381,66 @@ export default function LedgerPage() {
           entry.outstanding > 0 ? formatCurrency(entry.outstanding) : '-',
           formatCurrency(entry.balance)
         ];
+        return row;
       });
 
-      tableRows = [...tableRows, ...exportData];
+      tableRows = [...tableRows, ...exportDataWithMethod];
 
       if (tableRows.length === 0) {
-        tableRows.push(['-', 'No transactions found', '-', '-', '-', '-', '-', '-', '-']);
+        tableRows.push(['-', 'No transactions found', '-', '-', '-', '-', '-', '-', '-', '-']);
+      } else {
+        // Calculate totals
+        let totalBill = 0;
+        let totalAdvance = 0;
+        let totalPaidAmount = 0;
+        let totalAdj = 0;
+        let totalOutst = 0;
+
+        ledgerData.forEach((entry: any) => {
+          if (entry.description !== 'Opening Balance') {
+            totalBill += entry.debit || 0;
+            totalAdvance += entry.advance || 0;
+            totalPaidAmount += entry.paid || 0;
+            totalAdj += entry.adjustment || 0;
+          }
+          if (entry.type === 'BILL') {
+            totalOutst += entry.outstanding || 0;
+          }
+        });
+
+        const closingBalance = ledgerData.length > 0 ? ledgerData[ledgerData.length - 1].balance : 0;
+
+        tableRows.push([
+          '',
+          'TOTALS',
+          '',
+          '',
+          formatCurrency(totalBill),
+          formatCurrency(totalAdvance),
+          formatCurrency(totalPaidAmount),
+          formatCurrency(totalAdj),
+          formatCurrency(totalOutst),
+          formatCurrency(closingBalance)
+        ]);
       }
 
       autoTable(pdf, {
         startY: yPos + 4,
-        head: [['Date', 'Description', 'Job No', 'Bill Total', 'Advance', 'Paid', 'Adj.', 'Outst.', 'Balance']],
+        head: [['Date', 'Description', 'Method', 'Job No', 'Bill Total', 'Advance', 'Paid', 'Adj.', 'Outst.', 'Balance']],
         body: tableRows,
         theme: 'grid',
         headStyles: { fillColor: [44, 62, 80], textColor: [255, 255, 255], fontStyle: 'bold' },
         styles: { fontSize: 7, cellPadding: 1.5 },
         columnStyles: {
-          0: { cellWidth: 18 },
-          3: { halign: 'right' },
+          0: { cellWidth: 16 },
+          1: { cellWidth: 25 },
+          2: { cellWidth: 40 },
           4: { halign: 'right' },
           5: { halign: 'right' },
           6: { halign: 'right' },
           7: { halign: 'right' },
-          8: { halign: 'right', fontStyle: 'bold' }
+          8: { halign: 'right' },
+          9: { halign: 'right', fontStyle: 'bold' }
         },
         didParseCell: function (data) {
           if (data.section === 'body') {
@@ -336,7 +449,7 @@ export default function LedgerPage() {
               data.cell.styles.textColor = [100, 100, 100];
             }
 
-            if (data.column.index === 8) {
+            if (data.column.index === 9) {
               const valStr = data.cell.text[0] || '';
               const numStr = valStr.replace(/[^0-9.-]/g, '');
               const numVal = parseFloat(numStr);
@@ -347,6 +460,11 @@ export default function LedgerPage() {
                   data.cell.styles.textColor = [0, 128, 0]; // Green for zero or credit balance
                 }
               }
+            }
+            if (data.row.index === tableRows.length - 1 && (data.row.raw as any)[1] === 'TOTALS') {
+              data.cell.styles.fontStyle = 'bold';
+              data.cell.styles.fillColor = [241, 245, 249]; // slate-100
+              data.cell.styles.textColor = [15, 23, 42]; // slate-900
             }
           }
         }
@@ -436,7 +554,8 @@ export default function LedgerPage() {
                       <TableRow className="bg-muted/50">
                         <TableHead className="w-[100px] text-xs">Date</TableHead>
                         <TableHead className="w-[30px]"></TableHead>
-                        <TableHead className="min-w-[200px] text-xs">Description</TableHead>
+                        <TableHead className="min-w-[150px] text-xs">Description</TableHead>
+                        <TableHead className="min-w-[150px] text-xs text-primary">Method</TableHead>
                         <TableHead className="w-[100px] text-xs">Job No</TableHead>
                         <TableHead className="text-right text-destructive w-[100px] text-xs">Bill Total</TableHead>
                         <TableHead className="text-right text-muted-foreground w-[90px] text-xs">Advance</TableHead>
@@ -455,7 +574,7 @@ export default function LedgerPage() {
                       <TableCell className="text-sm font-medium text-muted-foreground">
                         {formatDate(startDate)}
                       </TableCell>
-                      <TableCell colSpan={7} className="font-medium italic text-muted-foreground">
+                      <TableCell colSpan={8} className="font-medium italic text-muted-foreground">
                         Opening Balance b/f
                       </TableCell>
                       <TableCell className="text-right font-bold font-mono text-sm">
@@ -466,12 +585,12 @@ export default function LedgerPage() {
 
                   {ledgerData.length === 0 ? (
                     <TableRow>
-                      <TableCell colSpan={selectedCompanyId !== 'all' ? 10 : 9} className="h-24 text-center text-muted-foreground">
+                      <TableCell colSpan={selectedCompanyId !== 'all' ? 11 : 10} className="h-24 text-center text-muted-foreground">
                         No transactions found for the selected period.
                       </TableCell>
                     </TableRow>
                   ) : (
-                    ledgerData.map((entry: any) => (
+                    paginatedLedgerData.map((entry: any) => (
                       <React.Fragment key={entry.id}>
                         <TableRow className="hover:bg-muted/30 group">
                           {/* 1. Date */}
@@ -497,38 +616,63 @@ export default function LedgerPage() {
                             )}
                           </TableCell>
 
-                          {/* 2. Description (Company Name First -> Method/Details) */}
+                          {/* 2. Description (Company Name First) */}
                           <TableCell className="align-top pt-3">
                             <div className="flex flex-col gap-1">
                               {/* Company Name First - Bold */}
                               {selectedCompanyId === 'all' && (
-                                <span className="font-bold text-base text-foreground">
+                                <span className="font-bold text-sm text-foreground">
                                   {entry.companyName}
                                 </span>
                               )}
 
                               {/* Transaction Details */}
                               <div className="text-sm text-muted-foreground">
-                                {entry.type === 'BILL' ? (
-                                  <div className="flex flex-col">
-                                    <span className="font-medium text-foreground/80">{entry.description}</span>
-                                  </div>
-                                ) : (
-                                  <div className="flex flex-col gap-0.5">
-                                    <div className="flex items-center gap-2">
-                                      <span className="font-medium text-foreground/80">
-                                        {/* ADVANCE PAYMENT: If no method, it's an advance */}
-                                        {(entry as any).method ? `Payment Received (${(entry as any).method})` : 'Advance Received'}
-                                      </span>
-                                      {(entry as any).paymentRef && (
-                                        <span className="text-xs bg-secondary px-1.5 py-0.5 rounded font-mono text-foreground">
-                                          {(entry as any).paymentRef}
-                                        </span>
-                                      )}
-                                    </div>
-                                  </div>
-                                )}
+                                <span className="font-medium text-foreground/80">{entry.description}</span>
                               </div>
+                            </div>
+                          </TableCell>
+
+                          {/* 3. Method & Payment Details */}
+                          <TableCell className="align-top pt-3">
+                            <div className="flex flex-col gap-1.5">
+                              {entry.type === 'BILL' ? (
+                                <div className="space-y-2">
+                                  {entry.payments && entry.payments.length > 0 ? (
+                                    entry.payments.map((p: any, idx: number) => (
+                                      <div key={idx} className="flex flex-col border-l-2 border-primary/20 pl-2 py-0.5">
+                                        <div className="flex items-center gap-2">
+                                          <span className="font-bold text-xs text-primary">{p.method || 'Payment'}</span>
+                                          {p.reference && (
+                                            <span className="text-[10px] bg-muted px-1 rounded font-mono">Ref: {p.reference}</span>
+                                          )}
+                                        </div>
+                                        <div className="flex flex-wrap gap-x-2 gap-y-0.5 mt-0.5 text-[10px] text-muted-foreground">
+                                          {p.trackingId && <span>Trk: {p.trackingId}</span>}
+                                          {p.chequeNo && <span>Chq: {p.chequeNo}</span>}
+                                          {p.payOrderNo && <span>PO: {p.payOrderNo}</span>}
+                                        </div>
+                                      </div>
+                                    ))
+                                  ) : (
+                                    <span className="text-xs text-muted-foreground italic">No payments</span>
+                                  )}
+                                </div>
+                              ) : (
+                                <div className="flex flex-col border-l-2 border-green-500/30 pl-2 py-0.5">
+                                  <div className="flex items-center gap-2">
+                                    <span className="font-bold text-xs text-green-600">{entry.method || 'Payment'}</span>
+                                    {entry.paymentRef && (
+                                      <span className="text-[10px] bg-muted px-1 rounded font-mono">Ref: {entry.paymentRef}</span>
+                                    )}
+                                  </div>
+                                  <div className="flex flex-wrap gap-x-2 gap-y-0.5 mt-0.5 text-[10px] text-muted-foreground">
+                                    {entry.trackingId && <span>Trk: {entry.trackingId}</span>}
+                                    {entry.chequeNo && <span>Chq: {entry.chequeNo}</span>}
+                                    {entry.payOrderNo && <span>PO: {entry.payOrderNo}</span>}
+                                  </div>
+                                </div>
+                              )}
                             </div>
                           </TableCell>
 
@@ -613,7 +757,7 @@ export default function LedgerPage() {
                         {/* Expandable Sub-Row */}
                         {entry.type === 'BILL' && expandedRows.has(entry.id) && (
                           <TableRow className="bg-muted/5">
-                            <TableCell colSpan={selectedCompanyId !== 'all' ? 10 : 9} className="p-0 border-b">
+                            <TableCell colSpan={selectedCompanyId !== 'all' ? 11 : 10} className="p-0 border-b">
                               <div className="p-4 animate-in slide-in-from-top-2 fade-in duration-200">
                                 <div className="grid grid-cols-2 md:grid-cols-6 gap-4 text-xs">
                                   <div>
@@ -653,6 +797,70 @@ export default function LedgerPage() {
                 </div>
               </div>
             </div>
+
+            {/* Pagination Controls */}
+            {totalPages > 1 && (
+              <div className="flex flex-col sm:flex-row items-center justify-between gap-4 mt-6 mb-4">
+                <p className="text-sm text-muted-foreground w-full text-center sm:text-left">
+                  Showing {(currentPage - 1) * itemsPerPage + 1} to {Math.min(currentPage * itemsPerPage, ledgerData.length)} of {ledgerData.length} entries
+                </p>
+                <div className="flex items-center gap-1.5 w-full justify-center sm:justify-end">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
+                    disabled={currentPage === 1}
+                    className="h-8 shadow-sm rounded-lg"
+                  >
+                    Previous
+                  </Button>
+                  <div className="flex items-center gap-1 hidden md:flex">
+                    {Array.from({ length: totalPages }, (_, i) => i + 1)
+                      .filter(p => p === 1 || p === totalPages || Math.abs(p - currentPage) <= 1)
+                      .map((p, i, arr) => {
+                        if (i > 0 && p - arr[i - 1] > 1) {
+                          return (
+                            <div key={`ellipsis-${p}`} className="flex items-center gap-1">
+                              <span className="px-2 text-muted-foreground">...</span>
+                              <Button
+                                variant={currentPage === p ? 'default' : 'outline'}
+                                size="sm"
+                                onClick={() => setCurrentPage(p)}
+                                className={`h-8 w-8 p-0 rounded-lg shadow-sm ${currentPage === p ? 'bg-primary text-primary-foreground font-bold hover:bg-primary/90' : 'text-slate-600 hover:text-slate-900 border-border/50 bg-slate-50'}`}
+                              >
+                                {p}
+                              </Button>
+                            </div>
+                          );
+                        }
+                        return (
+                          <Button
+                            key={p}
+                            variant={currentPage === p ? 'default' : 'outline'}
+                            size="sm"
+                            onClick={() => setCurrentPage(p)}
+                            className={`h-8 w-8 p-0 rounded-lg shadow-sm ${currentPage === p ? 'bg-primary text-primary-foreground font-bold hover:bg-primary/90' : 'text-slate-600 hover:text-slate-900 border-border/50 bg-white'}`}
+                          >
+                            {p}
+                          </Button>
+                        );
+                      })}
+                  </div>
+                  <span className="md:hidden text-sm px-2 font-medium">
+                    Page {currentPage} of {totalPages}
+                  </span>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))}
+                    disabled={currentPage === totalPages}
+                    className="h-8 shadow-sm rounded-lg"
+                  >
+                    Next
+                  </Button>
+                </div>
+              </div>
+            )}
 
             {/* Bottom Summary Totals */}
             {ledgerData.length > 0 && (

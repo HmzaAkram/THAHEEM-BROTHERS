@@ -18,7 +18,7 @@ import {
 import {
   Plus, Download, Trash2, Search, Filter, Receipt, Calculator, Eye, Pencil, Loader2,
 } from 'lucide-react';
-import { useState, useMemo, useRef } from 'react';
+import { useState, useMemo, useRef, useEffect } from 'react';
 import { useData, SaleTax } from '@/context/data-context';
 import { cn, formatDate, formatCurrency, numberToWords } from '@/lib/utils';
 import { CompanySelect } from '@/components/company-select';
@@ -371,6 +371,21 @@ export default function SaleTaxPage() {
     return filtered.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
   }, [saleTaxes, timeFilter, companyFilter, searchQuery, startDate, endDate]);
 
+  // Pagination State & Logic
+  const [currentPage, setCurrentPage] = useState(1);
+  const itemsPerPage = 50;
+
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [timeFilter, companyFilter, searchQuery, startDate, endDate]);
+
+  const paginatedRecords = useMemo(() => {
+    const startIdx = (currentPage - 1) * itemsPerPage;
+    return filteredRecords.slice(startIdx, startIdx + itemsPerPage);
+  }, [filteredRecords, currentPage]);
+
+  const totalPages = Math.ceil(filteredRecords.length / itemsPerPage);
+
   const tableTotals = useMemo(() => {
     return filteredRecords.reduce((acc, r) => {
       acc.value += (Number(r.value) || 0);
@@ -678,7 +693,7 @@ export default function SaleTaxPage() {
                       </TableCell>
                     </TableRow>
                   ) : (
-                    filteredRecords.map((record) => (
+                    paginatedRecords.map((record) => (
                       <TableRow key={record.id} className="group hover:bg-muted/30 transition-colors">
                         <TableCell className="text-xs">{formatDate(record.date)}</TableCell>
                         <TableCell className="text-xs font-mono">{record.refBillNo || '-'}</TableCell>
@@ -724,6 +739,70 @@ export default function SaleTaxPage() {
                   )}
                 </TableBody>
               </Table>
+
+              {/* Pagination Controls */}
+              {totalPages > 1 && (
+                <div className="flex flex-col sm:flex-row items-center justify-between gap-4 mt-6">
+                  <p className="text-sm text-muted-foreground w-full text-center sm:text-left">
+                    Showing {(currentPage - 1) * itemsPerPage + 1} to {Math.min(currentPage * itemsPerPage, filteredRecords.length)} of {filteredRecords.length} entries
+                  </p>
+                  <div className="flex items-center gap-1.5 w-full justify-center sm:justify-end">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
+                      disabled={currentPage === 1}
+                      className="h-8 shadow-sm rounded-lg"
+                    >
+                      Previous
+                    </Button>
+                    <div className="flex items-center gap-1 hidden md:flex">
+                      {Array.from({ length: totalPages }, (_, i) => i + 1)
+                        .filter(p => p === 1 || p === totalPages || Math.abs(p - currentPage) <= 1)
+                        .map((p, i, arr) => {
+                          if (i > 0 && p - arr[i - 1] > 1) {
+                            return (
+                              <div key={`ellipsis-${p}`} className="flex items-center gap-1">
+                                <span className="px-2 text-muted-foreground">...</span>
+                                <Button
+                                  variant={currentPage === p ? 'default' : 'outline'}
+                                  size="sm"
+                                  onClick={() => setCurrentPage(p)}
+                                  className={`h-8 w-8 p-0 rounded-lg shadow-sm ${currentPage === p ? 'bg-primary text-primary-foreground font-bold hover:bg-primary/90' : 'text-slate-600 hover:text-slate-900 border-border/50 bg-slate-50'}`}
+                                >
+                                  {p}
+                                </Button>
+                              </div>
+                            );
+                          }
+                          return (
+                            <Button
+                              key={p}
+                              variant={currentPage === p ? 'default' : 'outline'}
+                              size="sm"
+                              onClick={() => setCurrentPage(p)}
+                              className={`h-8 w-8 p-0 rounded-lg shadow-sm ${currentPage === p ? 'bg-primary text-primary-foreground font-bold hover:bg-primary/90' : 'text-slate-600 hover:text-slate-900 border-border/50 bg-white'}`}
+                            >
+                              {p}
+                            </Button>
+                          );
+                        })}
+                    </div>
+                    <span className="md:hidden text-sm px-2 font-medium">
+                      Page {currentPage} of {totalPages}
+                    </span>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))}
+                      disabled={currentPage === totalPages}
+                      className="h-8 shadow-sm rounded-lg"
+                    >
+                      Next
+                    </Button>
+                  </div>
+                </div>
+              )}
             </CardContent>
           </Card>
         </div>

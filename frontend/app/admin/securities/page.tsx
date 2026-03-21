@@ -253,6 +253,21 @@ export default function SecuritiesPage() {
             .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
     }, [securities, searchTerm, statusFilter]);
 
+    // Pagination State & Logic
+    const [currentPage, setCurrentPage] = useState(1);
+    const itemsPerPage = 50;
+
+    useEffect(() => {
+        setCurrentPage(1);
+    }, [searchTerm, statusFilter]);
+
+    const paginatedSecurities = useMemo(() => {
+        const startIdx = (currentPage - 1) * itemsPerPage;
+        return filteredSecurities.slice(startIdx, startIdx + itemsPerPage);
+    }, [filteredSecurities, currentPage]);
+
+    const totalPages = Math.ceil(filteredSecurities.length / itemsPerPage);
+
     const handleSubmit = async () => {
         setLoading(true);
         try {
@@ -681,7 +696,7 @@ export default function SecuritiesPage() {
                                             </TableCell>
                                         </TableRow>
                                     ) : (
-                                        filteredSecurities.map((security) => (
+                                        paginatedSecurities.map((security) => (
                                             <TableRow key={security.id} className="group hover:bg-slate-50/80 dark:hover:bg-white/5 border-border/30 transition-colors">
                                                 <TableCell className="pl-8 font-bold text-slate-900 dark:text-slate-100">{security.companyName}</TableCell>
                                                 <TableCell>
@@ -791,11 +806,75 @@ export default function SecuritiesPage() {
                                         ))
                                     )}
                                 </TableBody>
-                            </Table>
+                                </Table>
+                            </div>
                         </div>
-                    </div>
-                </CardContent>
-            </Card>
+
+                        {/* Pagination Controls */}
+                        {totalPages > 1 && (
+                            <div className="flex flex-col sm:flex-row items-center justify-between gap-4 mt-6 px-8 mb-4">
+                                <p className="text-sm text-muted-foreground w-full text-center sm:text-left">
+                                    Showing {(currentPage - 1) * itemsPerPage + 1} to {Math.min(currentPage * itemsPerPage, filteredSecurities.length)} of {filteredSecurities.length} entries
+                                </p>
+                                <div className="flex items-center gap-1.5 w-full justify-center sm:justify-end">
+                                    <Button
+                                        variant="outline"
+                                        size="sm"
+                                        onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
+                                        disabled={currentPage === 1}
+                                        className="h-8 shadow-sm rounded-lg"
+                                    >
+                                        Previous
+                                    </Button>
+                                    <div className="flex items-center gap-1 hidden md:flex">
+                                        {Array.from({ length: totalPages }, (_, i) => i + 1)
+                                            .filter(p => p === 1 || p === totalPages || Math.abs(p - currentPage) <= 1)
+                                            .map((p, i, arr) => {
+                                                if (i > 0 && p - arr[i - 1] > 1) {
+                                                    return (
+                                                        <div key={`ellipsis-${p}`} className="flex items-center gap-1">
+                                                            <span className="px-2 text-muted-foreground">...</span>
+                                                            <Button
+                                                                variant={currentPage === p ? 'default' : 'outline'}
+                                                                size="sm"
+                                                                onClick={() => setCurrentPage(p)}
+                                                                className={`h-8 w-8 p-0 rounded-lg shadow-sm ${currentPage === p ? 'bg-primary text-primary-foreground font-bold hover:bg-primary/90' : 'text-slate-600 hover:text-slate-900 border-border/50 bg-slate-50'}`}
+                                                            >
+                                                                {p}
+                                                            </Button>
+                                                        </div>
+                                                    );
+                                                }
+                                                return (
+                                                    <Button
+                                                        key={p}
+                                                        variant={currentPage === p ? 'default' : 'outline'}
+                                                        size="sm"
+                                                        onClick={() => setCurrentPage(p)}
+                                                        className={`h-8 w-8 p-0 rounded-lg shadow-sm ${currentPage === p ? 'bg-primary text-primary-foreground font-bold hover:bg-primary/90' : 'text-slate-600 hover:text-slate-900 border-border/50 bg-white'}`}
+                                                    >
+                                                        {p}
+                                                    </Button>
+                                                );
+                                            })}
+                                    </div>
+                                    <span className="md:hidden text-sm px-2 font-medium">
+                                        Page {currentPage} of {totalPages}
+                                    </span>
+                                    <Button
+                                        variant="outline"
+                                        size="sm"
+                                        onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))}
+                                        disabled={currentPage === totalPages}
+                                        className="h-8 shadow-sm rounded-lg"
+                                    >
+                                        Next
+                                    </Button>
+                                </div>
+                            </div>
+                        )}
+                    </CardContent>
+                </Card>
 
                 {/* Totaling Section */}
                 {securities.length > 0 && (
