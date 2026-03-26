@@ -12,9 +12,40 @@ class BillController extends Controller
     public function index()
     {
         $user = auth('sanctum')->user();
+        $request = request();
         
         // PERFORMANCE FIX: Eager load relationships to prevent N+1 queries
         // Also added pagination to prevent memory exhaustion with large datasets
+        if ($request->has('all') && $request->input('all') == 'true') {
+            if ($user instanceof \App\Models\Company) {
+                $bills = Bill::with(['items', 'company', 'payments'])
+                    ->where('company_id', $user->id)
+                    ->orderBy('id', 'desc')
+                    ->get();
+            } else {
+                $bills = Bill::with(['items', 'company', 'payments'])
+                    ->orderBy('id', 'desc')
+                    ->get();
+            }
+            
+            // Add pagination metadata wrapper for consistency if needed, 
+            // but for 'all' we just return the collection for now
+            $bills->loadSum('payments', 'amount');
+            $bills->loadSum('payments', 'adjustment');
+            
+            // Format URLs
+            $bills->each(function ($bill) {
+                if ($bill->attachment) $bill->attachment = $this->ensureAbsoluteUrl($bill->attachment);
+                if ($bill->attachments) {
+                    $bill->attachments = array_map(function($path) {
+                        return $this->ensureAbsoluteUrl($path);
+                    }, $bill->attachments);
+                }
+            });
+            
+            return response()->json($bills);
+        }
+
         if ($user instanceof \App\Models\Company) {
             $bills = Bill::with(['items', 'company', 'payments'])
                 ->where('company_id', $user->id)
@@ -56,7 +87,7 @@ class BillController extends Controller
             'company_name' => 'required|string',
             'bill_no' => 'nullable|string',
             'date' => 'required|date',
-            'job_number' => 'nullable|string',
+            'job_number' => 'nullable|string|unique:bills,job_number',
             'via' => 'nullable|string',
             'weight' => 'nullable|string',
             'packages' => 'nullable|string',
@@ -217,7 +248,7 @@ class BillController extends Controller
             'company_name' => 'sometimes|string',
             'bill_no' => 'nullable|string',
             'date' => 'required|date',
-            'job_number' => 'nullable|string',
+            'job_number' => 'nullable|string|unique:bills,job_number,' . $bill->id,
             'via' => 'nullable|string',
             'weight' => 'nullable|string',
             'packages' => 'nullable|string',

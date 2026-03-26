@@ -1062,7 +1062,7 @@ export default function ReportsPage() {
           </div>
         </div>
         {/* Pagination Controls */}
-        {totalPages > 1 && (
+        {totalPages > 0 && (
           <div className="flex flex-col sm:flex-row items-center justify-between gap-4 mt-6 px-4 pb-4">
             <p className="text-sm text-muted-foreground w-full text-center sm:text-left">
               Showing {Math.min((currentPage - 1) * itemsPerPage + 1, getCurrentTotalItems())} to {Math.min(currentPage * itemsPerPage, getCurrentTotalItems())} of {getCurrentTotalItems()} entries

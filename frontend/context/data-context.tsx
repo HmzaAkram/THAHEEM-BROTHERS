@@ -235,8 +235,8 @@ export function DataProvider({ children }: { children: ReactNode }) {
       // This prevents one API failure from breaking all data fetching
       const results = await Promise.allSettled([
         ApiService.get('/companies', token),
-        ApiService.get('/bills', token),
-        ApiService.get('/payments', token),
+        ApiService.get('/bills?all=true', token),
+        ApiService.get('/payments?all=true', token),
         ApiService.get('/securities', token),
         ApiService.get('/exporters', token),
         ApiService.get('/sale-taxes', token),
@@ -392,7 +392,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
         setPayments(prev => prev.map(p => p.id === tempId ? result.data : p));
 
         // Refresh bills to update their status
-        const billsRes = await ApiService.get('/bills', token);
+        const billsRes = await ApiService.get('/bills?all=true', token);
         if (billsRes.ok) {
           const billData = billsRes.data;
           setBills(Array.isArray(billData) ? billData : (billData?.data || []));
@@ -419,7 +419,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
       setPayments(prev => prev.map(p => p.id === id ? result.data : p));
 
       // Refresh bills in case the payment edit affects bill statuses
-      const billsRes = await ApiService.get('/bills', token);
+      const billsRes = await ApiService.get('/bills?all=true', token);
       if (billsRes.ok) {
         const billData = billsRes.data;
         setBills(Array.isArray(billData) ? billData : (billData?.data || []));

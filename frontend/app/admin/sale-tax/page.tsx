@@ -741,7 +741,7 @@ export default function SaleTaxPage() {
               </Table>
 
               {/* Pagination Controls */}
-              {totalPages > 1 && (
+              {totalPages > 0 && (
                 <div className="flex flex-col sm:flex-row items-center justify-between gap-4 mt-6">
                   <p className="text-sm text-muted-foreground w-full text-center sm:text-left">
                     Showing {(currentPage - 1) * itemsPerPage + 1} to {Math.min(currentPage * itemsPerPage, filteredRecords.length)} of {filteredRecords.length} entries
