@@ -197,10 +197,14 @@ class BillController extends Controller
 
     private function ensureAbsoluteUrl($path)
     {
-        if (!$path || str_starts_with($path, 'http')) {
+        if (!$path) {
             return $path;
         }
-        return config('app.url') . $path;
+        
+        $url = str_starts_with($path, 'http') ? $path : config('app.url') . $path;
+        
+        // Strip the incorrect /api/v1 prefix from old attachment URLs
+        return str_replace('/api/v1/storage/attachments/', '/storage/attachments/', $url);
     }
 
     private function processBase64Attachment($attachmentData)
@@ -231,8 +235,8 @@ class BillController extends Controller
         $extension = 'pdf';
         $fileName = 'bill_' . \Illuminate\Support\Str::uuid() . '.' . $extension;
         \Illuminate\Support\Facades\Storage::disk('public')->put('attachments/' . $fileName, $decodedData);
-        // Force the URL to use our new API fallback route
-        $url = '/api/v1/storage/attachments/' . $fileName;
+        // Use direct storage URL
+        $url = '/storage/attachments/' . $fileName;
         return config('app.url') . $url;
     }
 

@@ -256,42 +256,7 @@ export default function BillsPage() {
   const handleViewBill = async (bill: Bill) => {
     setSelectedBill(bill);
     setIsViewOpen(true);
-    setViewDataUrl(null); // Reset while loading
-
-    if (bill.attachment) {
-      try {
-        // Extract filename safely
-        const filename = bill.attachment.split('/').pop();
-        if (!filename) throw new Error("Invalid attachment path");
-
-        const token = localStorage.getItem('authToken');
-        console.log('[handleViewBill] Fetching attachment:', filename);
-
-        const response = await fetch(`http://localhost:8000/api/v1/bills/attachment/${filename}`, {
-          headers: {
-            'Authorization': `Bearer ${token}`
-          }
-        });
-
-        if (!response.ok) {
-          console.warn(`[handleViewBill] Fetch failed with status: ${response.status}`);
-          // If direct API fetch fails, it might be a public URL or different format
-          // We'll leave viewDataUrl as null, and let the template try its fallback
-          return;
-        }
-
-        const blob = await response.blob();
-        console.log('[handleViewBill] Blob received:', blob.size, 'bytes');
-
-        // Use Blob URL - more efficient and reliable for PDFs
-        const objectUrl = window.URL.createObjectURL(blob);
-        setViewDataUrl(objectUrl);
-
-      } catch (error) {
-        console.error('Error fetching attachment for view:', error);
-        // Toast optional here, as the modal will still open
-      }
-    }
+    setViewDataUrl(null); // Keep state reset just in case
   };
 
 

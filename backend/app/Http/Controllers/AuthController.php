@@ -11,57 +11,61 @@ class AuthController extends Controller
 {
     public function login(Request $request)
     {
-        $request->validate([
-            'email' => 'required', // Can be email or username
-            'password' => 'required',
-        ]);
-
-        $login = $request->input('email');
-        $password = $request->input('password');
-
-        // 1. Check User model (Admin)
-        $user = \App\Models\User::where('email', $login)->first();
-        if ($user && Hash::check($password, $user->password)) {
-            $token = $user->createToken('auth_token')->plainTextToken;
-            return response()->json([
-                'access_token' => $token,
-                'token_type' => 'Bearer',
-                'user' => $user
+        try {
+            $request->validate([
+                'email' => 'required', // Can be email or username
+                'password' => 'required',
             ]);
-        }
 
-        // 2. Check Company model (Company Owner) - SECURITY FIX: Check status first
-        $company = \App\Models\Company::where('status', 'Active')
-            ->where(function($query) use ($login) {
-                $query->where('username', $login)
-                      ->orWhere('email', $login);
-            })
-            ->first();
+            $login = $request->input('email');
+            $password = $request->input('password');
 
-        // Check if password matches hashed version OR plaintext (legacy support)
-        if ($company && (\Illuminate\Support\Facades\Hash::check($password, $company->password) || $password === $company->password)) {
-            // Optional: Upgrade plaintext to hashed here if needed
-            if (\Illuminate\Support\Facades\Hash::needsRehash($company->password) && $password === $company->password) {
-                // If it was plaintext, the model's 'hashed' cast might interfere if we just assign,
-                // but we can skip that for now or update it using a raw query. We'll simply let them login.
+            // 1. Check User model (Admin)
+            $user = \App\Models\User::where('email', $login)->first();
+            if ($user && Hash::check($password, $user->password)) {
+                $token = $user->createToken('auth_token')->plainTextToken;
+                return response()->json([
+                    'access_token' => $token,
+                    'token_type' => 'Bearer',
+                    'user' => $user
+                ]);
             }
+
+            // 2. Check Company model (Company Owner) - SECURITY FIX: Check status first
+            $company = \App\Models\Company::where('status', 'Active')
+                ->where(function($query) use ($login) {
+                    $query->where('username', $login)
+                          ->orWhere('email', $login);
+                })
+                ->first();
+
+            // Check if password matches hashed version OR plaintext (legacy support)
+            if ($company && (\Illuminate\Support\Facades\Hash::check($password, $company->password) || $password === $company->password)) {
+                $token = $company->createToken('auth_token')->plainTextToken;
+                return response()->json([
+                    'access_token' => $token,
+                    'token_type' => 'Bearer',
+                    'user' => $company // Frontend expects 'user' key
+                ]);
+            }
+
+
+            // SECURITY: Add delay to prevent timing attacks
+            usleep(500000); // 0.5 second delay
             
-            $token = $company->createToken('auth_token')->plainTextToken;
             return response()->json([
-                'access_token' => $token,
-                'token_type' => 'Bearer',
-                'user' => $company // Frontend expects 'user' key
+                'message' => 'Invalid login details'
+            ], 401);
+        } catch (\Exception $e) {
+            \Illuminate\Support\Facades\Log::error('Login exception: ' . $e->getMessage(), [
+                'trace' => $e->getTraceAsString(),
             ]);
+            return response()->json([
+                'message' => 'Login failed: ' . $e->getMessage(),
+            ], 500);
         }
-
-
-        // SECURITY: Add delay to prevent timing attacks
-        usleep(500000); // 0.5 second delay
-        
-        return response()->json([
-            'message' => 'Invalid login details'
-        ], 401);
     }
+
 
 
     public function logout(Request $request)
