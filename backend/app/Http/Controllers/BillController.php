@@ -13,7 +13,7 @@ class BillController extends Controller
     {
         $user = auth('sanctum')->user();
         $request = request();
-        
+
         // PERFORMANCE FIX: Eager load relationships to prevent N+1 queries
         // Also added pagination to prevent memory exhaustion with large datasets
         if ($request->has('all') && $request->input('all') == 'true') {
@@ -22,27 +22,30 @@ class BillController extends Controller
                     ->where('company_id', $user->id)
                     ->orderBy('id', 'desc')
                     ->get();
-            } else {
+            }
+            else {
                 $bills = Bill::with(['items', 'company', 'payments'])
                     ->orderBy('id', 'desc')
                     ->get();
             }
-            
+
             // Add pagination metadata wrapper for consistency if needed, 
             // but for 'all' we just return the collection for now
             $bills->loadSum('payments', 'amount');
             $bills->loadSum('payments', 'adjustment');
-            
+
             // Format URLs
             $bills->each(function ($bill) {
-                if ($bill->attachment) $bill->attachment = $this->ensureAbsoluteUrl($bill->attachment);
+                if ($bill->attachment)
+                    $bill->attachment = $this->ensureAbsoluteUrl($bill->attachment);
                 if ($bill->attachments) {
-                    $bill->attachments = array_map(function($path) {
-                        return $this->ensureAbsoluteUrl($path);
-                    }, $bill->attachments);
-                }
-            });
-            
+                    $bill->attachments = array_map(function ($path) {
+                                return $this->ensureAbsoluteUrl($path);
+                            }
+                                , $bill->attachments);
+                        }
+                    });
+
             return response()->json($bills);
         }
 
@@ -50,11 +53,12 @@ class BillController extends Controller
             $bills = Bill::with(['items', 'company', 'payments'])
                 ->where('company_id', $user->id)
                 ->orderBy('id', 'desc')
-                ->paginate(50);  // 50 bills per page
-        } else {
+                ->paginate(50); // 50 bills per page
+        }
+        else {
             $bills = Bill::with(['items', 'company', 'payments'])
                 ->orderBy('id', 'desc')
-                ->paginate(50);  // 50 bills per page
+                ->paginate(50); // 50 bills per page
         }
 
         // Load payment sums to optimize appended attributes
@@ -66,11 +70,12 @@ class BillController extends Controller
                 $bill->attachment = $this->ensureAbsoluteUrl($bill->attachment);
             }
             if ($bill->attachments) {
-                $bill->attachments = array_map(function($path) {
-                    return $this->ensureAbsoluteUrl($path);
-                }, $bill->attachments);
-            }
-        });
+                $bill->attachments = array_map(function ($path) {
+                            return $this->ensureAbsoluteUrl($path);
+                        }
+                            , $bill->attachments);
+                    }
+                });
 
         return response()->json($bills);
     }
@@ -119,39 +124,43 @@ class BillController extends Controller
 
         return DB::transaction(function () use ($validated, $request) {
             $billData = collect($validated)->except(['items', 'attachment', 'attachments'])->toArray();
-            
+
             // SECURITY FIX: Proper file upload validation
             // Keeping original attachment logic for backwards compatibility mapping
             if ($request->filled('attachment')) {
                 $attachmentData = $request->input('attachment');
                 if (str_starts_with($attachmentData, 'data:')) {
                     $url = $this->processBase64Attachment($attachmentData);
-                    if ($url instanceof \Illuminate\Http\JsonResponse) return $url;
+                    if ($url instanceof \Illuminate\Http\JsonResponse)
+                        return $url;
                     $billData['attachment'] = $url;
-                } else {
+                }
+                else {
                     $billData['attachment'] = $attachmentData;
                 }
             }
-            
+
             // Multiple Attachments logic
             $attachmentsArr = [];
             if ($request->filled('attachments') && is_array($request->input('attachments'))) {
-                 foreach ($request->input('attachments') as $attachmentData) {
-                      if (str_starts_with($attachmentData, 'data:')) {
-                           $url = $this->processBase64Attachment($attachmentData);
-                           if ($url instanceof \Illuminate\Http\JsonResponse) return $url;
-                           $attachmentsArr[] = $url;
-                      } else {
-                           $attachmentsArr[] = $attachmentData;
-                      }
-                 }
+                foreach ($request->input('attachments') as $attachmentData) {
+                    if (str_starts_with($attachmentData, 'data:')) {
+                        $url = $this->processBase64Attachment($attachmentData);
+                        if ($url instanceof \Illuminate\Http\JsonResponse)
+                            return $url;
+                        $attachmentsArr[] = $url;
+                    }
+                    else {
+                        $attachmentsArr[] = $attachmentData;
+                    }
+                }
             }
-            
+
             // If the old attachment was uploaded but not new ones, populate the new ones list
             if (isset($billData['attachment']) && empty($attachmentsArr)) {
-                 $attachmentsArr[] = $billData['attachment'];
+                $attachmentsArr[] = $billData['attachment'];
             }
-            
+
             $billData['attachments'] = empty($attachmentsArr) ? null : $attachmentsArr;
 
             $bill = Bill::create($billData);
@@ -161,19 +170,20 @@ class BillController extends Controller
             }
 
             $bill->load(['items', 'company']);
-            
+
             // Ensure return absolute URL for attachment if it exists
             if ($bill->attachment) {
                 $bill->attachment = $this->ensureAbsoluteUrl($bill->attachment);
             }
             if ($bill->attachments) {
-                $bill->attachments = array_map(function($path) {
-                    return $this->ensureAbsoluteUrl($path);
-                }, $bill->attachments);
-            }
+                $bill->attachments = array_map(function ($path) {
+                            return $this->ensureAbsoluteUrl($path);
+                        }
+                            , $bill->attachments);
+                    }
 
-            return response()->json($bill, 201);
-        });
+                    return response()->json($bill, 201);
+                });
     }
 
     public function show(Bill $bill)
@@ -182,12 +192,12 @@ class BillController extends Controller
         if ($user instanceof \App\Models\Company && $bill->company_id !== $user->id) {
             return response()->json(['message' => 'Unauthorized'], 403);
         }
-        
+
         if ($bill->attachment) {
             $bill->attachment = $this->ensureAbsoluteUrl($bill->attachment);
         }
         if ($bill->attachments) {
-            $bill->attachments = array_map(function($path) {
+            $bill->attachments = array_map(function ($path) {
                 return $this->ensureAbsoluteUrl($path);
             }, $bill->attachments);
         }
@@ -200,9 +210,9 @@ class BillController extends Controller
         if (!$path) {
             return $path;
         }
-        
+
         $url = str_starts_with($path, 'http') ? $path : config('app.url') . $path;
-        
+
         // Strip the incorrect /api/v1 prefix from old attachment URLs
         return str_replace('/api/v1/storage/attachments/', '/storage/attachments/', $url);
     }
@@ -214,16 +224,16 @@ class BillController extends Controller
         $decodedData = base64_decode($image);
         $finfo = new \finfo(FILEINFO_MIME_TYPE);
         $actualMimeType = $finfo->buffer($decodedData);
-         
+
         $allowedMimes = ['application/pdf' => 'pdf'];
-         
+
         if (!isset($allowedMimes[$actualMimeType])) {
-             return response()->json([
+            return response()->json([
                 'message' => 'Invalid file type. Only PDF files are allowed.',
                 'errors' => ['attachment' => ['Only PDF files are supported']]
             ], 422);
         }
-         
+
         // SECURITY: Check file size (limit to 10MB)
         if (strlen($decodedData) > 10 * 1024 * 1024) {
             return response()->json([
@@ -287,27 +297,30 @@ class BillController extends Controller
 
             // Handle Attachment Update (Legacy)
             if ($request->filled('attachment')) {
-                 $attachmentData = $request->input('attachment');
-                 if (str_starts_with($attachmentData, 'data:')) {
-                     $url = $this->processBase64Attachment($attachmentData);
-                     if ($url instanceof \Illuminate\Http\JsonResponse) return $url;
-                     $billData['attachment'] = $url;
-                 } 
+                $attachmentData = $request->input('attachment');
+                if (str_starts_with($attachmentData, 'data:')) {
+                    $url = $this->processBase64Attachment($attachmentData);
+                    if ($url instanceof \Illuminate\Http\JsonResponse)
+                        return $url;
+                    $billData['attachment'] = $url;
+                }
             }
-            
+
             // Multiple Attachments logic
             $attachmentsArr = [];
             if ($request->has('attachments') && is_array($request->input('attachments'))) {
-                 foreach ($request->input('attachments') as $attachmentData) {
-                      if (str_starts_with($attachmentData, 'data:')) {
-                           $url = $this->processBase64Attachment($attachmentData);
-                           if ($url instanceof \Illuminate\Http\JsonResponse) return $url;
-                           $attachmentsArr[] = $url;
-                      } else {
-                           $attachmentsArr[] = $attachmentData;
-                      }
-                 }
-                 $billData['attachments'] = empty($attachmentsArr) ? null : $attachmentsArr;
+                foreach ($request->input('attachments') as $attachmentData) {
+                    if (str_starts_with($attachmentData, 'data:')) {
+                        $url = $this->processBase64Attachment($attachmentData);
+                        if ($url instanceof \Illuminate\Http\JsonResponse)
+                            return $url;
+                        $attachmentsArr[] = $url;
+                    }
+                    else {
+                        $attachmentsArr[] = $attachmentData;
+                    }
+                }
+                $billData['attachments'] = empty($attachmentsArr) ? null : $attachmentsArr;
             }
 
             $bill->update($billData);
@@ -320,18 +333,19 @@ class BillController extends Controller
 
             $bill->refresh();
             $bill->load(['items', 'company']);
-            
+
             if ($bill->attachment) {
                 $bill->attachment = $this->ensureAbsoluteUrl($bill->attachment);
             }
             if ($bill->attachments) {
-                $bill->attachments = array_map(function($path) {
-                    return $this->ensureAbsoluteUrl($path);
-                }, $bill->attachments);
-            }
+                $bill->attachments = array_map(function ($path) {
+                            return $this->ensureAbsoluteUrl($path);
+                        }
+                            , $bill->attachments);
+                    }
 
-            return response()->json($bill);
-        });
+                    return response()->json($bill);
+                });
     }
 
     public function destroy(Bill $bill)
@@ -348,12 +362,12 @@ class BillController extends Controller
     {
         $filename = urldecode($filename);
         $path = 'attachments/' . $filename;
-        
+
         // Debugging
         \Illuminate\Support\Facades\Log::info("Checking attachment path: " . $path);
-        
+
         if (!\Illuminate\Support\Facades\Storage::disk('public')->exists($path)) {
-             \Illuminate\Support\Facades\Log::error("Attachment not found: " . $path);
+            \Illuminate\Support\Facades\Log::error("Attachment not found: " . $path);
             abort(404);
         }
 
