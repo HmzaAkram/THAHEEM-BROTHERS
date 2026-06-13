@@ -27,7 +27,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { Plus, Download, Filter, Search, DollarSign, TrendingUp, CreditCard, Pencil, FileText, Scale } from 'lucide-react';
+import { Plus, Download, Filter, Search, DollarSign, TrendingUp, CreditCard, Pencil, FileText, Scale, Eye } from 'lucide-react';
 import { useState, useMemo, useEffect } from 'react';
 import { useData, Payment } from '@/context/data-context';
 import { formatDate, formatCurrency } from '@/lib/utils';
@@ -53,6 +53,21 @@ export default function PaymentsPage() {
   // PIN Dialog State for Editing
   const [isEditPinDialogOpen, setIsEditPinDialogOpen] = useState(false);
   const [paymentToEdit, setPaymentToEdit] = useState<Payment | null>(null);
+
+  // View Transaction State
+  const [isViewTransactionOpen, setIsViewTransactionOpen] = useState(false);
+  const [transactionPayments, setTransactionPayments] = useState<Payment[]>([]);
+
+  const handleViewTransaction = (payment: Payment) => {
+    const related = payments.filter(p => 
+      p.companyId === payment.companyId &&
+      p.date === payment.date &&
+      p.method === payment.method &&
+      (p.reference || '') === (payment.reference || '')
+    );
+    setTransactionPayments(related);
+    setIsViewTransactionOpen(true);
+  };
 
   const handleDeletePayment = async () => {
     if (paymentToDelete) {
@@ -976,6 +991,15 @@ export default function PaymentsPage() {
                               <Button
                                 variant="ghost"
                                 size="icon"
+                                className="text-blue-600 hover:bg-blue-10/50 hover:text-blue-700 transition-colors"
+                                onClick={() => handleViewTransaction(payment)}
+                                title="View Transaction Breakdown"
+                              >
+                                <Eye className="w-4 h-4" />
+                              </Button>
+                              <Button
+                                variant="ghost"
+                                size="icon"
                                 className="text-primary hover:bg-primary/10 hover:text-primary transition-colors"
                                 onClick={() => {
                                   setPaymentToEdit(payment);
@@ -1148,6 +1172,65 @@ export default function PaymentsPage() {
         title="Edit Payment"
         description={`Authorize edit action for payment.`}
       />
+
+      <Dialog open={isViewTransactionOpen} onOpenChange={setIsViewTransactionOpen}>
+        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Transaction Breakdown</DialogTitle>
+          </DialogHeader>
+          {transactionPayments.length > 0 && (
+            <div className="space-y-6 pt-4">
+              <div className="grid grid-cols-2 gap-4 bg-muted/30 p-4 rounded-xl border border-border/50">
+                <div>
+                  <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Date</p>
+                  <p className="font-semibold">{formatDate(transactionPayments[0].date)}</p>
+                </div>
+                <div>
+                  <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Method & Reference</p>
+                  <p className="font-semibold">{transactionPayments[0].method} - {transactionPayments[0].reference || 'N/A'}</p>
+                </div>
+                <div>
+                  <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Company</p>
+                  <p className="font-semibold">{transactionPayments[0].companyName}</p>
+                </div>
+                <div>
+                  <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Total Transaction Amount</p>
+                  <p className="text-2xl font-black text-green-600 dark:text-green-500 font-mono">
+                    {formatCurrency(transactionPayments.reduce((sum, p) => sum + Number(p.amount), 0))}
+                  </p>
+                </div>
+              </div>
+              
+              <div>
+                <h3 className="text-sm font-bold mb-3 border-b pb-2">Allocated To Bills</h3>
+                <Table>
+                  <TableHeader>
+                    <TableRow className="bg-secondary/50">
+                      <TableHead className="text-xs">Job No</TableHead>
+                      <TableHead className="text-xs">Description</TableHead>
+                      <TableHead className="text-right text-xs">Adjustment</TableHead>
+                      <TableHead className="text-right text-xs">Amount Applied</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {transactionPayments.map((p, idx) => {
+                      const linkedBill = bills.find(b => String(b.id) === String(p.billId));
+                      return (
+                        <TableRow key={idx}>
+                          <TableCell className="text-xs font-mono">{linkedBill?.jobNumber || 'Advance / Opening Bal'}</TableCell>
+                          <TableCell className="text-xs">{p.description || '-'}</TableCell>
+                          <TableCell className="text-right text-xs text-amber-600 dark:text-amber-500 font-mono">{p.adjustment ? formatCurrency(p.adjustment) : '-'}</TableCell>
+                          <TableCell className="text-right text-xs text-green-600 dark:text-green-500 font-bold font-mono">{formatCurrency(p.amount)}</TableCell>
+                        </TableRow>
+                      );
+                    })}
+                  </TableBody>
+                </Table>
+              </div>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
     </DashboardLayout >
   );
 }
