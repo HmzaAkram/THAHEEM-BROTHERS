@@ -680,6 +680,7 @@ export default function SaleTaxPage() {
                     <TableHead className="text-[10px] font-bold uppercase">Date</TableHead>
                     <TableHead className="text-[10px] font-bold uppercase">Job Number</TableHead>
                     <TableHead className="text-[10px] font-bold uppercase">Company</TableHead>
+                    <TableHead className="text-[10px] font-bold uppercase">NTN Number</TableHead>
                     <TableHead className="text-[10px] font-bold uppercase text-right">Service Charges</TableHead>
                     <TableHead className="text-[10px] font-bold uppercase text-right">Total</TableHead>
                     <TableHead className="text-[10px] font-bold uppercase text-center">Actions</TableHead>
@@ -688,7 +689,7 @@ export default function SaleTaxPage() {
                 <TableBody>
                   {filteredRecords.length === 0 ? (
                     <TableRow>
-                      <TableCell colSpan={6} className="text-center py-16 text-muted-foreground">
+                      <TableCell colSpan={7} className="text-center py-16 text-muted-foreground">
                         No sale tax (SRB) records found.
                       </TableCell>
                     </TableRow>
@@ -698,6 +699,7 @@ export default function SaleTaxPage() {
                         <TableCell className="text-xs">{formatDate(record.date)}</TableCell>
                         <TableCell className="text-xs font-mono">{record.refBillNo || '-'}</TableCell>
                         <TableCell className="text-xs font-semibold">{record.companyName}</TableCell>
+                        <TableCell className="text-xs font-mono">{companies.find(c => String(c.id) === String(record.companyId))?.ntn || '-'}</TableCell>
                         <TableCell className="text-xs text-right font-mono">{formatCurrency(record.serviceCharges)}</TableCell>
                         <TableCell className="text-xs text-right font-mono font-bold">{formatCurrency(record.grandTotal)}</TableCell>
                         <TableCell className="text-center">

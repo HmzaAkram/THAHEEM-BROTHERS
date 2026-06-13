@@ -54,7 +54,7 @@ export default function BackupPage() {
     const handleExport = async () => {
         setExportLoading(true);
         try {
-            const token = localStorage.getItem('authToken');
+            const token = sessionStorage.getItem('authToken');
             const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000/api/v1'}/backup/export`, {
                 headers: {
                     'Authorization': `Bearer ${token}`
@@ -136,7 +136,7 @@ export default function BackupPage() {
 
         setImportLoading(true);
         try {
-            const token = localStorage.getItem('authToken');
+            const token = sessionStorage.getItem('authToken');
             const formData = new FormData();
             formData.append('backup_file', selectedFile);
 
@@ -607,7 +607,7 @@ export default function BackupPage() {
                                             try {
                                                 const filename = attachmentUrl.split('/').pop();
                                                 if (filename) {
-                                                    const token = localStorage.getItem('authToken');
+                                                    const token = sessionStorage.getItem('authToken');
                                                     const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000/api/v1';
                                                     const attachUrl = `${apiUrl}/bills/attachment/${filename}`;
 

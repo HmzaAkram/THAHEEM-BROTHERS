@@ -26,14 +26,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [isHydrated, setIsHydrated] = useState(false);
 
   useEffect(() => {
-    // Load user and token from localStorage after hydration
-    const savedUser = localStorage.getItem('currentUser');
-    const savedToken = localStorage.getItem('authToken');
+    // Load user and token from sessionStorage after hydration
+    const savedUser = sessionStorage.getItem('currentUser');
+    const savedToken = sessionStorage.getItem('authToken');
     if (savedUser && savedToken) {
       setUser(JSON.parse(savedUser));
       setToken(savedToken);
     } else if (savedUser && !savedToken) {
-      localStorage.removeItem('currentUser');
+      sessionStorage.removeItem('currentUser');
       setUser(null);
     }
     setIsHydrated(true);
@@ -41,7 +41,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const handleUnauthorized = () => {
       setUser(null);
       setToken(null);
-      localStorage.clear();
+      sessionStorage.clear();
       sessionStorage.clear();
       window.location.href = '/login';
     };
@@ -52,10 +52,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const login = (userData: User, newToken?: string) => {
     setUser(userData);
-    localStorage.setItem('currentUser', JSON.stringify(userData));
+    sessionStorage.setItem('currentUser', JSON.stringify(userData));
     if (newToken) {
       setToken(newToken);
-      localStorage.setItem('authToken', newToken);
+      sessionStorage.setItem('authToken', newToken);
     }
   };
 
@@ -81,7 +81,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
     setUser(null);
     setToken(null);
-    localStorage.clear();
+    sessionStorage.clear();
     sessionStorage.clear();
   };
 

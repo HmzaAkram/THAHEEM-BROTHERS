@@ -2,6 +2,7 @@
 
 import { Sidebar } from '@/components/sidebar';
 import { useAuth } from '@/context/auth-context';
+import { useData } from '@/context/data-context';
 import { useRouter } from 'next/navigation';
 import { ReactNode, useEffect } from 'react';
 
@@ -12,6 +13,7 @@ interface DashboardLayoutProps {
 
 export function DashboardLayout({ children, role }: DashboardLayoutProps) {
   const { isAuthenticated, user, logout, isHydrated } = useAuth();
+  const { isLoaded } = useData();
   const router = useRouter();
 
   useEffect(() => {
@@ -20,7 +22,8 @@ export function DashboardLayout({ children, role }: DashboardLayoutProps) {
     }
   }, [isAuthenticated, isHydrated, router]);
 
-  if (!isHydrated || !isAuthenticated) {
+  // Wait for hydration, authentication, and data loading
+  if (!isHydrated || !isAuthenticated || !isLoaded) {
     return (
       <div className="h-screen w-screen flex items-center justify-center bg-slate-50 dark:bg-slate-950" suppressHydrationWarning>
         <div className="w-8 h-8 border-4 border-primary border-t-transparent rounded-full animate-spin" />

@@ -1,5 +1,5 @@
 import React, { forwardRef } from 'react';
-import { SaleTax } from '@/context/data-context';
+import { SaleTax, useData } from '@/context/data-context';
 import { formatDate, formatCurrency } from '@/lib/utils';
 
 interface SaleTaxTemplateProps {
@@ -7,6 +7,8 @@ interface SaleTaxTemplateProps {
 }
 
 export const SaleTaxTemplate = forwardRef<HTMLDivElement, SaleTaxTemplateProps>(({ record }, ref) => {
+  const { companies } = useData();
+  
   if (!record) return null;
 
   const serviceCharges = Number(record.serviceCharges) || 0;
@@ -14,10 +16,12 @@ export const SaleTaxTemplate = forwardRef<HTMLDivElement, SaleTaxTemplateProps>(
   const taxAmount = serviceCharges * (taxPercentage / 100);
   const totalChargesAndTax = serviceCharges + taxAmount;
 
-  const companyName = (record as any).company?.name || record.companyName;
-  const companyAddress = (record as any).company?.address || 'N/A';
-  const companyNtn = (record as any).company?.ntn || 'N/A';
-  const companySaleTaxNo = (record as any).company?.saleTaxNo || 'N/A';
+  const company = companies.find(c => String(c.id) === String(record.companyId)) || (record as any).company;
+
+  const companyName = company?.name || record.companyName;
+  const companyAddress = company?.address || 'N/A';
+  const companyNtn = company?.ntn || 'N/A';
+  const companySaleTaxNo = company?.saleTaxNo || 'N/A';
 
   return (
     <div ref={ref} className="bg-white p-12 max-w-[210mm] mx-auto min-h-[297mm] relative text-slate-900 border" style={{ fontSize: '11px', lineHeight: '1.4' }}>
@@ -143,6 +147,7 @@ export const SaleTaxTemplate = forwardRef<HTMLDivElement, SaleTaxTemplateProps>(
         <div className="flex justify-between items-end pt-4 border-t-2 border-slate-800">
           <div className="text-[9px] text-slate-400 font-semibold space-y-0.5">
             <p>This is a system generated Sale Tax (SRB) Invoice.</p>
+            <p>This is a computer generated receipt, does not contain any signature.</p>
             <p>Generated on {new Date().toLocaleDateString()}</p>
           </div>
           <div className="text-center">
