@@ -240,7 +240,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
         setPayments(Array.isArray(data.payments) ? data.payments : (data.payments?.data || []));
         setSecurities(data.securities || []);
         setExporters(data.exporters || []);
-        setSaleTaxes(data.sale_taxes || []);
+        setSaleTaxes(data.saleTaxes || data.sale_taxes || []);
       } else {
         console.error('Failed to load bootstrap data:', response);
       }
@@ -310,7 +310,9 @@ export function DataProvider({ children }: { children: ReactNode }) {
     const token = localStorage.getItem('authToken');
     const result = await ApiService.post('/bills', billData, token);
     if (result.ok && result.data) {
-      setBills(prev => [...prev, result.data]);
+      // Ensure createdAt is present, fallback to now. Prepend so it appears at top.
+      const newBill = { ...result.data, createdAt: result.data.createdAt || new Date().toISOString() };
+      setBills(prev => [newBill, ...prev]);
     }
     return result;
   };
@@ -557,7 +559,9 @@ export function DataProvider({ children }: { children: ReactNode }) {
     const token = localStorage.getItem('authToken');
     const result = await ApiService.post('/sale-taxes', data, token);
     if (result.ok && result.data) {
-      setSaleTaxes(prev => [...prev, result.data]);
+      // Ensure createdAt is present, fallback to now. Prepend so it appears at top.
+      const newSaleTax = { ...result.data, createdAt: result.data.createdAt || new Date().toISOString() };
+      setSaleTaxes(prev => [newSaleTax, ...prev]);
     }
     return result;
   };

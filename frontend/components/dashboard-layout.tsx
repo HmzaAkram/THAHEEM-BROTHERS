@@ -34,7 +34,7 @@ export function DashboardLayout({ children, role }: DashboardLayoutProps) {
   };
 
   return (
-    <div className="flex h-screen bg-background overflow-hidden" suppressHydrationWarning>
+    <div className="flex h-[100dvh] bg-background overflow-hidden" suppressHydrationWarning>
       <Sidebar user={user} onLogout={handleLogout} />
       <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
         <main className="flex-1 overflow-y-auto overflow-x-hidden">

@@ -72,7 +72,7 @@ export function Sidebar({ user, onLogout }: SidebarProps) {
 
       <aside
         className={`${isOpen ? 'translate-x-0' : '-translate-x-full'
-          } transition-transform duration-300 lg:translate-x-0 fixed lg:static left-0 top-0 pt-16 lg:pt-0 h-screen w-64 bg-sidebar-background border-r border-sidebar-border flex flex-col z-40 bg-gradient-to-b from-slate-900 to-slate-800 text-white shadow-2xl`}
+          } transition-transform duration-300 lg:translate-x-0 fixed lg:static left-0 top-0 pt-16 lg:pt-0 h-[100dvh] lg:h-full w-64 bg-sidebar-background border-r border-sidebar-border flex flex-col z-40 bg-gradient-to-b from-slate-900 to-slate-800 text-white shadow-2xl`}
       >
         <div className="px-6 py-8">
           <h1 className="text-xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-blue-400 to-cyan-300">
@@ -105,14 +105,14 @@ export function Sidebar({ user, onLogout }: SidebarProps) {
           })}
         </nav>
 
-        <div className="p-4 border-t border-slate-700/50 bg-slate-900/50">
+        <div className="p-4 mt-auto">
           <Button
             onClick={onLogout}
             variant="ghost"
-            className="w-full justify-start gap-2 text-slate-300 hover:text-red-400 hover:bg-red-900/10 transition-colors"
+            className="w-full flex items-center justify-start gap-3 px-4 py-3 h-auto rounded-lg transition-all duration-200 group relative overflow-hidden text-slate-400 hover:bg-red-500/10 hover:text-red-400 hover:translate-x-1"
           >
-            <LogOut className="w-5 h-5" />
-            Logout
+            <LogOut className="w-5 h-5 transition-transform group-hover:scale-110" />
+            <span className="font-medium relative z-10 text-base">Logout</span>
           </Button>
         </div>
       </aside>
