@@ -19,6 +19,7 @@ Route::post('/v1/login', [AuthController::class, 'login'])
 Route::prefix('v1')->middleware('auth.token')->group(function () {
     Route::post('/logout', [AuthController::class, 'logout']);
     Route::get('/me', [AuthController::class, 'me']);
+    Route::get('/bootstrap', [AuthController::class, 'bootstrap']);
 
     Route::apiResource('companies', CompanyController::class);
     Route::get('/bills/attachment/{filename}', [BillController::class, 'getAttachment']);

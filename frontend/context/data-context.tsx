@@ -231,59 +231,18 @@ export function DataProvider({ children }: { children: ReactNode }) {
     try {
       const token = localStorage.getItem('authToken');
 
-      // BUG FIX: Use Promise.allSettled instead of Promise.all
-      // This prevents one API failure from breaking all data fetching
-      const results = await Promise.allSettled([
-        ApiService.get('/companies', token),
-        ApiService.get('/bills?all=true', token),
-        ApiService.get('/payments?all=true', token),
-        ApiService.get('/securities', token),
-        ApiService.get('/exporters', token),
-        ApiService.get('/sale-taxes', token),
-      ]);
+      const response = await ApiService.get('/bootstrap', token);
 
-      // Handle each result independently
-      const [companiesRes, billsRes, paymentsRes, securitiesRes, exportersRes, saleTaxesRes] = results;
-
-      // SECURITY FIX: Remove unsafe 'as any' casts, use proper type checking
-      if (companiesRes.status === 'fulfilled' && companiesRes.value.ok) {
-        setCompanies(companiesRes.value.data || []);
+      if (response.ok && response.data) {
+        const data = response.data;
+        setCompanies(data.companies || []);
+        setBills(Array.isArray(data.bills) ? data.bills : (data.bills?.data || []));
+        setPayments(Array.isArray(data.payments) ? data.payments : (data.payments?.data || []));
+        setSecurities(data.securities || []);
+        setExporters(data.exporters || []);
+        setSaleTaxes(data.sale_taxes || []);
       } else {
-        console.error('Failed to load companies:', companiesRes);
-      }
-
-      if (billsRes.status === 'fulfilled' && billsRes.value.ok) {
-        // Handle paginated response from backend
-        const billData = billsRes.value.data;
-        setBills(Array.isArray(billData) ? billData : (billData?.data || []));
-      } else {
-        console.error('Failed to load bills:', billsRes);
-      }
-
-      if (paymentsRes.status === 'fulfilled' && paymentsRes.value.ok) {
-        // PAGINATION FIX: Handle paginated response from backend
-        const paymentData = paymentsRes.value.data;
-        setPayments(Array.isArray(paymentData) ? paymentData : (paymentData?.data || []));
-      } else {
-        console.error('Failed to load payments:', paymentsRes);
-      }
-
-      if (securitiesRes.status === 'fulfilled' && securitiesRes.value.ok) {
-        setSecurities(securitiesRes.value.data || []);
-      } else {
-        console.error('Failed to load securities:', securitiesRes);
-      }
-
-      if (exportersRes.status === 'fulfilled' && exportersRes.value.ok) {
-        setExporters(exportersRes.value.data || []);
-      } else {
-        console.error('Failed to load exporters:', exportersRes);
-      }
-
-      if (saleTaxesRes.status === 'fulfilled' && saleTaxesRes.value.ok) {
-        setSaleTaxes(saleTaxesRes.value.data || []);
-      } else {
-        console.error('Failed to load sale taxes:', saleTaxesRes);
+        console.error('Failed to load bootstrap data:', response);
       }
 
       setIsLoaded(true);

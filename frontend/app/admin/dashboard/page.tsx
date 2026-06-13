@@ -75,8 +75,9 @@ import Swal from 'sweetalert2';
 import { InvoiceTemplate } from '@/components/invoice-template';
 
 export default function AdminDashboard() {
-  const { bills, payments, companies, securities, getCompanyLedger } = useData();
+  const { bills, payments, companies, securities, getCompanyLedger, isLoaded } = useData();
   const [filterType, setFilterType] = useState('overall');
+
   const [exportLoading, setExportLoading] = useState(false);
   const [zipProgressText, setZipProgressText] = useState('');
   const [renderingBill, setRenderingBill] = useState<any>(null);
@@ -550,6 +551,19 @@ export default function AdminDashboard() {
       setZipProgressText('');
     }
   };
+
+  if (!isLoaded) {
+    return (
+      <DashboardLayout>
+        <div className="flex-1 flex items-center justify-center min-h-[calc(100vh-200px)]">
+          <div className="flex flex-col items-center gap-4 text-muted-foreground">
+            <Loader2 className="w-10 h-10 animate-spin text-primary" />
+            <p className="font-medium animate-pulse">Loading dashboard data...</p>
+          </div>
+        </div>
+      </DashboardLayout>
+    );
+  }
 
   return (
     <DashboardLayout>

@@ -81,12 +81,12 @@ export default function LoginPage() {
                     <form onSubmit={handleLogin} className="space-y-6 pt-4">
                         <div className="space-y-4">
                             <div className="space-y-2">
-                                <Label className="text-xs font-bold uppercase tracking-widest text-muted-foreground ml-1">Email Address</Label>
+                                <Label className="text-xs font-bold uppercase tracking-widest text-muted-foreground ml-1">Email or Username</Label>
                                 <div className="relative">
                                     <Mail className="absolute left-3 top-3 w-4 h-4 text-muted-foreground" />
                                     <Input
-                                        type="email"
-                                        placeholder="admin@thaheem.com"
+                                        type="text"
+                                        placeholder="admin@thaheem.com or username"
                                         className="pl-10 h-12 bg-slate-50 border-none rounded-xl focus-visible:ring-primary/20"
                                         value={email}
                                         onChange={(e) => setEmail(e.target.value)}
