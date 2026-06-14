@@ -14,6 +14,7 @@ import {
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Download, Search, Calendar, ChevronDown, ChevronUp } from 'lucide-react';
+import { useData as useFullData } from '@/context/data-context';
 import { jsPDF } from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import { toPng } from 'html-to-image';
@@ -27,6 +28,7 @@ import { formatDate, formatCurrency } from '@/lib/utils';
 export default function CompanyLedgerPage() {
   const { user, isHydrated: authHydrated } = useAuth();
   const { companies, getCompanyLedger } = useData();
+  const { bills: allBills, payments: allPayments } = useFullData();
   const tableRef = useRef<HTMLDivElement>(null);
 
   // Filters
@@ -77,12 +79,219 @@ export default function CompanyLedgerPage() {
     return entries;
   }, [currentCompany, getCompanyLedger, searchTerm, startDate, endDate]);
 
+  // Reverse for display: newest dates first
+  const displayEntries = useMemo(() => {
+    return [...ledgerEntries].reverse();
+  }, [ledgerEntries]);
+
   const stats = useMemo(() => {
     const totalCharged = ledgerEntries.reduce((sum, item) => sum + item.debit, 0);
     const totalPaid = ledgerEntries.reduce((sum, item) => sum + item.credit, 0);
     const currentBalance = ledgerEntries.length > 0 ? ledgerEntries[ledgerEntries.length - 1].balance : 0;
     return { totalCharged, totalPaid, currentBalance };
   }, [ledgerEntries]);
+
+  const handleExportBillStatusPDF = async () => {
+    try {
+      const pdf = new jsPDF('p', 'mm', 'a4');
+      const pageWidth = pdf.internal.pageSize.getWidth();
+
+      const img = new Image();
+      img.src = '/logo.jpeg';
+      await new Promise((resolve) => { img.onload = resolve; img.onerror = resolve; });
+      if (img.width > 0) {
+        const ratio = Math.min(16 / img.width, 16 / img.height);
+        pdf.addImage(img, 'PNG', 14, 10, img.width * ratio, img.height * ratio);
+      }
+
+      pdf.setTextColor(15, 23, 42); pdf.setFontSize(14); pdf.setFont('helvetica', 'bold');
+      pdf.text('THAHEEM BROTHERS', 34, 14);
+      pdf.setTextColor(100, 116, 139); pdf.setFontSize(8); pdf.setFont('helvetica', 'normal');
+      pdf.text('Suite 23, 2nd Floor, R.K. Square Ext, Shahrah-e-Liaquat, Karachi', 34, 19);
+      pdf.text('+92 21 32421347 | +92 300 2791780 | import.khi@hotmail.com', 34, 23);
+      pdf.setDrawColor(226, 232, 240); pdf.setLineWidth(0.5);
+      pdf.line(14, 28, pageWidth - 14, 28);
+
+      pdf.setTextColor(15, 23, 42); pdf.setFontSize(14); pdf.setFont('helvetica', 'bold');
+      pdf.text('BILL PAYMENT STATUS REPORT', pageWidth - 14, 18, { align: 'right' });
+
+      let yPos = 36;
+      pdf.setFontSize(10); pdf.setFont('helvetica', 'bold'); pdf.setTextColor(15, 23, 42);
+      pdf.text(`Client: ${currentCompany?.name || '-'}`, 14, yPos);
+      pdf.setFontSize(9); pdf.setFont('helvetica', 'normal'); pdf.setTextColor(100, 116, 139);
+      const periodLabel = (startDate || endDate)
+        ? `Period: ${startDate ? formatDate(startDate) : 'Beginning'} to ${endDate ? formatDate(endDate) : 'Present'}`
+        : 'Period: All Time';
+      pdf.text(periodLabel, 14, yPos + 5);
+      pdf.text(`Date Printed: ${formatDate(new Date().toISOString())}`, pageWidth - 14, yPos, { align: 'right' });
+      yPos += 14;
+
+      // Get bills for this company
+      const compBills = allBills.filter(b => String(b.companyId) === String(currentCompany?.id) && b.status !== 'Draft');
+      const compPayments = allPayments.filter(p => String(p.companyId) === String(currentCompany?.id));
+
+      // Apply date filter
+      const filteredBills = compBills.filter(b => {
+        if (startDate && b.date < startDate) return false;
+        if (endDate && b.date > endDate) return false;
+        return true;
+      });
+
+      // Section 1 heading
+      pdf.setFontSize(11); pdf.setFont('helvetica', 'bold'); pdf.setTextColor(15, 23, 42);
+      pdf.text('Bill Summary', 14, yPos); yPos += 4;
+
+      let totalBillAmt = 0, totalAdvAmt = 0, totalPaidAmt = 0, totalAdjAmt = 0, totalOutstAmt = 0;
+
+      const billRows = filteredBills.map(bill => {
+        const linkedPayments = compPayments.filter(p => String(p.billId) === String(bill.id));
+        const paid = linkedPayments.reduce((s, p) => s + Number(p.amount || 0), 0);
+        const adj  = linkedPayments.reduce((s, p) => s + Number(p.adjustment || 0), 0);
+        const adv  = Number(bill.advancePayment || 0);
+        const total = Number(bill.grandTotal || bill.totalAmount || 0);
+        const outstanding = Math.max(0, total - adv - paid - adj);
+        const status = outstanding <= 0 ? 'PAID' : paid > 0 || adv > 0 ? 'PARTIAL' : 'UNPAID';
+
+        totalBillAmt  += total;
+        totalAdvAmt   += adv;
+        totalPaidAmt  += paid;
+        totalAdjAmt   += adj;
+        totalOutstAmt += outstanding;
+
+        return [
+          formatDate(bill.date),
+          bill.jobNumber || '-',
+          formatCurrency(total),
+          adv > 0 ? formatCurrency(adv) : '-',
+          paid > 0 ? formatCurrency(paid) : '-',
+          adj > 0 ? formatCurrency(adj) : '-',
+          outstanding > 0 ? formatCurrency(outstanding) : '-',
+          status,
+          linkedPayments // keep for section 2
+        ];
+      });
+
+      const displayRows = billRows.map(r => r.slice(0, 8)); // without linkedPayments
+      displayRows.push(['', 'TOTALS', formatCurrency(totalBillAmt), formatCurrency(totalAdvAmt), formatCurrency(totalPaidAmt), formatCurrency(totalAdjAmt), formatCurrency(totalOutstAmt), '']);
+
+      autoTable(pdf, {
+        startY: yPos,
+        head: [['Date', 'Job No', 'Bill Total', 'Advance', 'Paid', 'Adj.', 'Outstanding', 'Status']],
+        body: displayRows,
+        theme: 'grid',
+        headStyles: { fillColor: [44, 62, 80], textColor: [255, 255, 255], fontStyle: 'bold' },
+        styles: { fontSize: 7.5, cellPadding: 1.5 },
+        columnStyles: {
+          2: { halign: 'right' }, 3: { halign: 'right' },
+          4: { halign: 'right' }, 5: { halign: 'right' },
+          6: { halign: 'right' }, 7: { halign: 'center', cellWidth: 18 },
+        },
+        didParseCell: function (data) {
+          if (data.section === 'body') {
+            if (data.column.index === 7) {
+              const v = String((data.row.raw as any)[7] || '');
+              if (v === 'PAID') { data.cell.styles.textColor = [22, 163, 74]; data.cell.styles.fontStyle = 'bold'; }
+              else if (v === 'PARTIAL') { data.cell.styles.textColor = [217, 119, 6]; data.cell.styles.fontStyle = 'bold'; }
+              else if (v === 'UNPAID') { data.cell.styles.textColor = [220, 38, 38]; data.cell.styles.fontStyle = 'bold'; }
+            }
+            if ((data.row.raw as any)[1] === 'TOTALS') {
+              data.cell.styles.fontStyle = 'bold';
+              data.cell.styles.fillColor = [241, 245, 249];
+            }
+          }
+        }
+      });
+
+      // Section 2: Payment details per bill
+      const finalY1 = (pdf as any).lastAutoTable.finalY || yPos + 20;
+      let yPos2 = finalY1 + 10;
+      if (yPos2 > 240) { pdf.addPage(); yPos2 = 20; }
+
+      pdf.setFontSize(11); pdf.setFont('helvetica', 'bold'); pdf.setTextColor(15, 23, 42);
+      pdf.text('Payment Details Per Bill', 14, yPos2); yPos2 += 4;
+
+      const detailRows: any[] = [];
+      filteredBills.forEach((bill, idx) => {
+        const linkedPayments = billRows[idx][8] as any[];
+        const adv  = Number(bill.advancePayment || 0);
+        const total = Number(bill.grandTotal || bill.totalAmount || 0);
+        const paid = linkedPayments.reduce((s: number, p: any) => s + Number(p.amount || 0), 0);
+        const adj  = linkedPayments.reduce((s: number, p: any) => s + Number(p.adjustment || 0), 0);
+        const outstanding = Math.max(0, total - adv - paid - adj);
+        const status = outstanding <= 0 ? 'PAID' : paid > 0 || adv > 0 ? 'PARTIAL' : 'UNPAID';
+
+        detailRows.push([{
+          content: `${formatDate(bill.date)}  |  Job: ${bill.jobNumber || '-'}  |  Total: ${formatCurrency(total)}  |  Outstanding: ${outstanding > 0 ? formatCurrency(outstanding) : 'NIL'}  |  Status: ${status}`,
+          colSpan: 4,
+          styles: { fontStyle: 'bold', fillColor: [236, 242, 255], textColor: [15, 23, 42], fontSize: 7.5 }
+        }]);
+
+        if (adv > 0) {
+          detailRows.push(['Advance', '-', formatCurrency(adv), 'Advance Received']);
+        }
+        if (linkedPayments.length > 0) {
+          linkedPayments.forEach((p: any) => {
+            const ref = [p.reference, p.trackingId, p.chequeNo, p.payOrderNo].filter(Boolean).join(' | ');
+            detailRows.push([p.method || 'Payment', ref || '-', p.amount > 0 ? formatCurrency(Number(p.amount)) : '-', p.adjustment > 0 ? formatCurrency(Number(p.adjustment)) : '-']);
+          });
+        }
+        if (linkedPayments.length === 0 && adv <= 0) {
+          detailRows.push([{ content: 'No payments recorded', colSpan: 4, styles: { textColor: [150, 150, 150], fontStyle: 'italic', fontSize: 7 } }]);
+        }
+      });
+
+      if (detailRows.length === 0) {
+        detailRows.push([{ content: 'No bills found.', colSpan: 4, styles: { textColor: [150, 150, 150] } }]);
+      }
+
+      autoTable(pdf, {
+        startY: yPos2,
+        head: [['Method', 'Reference / Tracking', 'Amount Paid', 'Adjustment']],
+        body: detailRows,
+        theme: 'grid',
+        headStyles: { fillColor: [22, 163, 74], textColor: [255, 255, 255], fontStyle: 'bold' },
+        styles: { fontSize: 7.5, cellPadding: 1.5 },
+        columnStyles: { 2: { halign: 'right' }, 3: { halign: 'right' } }
+      });
+
+      // Grand Summary
+      const finalY2 = (pdf as any).lastAutoTable.finalY || yPos2 + 10;
+      const paidCnt   = filteredBills.filter((_, i) => { const r = billRows[i]; return (r[6] === '-' || r[6] === undefined); }).length;
+      const paidCount = filteredBills.filter((bill) => {
+        const lp = compPayments.filter(p => String(p.billId) === String(bill.id));
+        const paid2 = lp.reduce((s, p) => s + Number(p.amount || 0), 0);
+        const adj2  = lp.reduce((s, p) => s + Number(p.adjustment || 0), 0);
+        const adv2  = Number(bill.advancePayment || 0);
+        const tot2  = Number(bill.grandTotal || bill.totalAmount || 0);
+        return tot2 - adv2 - paid2 - adj2 <= 0;
+      }).length;
+      const unpaidCount = filteredBills.filter((bill) => {
+        const lp = compPayments.filter(p => String(p.billId) === String(bill.id));
+        const paid2 = lp.reduce((s, p) => s + Number(p.amount || 0), 0);
+        const adv2  = Number(bill.advancePayment || 0);
+        return paid2 <= 0 && adv2 <= 0;
+      }).length;
+      const partCount = filteredBills.length - paidCount - unpaidCount;
+
+      let fY = finalY2 + 10;
+      if (fY > 260) { pdf.addPage(); fY = 20; }
+
+      pdf.setFontSize(11); pdf.setFont('helvetica', 'bold'); pdf.setTextColor(15, 23, 42);
+      pdf.text('Grand Summary', 14, fY); fY += 6;
+      pdf.setFontSize(9); pdf.setFont('helvetica', 'normal');
+      pdf.setTextColor(22, 163, 74);  pdf.text(`✓  Fully Paid Bills:     ${paidCount}`, 14, fY); fY += 5;
+      pdf.setTextColor(217, 119, 6); pdf.text(`⊘  Partially Paid Bills: ${partCount}`, 14, fY); fY += 5;
+      pdf.setTextColor(220, 38, 38);  pdf.text(`✗  Unpaid Bills:         ${unpaidCount}`, 14, fY); fY += 7;
+      pdf.setTextColor(15, 23, 42); pdf.setFont('helvetica', 'bold');
+      pdf.text(`Total Bill Amount:    ${formatCurrency(totalBillAmt)}`, 14, fY); fY += 5;
+      pdf.text(`Total Collected:      ${formatCurrency(totalPaidAmt + totalAdvAmt + totalAdjAmt)}`, 14, fY); fY += 5;
+      pdf.text(`Total Outstanding:    ${formatCurrency(totalOutstAmt)}`, 14, fY);
+
+      pdf.save(`Bill_Payment_Status_${(currentCompany?.name || 'Company').replace(/[/\\?%*:|"<>\s]/g, '_')}_${new Date().toISOString().split('T')[0]}.pdf`);
+    } catch (err) {
+      console.error('Failed to export Bill Status PDF', err);
+    }
+  };
 
   const handleExportPDF = async () => {
     try {
@@ -147,7 +356,9 @@ export default function CompanyLedgerPage() {
       pdf.text(`Date Printed: ${formatDate(new Date().toISOString())}`, pageWidth - 14, yPos, { align: "right" });
       yPos += 8;
 
-      let body = ledgerEntries.map(entry => {
+      // Reverse for PDF export (newest first)
+      const reversedForPDF = [...ledgerEntries].reverse();
+      let body = reversedForPDF.map(entry => {
         let desc = entry.description;
         if (entry.type === 'PAYMENT') {
           desc = (entry as any).method ? `Payment Received (${(entry as any).method})` : 'Advance Received';
@@ -280,9 +491,13 @@ export default function CompanyLedgerPage() {
             <div className="flex items-center justify-between">
               <CardTitle className="text-base">Transaction History</CardTitle>
               <div className="flex gap-2">
+                <Button variant="outline" size="sm" className="gap-2 bg-transparent border-green-500/30 hover:bg-green-50 text-green-700" onClick={handleExportBillStatusPDF}>
+                  <Download className="w-4 h-4 text-green-600" />
+                  Bill Status
+                </Button>
                 <Button variant="outline" size="sm" className="gap-2 bg-transparent" onClick={handleExportPDF}>
                   <Download className="w-4 h-4" />
-                  Export
+                  Ledger
                 </Button>
               </div>
             </div>
@@ -309,7 +524,7 @@ export default function CompanyLedgerPage() {
                       </TableCell>
                     </TableRow>
                   ) : (
-                    ledgerEntries.map((entry) => (
+                    displayEntries.map((entry) => (
                       <React.Fragment key={entry.id}>
                         <TableRow className="hover:bg-muted/30 group">
                           <TableCell className="text-sm text-muted-foreground align-top pt-3">

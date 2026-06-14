@@ -482,16 +482,33 @@ export default function ReportsPage() {
           4: { halign: 'right', fontStyle: 'bold' }
         };
       } else if (reportType === 'payments') {
-        head = [['Date', 'Reference', 'Company', 'Method', 'Amount']];
-        body = filteredPayments.map(payment => [
-          formatDate(payment.date),
-          payment.reference || 'N/A',
-          payment.companyName,
-          payment.method,
-          formatCurrency(parseNumber(payment.amount) + parseNumber(payment.adjustment))
+        head = [['Date', 'Reference', 'Company', 'Method', 'Total Amount', 'Split Breakdown']];
+        
+        const grouped: Record<string, any> = {};
+        filteredPayments.forEach(p => {
+          const key = `${p.companyId}_${p.date}_${p.method}_${p.reference || 'none'}`;
+          if (!grouped[key]) {
+            grouped[key] = { ...p, split: [], totalAmt: 0 };
+          }
+          const linkedBill = bills.find(b => String(b.id) === String(p.billId));
+          const jobName = linkedBill?.jobNumber ? `Job ${linkedBill.jobNumber}` : (p.billId ? 'Bill' : 'Advance');
+          const amt = parseNumber(p.amount) + parseNumber(p.adjustment);
+          grouped[key].split.push(`- ${jobName}: ${formatCurrency(amt)}`);
+          grouped[key].totalAmt += amt;
+        });
+
+        body = Object.values(grouped).map(g => [
+          formatDate(g.date),
+          g.reference || 'N/A',
+          g.companyName,
+          g.method,
+          formatCurrency(g.totalAmt),
+          g.split.join('\n')
         ]);
+        
         customStyles = {
-          4: { halign: 'right', fontStyle: 'bold', textColor: [0, 128, 0] }
+          4: { halign: 'right', fontStyle: 'bold', textColor: [0, 128, 0] },
+          5: { cellWidth: 50 }
         };
       } else if (reportType === 'company') {
         head = [['Date', 'Description', 'Method', 'Job No', 'Bill Total', 'Advance', 'Paid', 'Adj.', 'Outst.', 'Balance']];
@@ -514,7 +531,28 @@ export default function ReportsPage() {
               if (p.trackingId && !pParts.some(x => x.includes(p.trackingId) || p.trackingId.includes(x))) pParts.push(`Trk: ${p.trackingId}`);
               if (p.chequeNo && !pParts.some(x => x.includes(p.chequeNo) || p.chequeNo.includes(x))) pParts.push(`Chq: ${p.chequeNo}`);
               if (p.payOrderNo && !pParts.some(x => x.includes(p.payOrderNo) || p.payOrderNo.includes(x))) pParts.push(`PO: ${p.payOrderNo}`);
-              return pParts.length > 0 ? `${m}\n(${pParts.join(', ')})` : m;
+              
+              let splitText = '';
+              if (p.date && p.method) {
+                 const relatedPayments = payments.filter((allP: any) => 
+                   allP.date === p.date && 
+                   allP.method === p.method && 
+                   (allP.reference || '') === (p.reference || '') &&
+                   (allP.companyId === entry.companyId || allP.companyName === entry.companyName || String(allP.companyId) === selectedCompanyId)
+                 );
+                 
+                 if (relatedPayments.length > 1) {
+                   const totalTransAmount = relatedPayments.reduce((sum: number, rp: any) => sum + parseNumber(rp.amount) + parseNumber(rp.adjustment), 0);
+                   const splits = relatedPayments.map((rp: any) => {
+                     const linkedBill = bills.find(b => String(b.id) === String(rp.billId));
+                     const jobName = linkedBill?.jobNumber ? `Job ${linkedBill.jobNumber}` : (rp.billId ? 'Bill' : 'Adv');
+                     return `  - ${jobName}: ${formatCurrency(parseNumber(rp.amount) + parseNumber(rp.adjustment))}`;
+                   });
+                   splitText = `\nTotal Pmt: ${formatCurrency(totalTransAmount)}\nSplit Breakdown:\n${splits.join('\n')}`;
+                 }
+              }
+
+              return pParts.length > 0 ? `${m}\n(${pParts.join(', ')})${splitText}` : `${m}${splitText}`;
             }).join('\n\n');
           }
           return '-';

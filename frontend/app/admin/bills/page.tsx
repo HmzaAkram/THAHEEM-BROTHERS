@@ -1437,7 +1437,7 @@ export default function BillsPage() {
                     onChange={(e) => setSearchQuery(e.target.value)}
                   />
                 </div>
- 
+
                 {/* Company Select */}
                 <Select value={companyFilter} onValueChange={setCompanyFilter}>
                   <SelectTrigger className="w-full sm:w-[180px] h-9 bg-muted/20 border-border/50 text-xs">
@@ -1450,7 +1450,7 @@ export default function BillsPage() {
                     ))}
                   </SelectContent>
                 </Select>
- 
+
                 {/* Time Filter Select */}
                 <Select value={timeFilter} onValueChange={(v: any) => setTimeFilter(v)}>
                   <SelectTrigger className="w-full sm:w-[140px] h-9 bg-muted/20 border-border/50 text-xs">
@@ -1482,134 +1482,134 @@ export default function BillsPage() {
                 <div className="overflow-x-auto custom-scrollbar">
                   <div className="min-w-[900px]">
                     <Table>
-                    <TableHeader>
-                      <TableRow className="bg-secondary/50">
-                        <TableHead>Job No</TableHead>
-                        <TableHead>Company</TableHead>
-                        <TableHead>Date</TableHead>
-                        <TableHead>Amount</TableHead>
-                        <TableHead>Paid</TableHead>
-                        <TableHead>Balance</TableHead>
-                        <TableHead>Status</TableHead>
-                        <TableHead className="text-right">Actions</TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {paginatedBills.map((item) => (
-                        <TableRow key={item.id} className="hover:bg-muted/50 transition-colors">
-                          <TableCell className="font-mono text-sm font-medium">
-                            {item.jobNumber || 'N/A'}
-                          </TableCell>
-                          <TableCell>
-                            {item.companyName}
-                          </TableCell>
-                          <TableCell className="text-sm text-muted-foreground">
-                            {formatDate(item.date)}
-                          </TableCell>
-                          <TableCell className="font-semibold">
-                            {item.grandTotal?.toLocaleString() || '0'}
-                          </TableCell>
-                          <TableCell className="text-sm text-muted-foreground">
-                            {item.paidAmount?.toLocaleString() || '0'}
-                          </TableCell>
-                          <TableCell className="font-semibold text-primary">
-                            {((item.grandTotal || 0) - (item.paidAmount || 0)).toLocaleString()}
-                          </TableCell>
-                          <TableCell>
-                            <DropdownMenu>
-                              <DropdownMenuTrigger className="focus:outline-none">
-                                <span
-                                  className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium border cursor-pointer hover:opacity-80 transition-opacity ${statusStyles[(item.calculatedStatus || 'Unpaid') as keyof typeof statusStyles]
-                                    }`}
-                                >
-                                  {item.calculatedStatus || 'Unpaid'}
-                                </span>
-                              </DropdownMenuTrigger>
-                              <DropdownMenuContent align="end">
-                                <DropdownMenuItem onClick={() => {
-                                  if (item.calculatedStatus !== 'Paid') {
-                                    setBillToUpdateStatus({ bill: item, newStatus: 'Paid' });
-                                    setIsStatusPinDialogOpen(true);
-                                  }
-                                }}>
-                                  Override to Paid
-                                </DropdownMenuItem>
-                                <DropdownMenuItem onClick={() => {
-                                  if (item.calculatedStatus !== 'Partial') {
-                                    setBillToUpdateStatus({ bill: item, newStatus: 'Partial' });
-                                    setIsStatusPinDialogOpen(true);
-                                  }
-                                }}>
-                                  Override to Partial
-                                </DropdownMenuItem>
-                                <DropdownMenuItem onClick={() => {
-                                  if (item.calculatedStatus !== 'Unpaid') {
-                                    setBillToUpdateStatus({ bill: item, newStatus: 'Unpaid' });
-                                    setIsStatusPinDialogOpen(true);
-                                  }
-                                }}>
-                                  Override to Unpaid
-                                </DropdownMenuItem>
-                              </DropdownMenuContent>
-                            </DropdownMenu>
-                          </TableCell>
-                          <TableCell className="text-right">
-                            <div className="flex items-center justify-end gap-2">
-                              <Button
-                                variant="ghost"
-                                size="icon"
-                                className="hover:text-primary hover:bg-primary/5 transition-colors"
-                                onClick={() => handleViewBill(item)}
-                              >
-                                <Eye className="w-4 h-4" />
-                              </Button>
-                              <Button
-                                variant="ghost"
-                                size="icon"
-                                className="hover:text-primary hover:bg-primary/5 transition-colors"
-                               onClick={() => {
-                                  if (item.status === 'Draft' || item.calculatedStatus === 'Draft') {
-                                    handleEditClick(item);
-                                  } else {
-                                    setBillToEdit(item);
-                                    setIsEditPinDialogOpen(true);
-                                  }
-                                }}
-                                title="Edit Bill"
-                              >
-                                <Pencil className="w-4 h-4" />
-                              </Button>
-                              <Button
-                                variant="ghost"
-                                size="icon"
-                                className="hover:text-primary hover:bg-primary/5 transition-colors"
-                                onClick={() => handleDownloadInvoice(item)}
-                                title="Download PDF"
-                              >
-                                <Download className="w-4 h-4" />
-                              </Button>
-                              <Button
-                                variant="ghost"
-                                size="icon"
-                                className="text-destructive hover:bg-destructive/10 hover:text-destructive transition-colors"
-                               onClick={() => {
-                                  if (item.status === 'Draft' || item.calculatedStatus === 'Draft') {
-                                    setBillToDelete(item);
-                                    handleDeleteBill();
-                                  } else {
-                                    setBillToDelete(item);
-                                    setIsPinDialogOpen(true);
-                                  }
-                                }}
-                                title="Delete Bill"
-                              >
-                                <Trash2 className="w-4 h-4" />
-                              </Button>
-                            </div>
-                          </TableCell>
+                      <TableHeader>
+                        <TableRow className="bg-secondary/50">
+                          <TableHead>Job No</TableHead>
+                          <TableHead>Company</TableHead>
+                          <TableHead>Date</TableHead>
+                          <TableHead>Amount</TableHead>
+                          <TableHead>Paid</TableHead>
+                          <TableHead>Balance</TableHead>
+                          <TableHead>Status</TableHead>
+                          <TableHead className="text-right">Actions</TableHead>
                         </TableRow>
-                      ))}
-                    </TableBody>
+                      </TableHeader>
+                      <TableBody>
+                        {paginatedBills.map((item) => (
+                          <TableRow key={item.id} className="hover:bg-muted/50 transition-colors">
+                            <TableCell className="font-mono text-sm font-medium">
+                              {item.jobNumber || 'N/A'}
+                            </TableCell>
+                            <TableCell>
+                              {item.companyName}
+                            </TableCell>
+                            <TableCell className="text-sm text-muted-foreground">
+                              {formatDate(item.date)}
+                            </TableCell>
+                            <TableCell className="font-semibold">
+                              {item.grandTotal?.toLocaleString() || '0'}
+                            </TableCell>
+                            <TableCell className="text-sm text-muted-foreground">
+                              {item.paidAmount?.toLocaleString() || '0'}
+                            </TableCell>
+                            <TableCell className="font-semibold text-primary">
+                              {((item.grandTotal || 0) - (item.paidAmount || 0)).toLocaleString()}
+                            </TableCell>
+                            <TableCell>
+                              <DropdownMenu>
+                                <DropdownMenuTrigger className="focus:outline-none">
+                                  <span
+                                    className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium border cursor-pointer hover:opacity-80 transition-opacity ${statusStyles[(item.calculatedStatus || 'Unpaid') as keyof typeof statusStyles]
+                                      }`}
+                                  >
+                                    {item.calculatedStatus || 'Unpaid'}
+                                  </span>
+                                </DropdownMenuTrigger>
+                                <DropdownMenuContent align="end">
+                                  <DropdownMenuItem onClick={() => {
+                                    if (item.calculatedStatus !== 'Paid') {
+                                      setBillToUpdateStatus({ bill: item, newStatus: 'Paid' });
+                                      setIsStatusPinDialogOpen(true);
+                                    }
+                                  }}>
+                                    Override to Paid
+                                  </DropdownMenuItem>
+                                  <DropdownMenuItem onClick={() => {
+                                    if (item.calculatedStatus !== 'Partial') {
+                                      setBillToUpdateStatus({ bill: item, newStatus: 'Partial' });
+                                      setIsStatusPinDialogOpen(true);
+                                    }
+                                  }}>
+                                    Override to Partial
+                                  </DropdownMenuItem>
+                                  <DropdownMenuItem onClick={() => {
+                                    if (item.calculatedStatus !== 'Unpaid') {
+                                      setBillToUpdateStatus({ bill: item, newStatus: 'Unpaid' });
+                                      setIsStatusPinDialogOpen(true);
+                                    }
+                                  }}>
+                                    Override to Unpaid
+                                  </DropdownMenuItem>
+                                </DropdownMenuContent>
+                              </DropdownMenu>
+                            </TableCell>
+                            <TableCell className="text-right">
+                              <div className="flex items-center justify-end gap-2">
+                                <Button
+                                  variant="ghost"
+                                  size="icon"
+                                  className="hover:text-primary hover:bg-primary/5 transition-colors"
+                                  onClick={() => handleViewBill(item)}
+                                >
+                                  <Eye className="w-4 h-4" />
+                                </Button>
+                                <Button
+                                  variant="ghost"
+                                  size="icon"
+                                  className="hover:text-primary hover:bg-primary/5 transition-colors"
+                                  onClick={() => {
+                                    if (item.status === 'Draft' || item.calculatedStatus === 'Draft') {
+                                      handleEditClick(item);
+                                    } else {
+                                      setBillToEdit(item);
+                                      setIsEditPinDialogOpen(true);
+                                    }
+                                  }}
+                                  title="Edit Bill"
+                                >
+                                  <Pencil className="w-4 h-4" />
+                                </Button>
+                                <Button
+                                  variant="ghost"
+                                  size="icon"
+                                  className="hover:text-primary hover:bg-primary/5 transition-colors"
+                                  onClick={() => handleDownloadInvoice(item)}
+                                  title="Download PDF"
+                                >
+                                  <Download className="w-4 h-4" />
+                                </Button>
+                                <Button
+                                  variant="ghost"
+                                  size="icon"
+                                  className="text-destructive hover:bg-destructive/10 hover:text-destructive transition-colors"
+                                  onClick={() => {
+                                    if (item.status === 'Draft' || item.calculatedStatus === 'Draft') {
+                                      setBillToDelete(item);
+                                      handleDeleteBill();
+                                    } else {
+                                      setBillToDelete(item);
+                                      setIsPinDialogOpen(true);
+                                    }
+                                  }}
+                                  title="Delete Bill"
+                                >
+                                  <Trash2 className="w-4 h-4" />
+                                </Button>
+                              </div>
+                            </TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody>
                     </Table>
                   </div>
                 </div>

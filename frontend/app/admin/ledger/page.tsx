@@ -52,18 +52,68 @@ export default function LedgerPage() {
   const { ledgerData, openingBalance } = useMemo(() => {
     let consolidatedEntries: any[] = [];
 
+    // Group lumpsum payments
+    const lumpsumGroups = new Map<string, any>();
+    payments.forEach(p => {
+      if (p.description && p.description.includes('(Auto-distributed)')) {
+        const cleanDesc = p.description.replace(/\s*\(Auto-distributed\)/g, '');
+        const key = `${p.companyId}|${p.date}|${p.reference || ''}|${cleanDesc}`;
+        if (!lumpsumGroups.has(key)) {
+          lumpsumGroups.set(key, {
+            id: `lumpsum_${p.id}`,
+            date: p.date,
+            type: 'PAYMENT',
+            description: cleanDesc || 'Lumpsum Payment Received',
+            companyName: p.companyName,
+            companyId: p.companyId,
+            jobNumber: null,
+            debit: 0,
+            advance: 0,
+            paid: 0,
+            adjustment: 0,
+            credit: 0,
+            outstanding: 0,
+            method: p.method,
+            paymentRef: p.reference,
+            trackingId: p.trackingId,
+            chequeNo: p.chequeNo,
+            payOrderNo: p.payOrderNo,
+            isLumpsumGroup: true
+          });
+        }
+        const group = lumpsumGroups.get(key);
+        group.paid += Number(p.amount || 0);
+        group.adjustment += Number(p.adjustment || 0);
+        group.credit = group.paid + group.adjustment;
+      }
+    });
+
+    // Push grouped lumpsums to consolidatedEntries
+    lumpsumGroups.forEach(group => {
+      if (selectedCompanyId === 'all' || String(group.companyId) === selectedCompanyId) {
+        consolidatedEntries.push(group);
+      }
+    });
+
     // Process Bills
     const companyBills = (selectedCompanyId === 'all' ? bills : bills.filter(b => String(b.companyId) === selectedCompanyId)).filter(b => b.status !== 'Draft');
 
     companyBills.forEach(bill => {
       // Find all payments linked to this bill
       const linkedPayments = payments.filter(p => String(p.billId) === String(bill.id));
-      const totalPaid = linkedPayments.reduce((sum, p) => sum + Number(p.amount || 0), 0);
-      const totalAdjustment = linkedPayments.reduce((sum, p) => sum + Number(p.adjustment || 0), 0);
+
+      // Separate regular and lumpsum payments
+      const regularPayments = linkedPayments.filter(p => !(p.description && p.description.includes('(Auto-distributed)')));
+      const totalRegularPaid = regularPayments.reduce((sum, p) => sum + Number(p.amount || 0), 0);
+      const totalRegularAdjustment = regularPayments.reduce((sum, p) => sum + Number(p.adjustment || 0), 0);
+
+      // Total actual paid and adjustments (used ONLY for calculating bill's own remaining outstanding balance, not for ledger debit/credit)
+      const actualTotalPaid = linkedPayments.reduce((sum, p) => sum + Number(p.amount || 0), 0);
+      const actualTotalAdjustment = linkedPayments.reduce((sum, p) => sum + Number(p.adjustment || 0), 0);
 
       const debitAmount = bill.grandTotal || bill.totalAmount || 0;
       const advanceAmount = bill.advancePayment || 0;
-      const outstanding = debitAmount - advanceAmount - totalPaid - totalAdjustment;
+      const outstanding = debitAmount - advanceAmount - actualTotalPaid - actualTotalAdjustment;
 
       consolidatedEntries.push({
         id: `bill_${bill.id}`,
@@ -74,9 +124,9 @@ export default function LedgerPage() {
         jobNumber: bill.jobNumber,
         debit: debitAmount,
         advance: advanceAmount,
-        paid: totalPaid,
-        adjustment: totalAdjustment,
-        credit: advanceAmount + totalPaid + totalAdjustment,
+        paid: totalRegularPaid,
+        adjustment: totalRegularAdjustment,
+        credit: advanceAmount + totalRegularPaid + totalRegularAdjustment,
         outstanding: outstanding,
         via: bill.via,
         weight: bill.weight,
@@ -98,7 +148,8 @@ export default function LedgerPage() {
     // Process Unlinked Payments (Payments with no billId, advance generic payments)
     const companyPayments = selectedCompanyId === 'all' ? payments : payments.filter(p => String(p.companyId) === selectedCompanyId);
     companyPayments.forEach(p => {
-      if (!p.billId) {
+      // Do not include auto-distributed payments as they are already grouped in lumpsumGroups
+      if (!p.billId && !(p.description && p.description.includes('(Auto-distributed)'))) {
         consolidatedEntries.push({
           id: `pay_${p.id}`,
           date: p.date,
@@ -121,9 +172,6 @@ export default function LedgerPage() {
       }
     });
 
-    // Sort chronologically
-    consolidatedEntries.sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
-
     // Calculate exact inherent opening balance for "ALL" time
     const parseNumber = (val: any) => {
       if (typeof val === 'number') return val;
@@ -140,7 +188,35 @@ export default function LedgerPage() {
       if (comp) baseOpeningBal = parseNumber(comp.openingBalance);
     }
 
-    let openingBal = baseOpeningBal;
+    if (baseOpeningBal > 0) {
+      let earliestDate = new Date().toISOString().split('T')[0];
+      if (companyBills.length > 0) {
+        const sortedBills = [...companyBills].sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+        const earliestDateObj = new Date(sortedBills[0].date);
+        earliestDateObj.setDate(earliestDateObj.getDate() - 1);
+        earliestDate = earliestDateObj.toISOString().split('T')[0];
+      }
+      consolidatedEntries.push({
+        id: `opening_balance`,
+        date: earliestDate,
+        type: 'BILL',
+        description: 'opening balance',
+        companyName: 'Opening Balance',
+        jobNumber: null,
+        debit: baseOpeningBal,
+        advance: 0,
+        paid: 0,
+        adjustment: 0,
+        credit: 0,
+        outstanding: 0,
+        payments: []
+      });
+    }
+
+    // Sort chronologically
+    consolidatedEntries.sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+
+    let openingBal = 0;
     let filteredEntries = consolidatedEntries;
 
     // Filter by Starting Date & Calculate Opening Balance
@@ -207,6 +283,11 @@ export default function LedgerPage() {
     const startIdx = (currentPage - 1) * itemsPerPage;
     return ledgerData.slice(startIdx, startIdx + itemsPerPage);
   }, [ledgerData, currentPage]);
+
+  // Reverse display order: newest dates first, balance already calculated chronologically
+  const displayLedgerData = useMemo(() => {
+    return [...paginatedLedgerData].reverse();
+  }, [paginatedLedgerData]);
 
   const totalPages = Math.ceil(ledgerData.length / itemsPerPage);
 
@@ -279,28 +360,28 @@ export default function LedgerPage() {
       pdf.setFontSize(10);
       pdf.setFont("helvetica", "bold");
       pdf.setTextColor(15, 23, 42);
-      const companyNameStr = selectedCompanyId !== 'all' 
-        ? companies.find(c => String(c.id) === selectedCompanyId)?.name || 'Unknown Company' 
+      const companyNameStr = selectedCompanyId !== 'all'
+        ? companies.find(c => String(c.id) === selectedCompanyId)?.name || 'Unknown Company'
         : 'All Companies';
       pdf.text(`Client: ${companyNameStr}`, 14, yPos);
 
       pdf.setFontSize(9);
       pdf.setFont("helvetica", "normal");
       pdf.setTextColor(100, 116, 139);
-      
-      const periodLabel = (startDate || endDate) 
+
+      const periodLabel = (startDate || endDate)
         ? `Period: ${startDate ? formatDate(startDate) : 'Beginning'} to ${endDate ? formatDate(endDate) : 'Present'}`
         : 'Period: All Time';
-        
+
       pdf.text(periodLabel, 14, yPos + 5);
 
       pdf.text(`Date Printed: ${formatDate(new Date().toISOString())}`, pageWidth - 14, yPos, { align: "right" });
-      
-      const { remainingOpeningBalance } = ledgerData.length > 0 ? (ledgerData[0] as any)._meta || { remainingOpeningBalance: 0 } : { remainingOpeningBalance: 0 }; 
+
+      const { remainingOpeningBalance } = ledgerData.length > 0 ? (ledgerData[0] as any)._meta || { remainingOpeningBalance: 0 } : { remainingOpeningBalance: 0 };
       // Note: I need to make sure remainingOpeningBalance is accessible here. 
       // Actually, I'll just use the calculated one from the scope if possible, but handleExportPDF is outside useMemo.
       // I'll calculate it again inside handleExportPDF for simplicity or pass it.
-      
+
       // Better approach: Calculate it right here.
       const parseNumber = (val: any) => {
         if (typeof val === 'number') return val;
@@ -321,7 +402,7 @@ export default function LedgerPage() {
       const remainingOpeningBalPDF = Math.max(0, baseOpeningBalPDF - clearedOpeningBalPDF);
 
       pdf.text(`Opening Balance: ${formatCurrency(remainingOpeningBalPDF)}`, pageWidth - 14, yPos + 5, { align: "right" });
-      
+
       yPos += 12;
 
       // Prepare Table Data
@@ -368,14 +449,15 @@ export default function LedgerPage() {
         return '-';
       };
 
-      const exportDataWithMethod = ledgerData.map((entry: any) => {
+      // Reverse ledger data for PDF export (newest first)
+      const reversedLedgerForPDF = [...ledgerData].reverse();
+      const exportDataWithMethod = reversedLedgerForPDF.map((entry: any) => {
         const row = [
           new Date(entry.date).toLocaleDateString(),
           selectedCompanyId === 'all' ? `${entry.companyName}\n${entry.description}` : entry.description,
           formatMethodDetails(entry),
           entry.jobNumber || '-',
           entry.debit > 0 ? formatCurrency(entry.debit) : '-',
-          entry.advance > 0 ? formatCurrency(entry.advance) : '-',
           entry.paid > 0 ? formatCurrency(entry.paid) : '-',
           entry.adjustment > 0 ? formatCurrency(entry.adjustment) : '-',
           entry.outstanding > 0 ? formatCurrency(entry.outstanding) : '-',
@@ -391,7 +473,6 @@ export default function LedgerPage() {
       } else {
         // Calculate totals
         let totalBill = 0;
-        let totalAdvance = 0;
         let totalPaidAmount = 0;
         let totalAdj = 0;
         let totalOutst = 0;
@@ -399,7 +480,6 @@ export default function LedgerPage() {
         ledgerData.forEach((entry: any) => {
           if (entry.description !== 'Opening Balance') {
             totalBill += entry.debit || 0;
-            totalAdvance += entry.advance || 0;
             totalPaidAmount += entry.paid || 0;
             totalAdj += entry.adjustment || 0;
           }
@@ -416,7 +496,6 @@ export default function LedgerPage() {
           '',
           '',
           formatCurrency(totalBill),
-          formatCurrency(totalAdvance),
           formatCurrency(totalPaidAmount),
           formatCurrency(totalAdj),
           formatCurrency(totalOutst),
@@ -426,7 +505,7 @@ export default function LedgerPage() {
 
       autoTable(pdf, {
         startY: yPos + 4,
-        head: [['Date', 'Description', 'Method', 'Job No', 'Bill Total', 'Advance', 'Paid', 'Adj.', 'Outst.', 'Balance']],
+        head: [['Date', 'Description', 'Method', 'Job No', 'Bill Total', 'Paid', 'Adj.', 'Outst.', 'Balance']],
         body: tableRows,
         theme: 'grid',
         headStyles: { fillColor: [44, 62, 80], textColor: [255, 255, 255], fontStyle: 'bold' },
@@ -439,8 +518,7 @@ export default function LedgerPage() {
           5: { halign: 'right' },
           6: { halign: 'right' },
           7: { halign: 'right' },
-          8: { halign: 'right' },
-          9: { halign: 'right', fontStyle: 'bold' }
+          8: { halign: 'right', fontStyle: 'bold' }
         },
         didParseCell: function (data) {
           if (data.section === 'body') {
@@ -449,7 +527,7 @@ export default function LedgerPage() {
               data.cell.styles.textColor = [100, 100, 100];
             }
 
-            if (data.column.index === 9) {
+            if (data.column.index === 8) {
               const valStr = data.cell.text[0] || '';
               const numStr = valStr.replace(/[^0-9.-]/g, '');
               const numVal = parseFloat(numStr);
@@ -558,7 +636,6 @@ export default function LedgerPage() {
                         <TableHead className="min-w-[150px] text-xs text-primary">Method</TableHead>
                         <TableHead className="w-[100px] text-xs">Job No</TableHead>
                         <TableHead className="text-right text-destructive w-[100px] text-xs">Bill Total</TableHead>
-                        <TableHead className="text-right text-muted-foreground w-[90px] text-xs">Advance</TableHead>
                         <TableHead className="text-right text-green-600 w-[90px] text-xs">Paid</TableHead>
                         <TableHead className="text-right text-amber-600 w-[80px] text-xs">Adj.</TableHead>
                         <TableHead className="text-right text-blue-600 w-[100px] text-xs">Outst.</TableHead>
@@ -568,230 +645,219 @@ export default function LedgerPage() {
                       </TableRow>
                     </TableHeader>
                     <TableBody>
-                  {/* Opening Balance Row if filtered by date */}
-                  {startDate && selectedCompanyId !== 'all' && (
-                    <TableRow className="bg-muted/20">
-                      <TableCell className="text-sm font-medium text-muted-foreground">
-                        {formatDate(startDate)}
-                      </TableCell>
-                      <TableCell colSpan={8} className="font-medium italic text-muted-foreground">
-                        Opening Balance b/f
-                      </TableCell>
-                      <TableCell className="text-right font-bold font-mono text-sm">
-                        {formatCurrency(openingBalance)}
-                      </TableCell>
-                    </TableRow>
-                  )}
-
-                  {ledgerData.length === 0 ? (
-                    <TableRow>
-                      <TableCell colSpan={selectedCompanyId !== 'all' ? 11 : 10} className="h-24 text-center text-muted-foreground">
-                        No transactions found for the selected period.
-                      </TableCell>
-                    </TableRow>
-                  ) : (
-                    paginatedLedgerData.map((entry: any) => (
-                      <React.Fragment key={entry.id}>
-                        <TableRow className="hover:bg-muted/30 group">
-                          {/* 1. Date */}
-                          <TableCell className="text-sm font-medium align-top pt-3">
-                            {new Date(entry.date).toLocaleDateString()}
+                      {/* Opening Balance Row if filtered by date */}
+                      {startDate && selectedCompanyId !== 'all' && (
+                        <TableRow className="bg-muted/20">
+                          <TableCell className="text-sm font-medium text-muted-foreground">
+                            {formatDate(startDate)}
                           </TableCell>
+                          <TableCell colSpan={7} className="font-medium italic text-muted-foreground">
+                            Opening Balance b/f
+                          </TableCell>
+                          <TableCell className="text-right font-bold font-mono text-sm">
+                            {formatCurrency(openingBalance)}
+                          </TableCell>
+                        </TableRow>
+                      )}
 
-                          {/* Expand Button */}
-                          <TableCell className="align-top pt-3 px-0">
-                            {entry.type === 'BILL' && (
-                              <Button
-                                variant="ghost"
-                                size="icon"
-                                className="h-6 w-6 rounded-full hover:bg-primary/10 text-muted-foreground"
-                                onClick={() => toggleRow(entry.id)}
-                              >
-                                {expandedRows.has(entry.id) ? (
-                                  <ChevronUp className="h-4 w-4" />
-                                ) : (
-                                  <ChevronDown className="h-4 w-4" />
+                      {ledgerData.length === 0 ? (
+                        <TableRow>
+                          <TableCell colSpan={selectedCompanyId !== 'all' ? 10 : 9} className="h-24 text-center text-muted-foreground">
+                            No transactions found for the selected period.
+                          </TableCell>
+                        </TableRow>
+                      ) : (
+                        displayLedgerData.map((entry: any) => (
+                          <React.Fragment key={entry.id}>
+                            <TableRow className="hover:bg-muted/30 group">
+                              {/* 1. Date */}
+                              <TableCell className="text-sm font-medium align-top pt-3">
+                                {new Date(entry.date).toLocaleDateString()}
+                              </TableCell>
+
+                              {/* Expand Button */}
+                              <TableCell className="align-top pt-3 px-0">
+                                {entry.type === 'BILL' && (
+                                  <Button
+                                    variant="ghost"
+                                    size="icon"
+                                    className="h-6 w-6 rounded-full hover:bg-primary/10 text-muted-foreground"
+                                    onClick={() => toggleRow(entry.id)}
+                                  >
+                                    {expandedRows.has(entry.id) ? (
+                                      <ChevronUp className="h-4 w-4" />
+                                    ) : (
+                                      <ChevronDown className="h-4 w-4" />
+                                    )}
+                                  </Button>
                                 )}
-                              </Button>
-                            )}
-                          </TableCell>
+                              </TableCell>
 
-                          {/* 2. Description (Company Name First) */}
-                          <TableCell className="align-top pt-3">
-                            <div className="flex flex-col gap-1">
-                              {/* Company Name First - Bold */}
-                              {selectedCompanyId === 'all' && (
-                                <span className="font-bold text-sm text-foreground">
-                                  {entry.companyName}
-                                </span>
-                              )}
+                              {/* 2. Description (Company Name First) */}
+                              <TableCell className="align-top pt-3">
+                                <div className="flex flex-col gap-1">
+                                  {/* Company Name First - Bold */}
+                                  {selectedCompanyId === 'all' && (
+                                    <span className="font-bold text-sm text-foreground">
+                                      {entry.companyName}
+                                    </span>
+                                  )}
 
-                              {/* Transaction Details */}
-                              <div className="text-sm text-muted-foreground">
-                                <span className="font-medium text-foreground/80">{entry.description}</span>
-                              </div>
-                            </div>
-                          </TableCell>
+                                  {/* Transaction Details */}
+                                  <div className="text-sm text-muted-foreground">
+                                    <span className="font-medium text-foreground/80">{entry.description}</span>
+                                  </div>
+                                </div>
+                              </TableCell>
 
-                          {/* 3. Method & Payment Details */}
-                          <TableCell className="align-top pt-3">
-                            <div className="flex flex-col gap-1.5">
-                              {entry.type === 'BILL' ? (
-                                <div className="space-y-2">
-                                  {entry.payments && entry.payments.length > 0 ? (
-                                    entry.payments.map((p: any, idx: number) => (
-                                      <div key={idx} className="flex flex-col border-l-2 border-primary/20 pl-2 py-0.5">
-                                        <div className="flex items-center gap-2">
-                                          <span className="font-bold text-xs text-primary">{p.method || 'Payment'}</span>
-                                          {p.reference && (
-                                            <span className="text-[10px] bg-muted px-1 rounded font-mono">Ref: {p.reference}</span>
-                                          )}
-                                        </div>
-                                        <div className="flex flex-wrap gap-x-2 gap-y-0.5 mt-0.5 text-[10px] text-muted-foreground">
-                                          {p.trackingId && <span>Trk: {p.trackingId}</span>}
-                                          {p.chequeNo && <span>Chq: {p.chequeNo}</span>}
-                                          {p.payOrderNo && <span>PO: {p.payOrderNo}</span>}
-                                        </div>
-                                      </div>
-                                    ))
+                              {/* 3. Method & Payment Details */}
+                              <TableCell className="align-top pt-3">
+                                <div className="flex flex-col gap-1.5">
+                                  {entry.type === 'BILL' ? (
+                                    <div className="space-y-2">
+                                      {entry.payments && entry.payments.length > 0 ? (
+                                        entry.payments.map((p: any, idx: number) => (
+                                          <div key={idx} className="flex flex-col border-l-2 border-primary/20 pl-2 py-0.5">
+                                            <div className="flex items-center gap-2">
+                                              <span className="font-bold text-xs text-primary">{p.method || 'Payment'}</span>
+                                              {p.reference && (
+                                                <span className="text-[10px] bg-muted px-1 rounded font-mono">Ref: {p.reference}</span>
+                                              )}
+                                            </div>
+                                            <div className="flex flex-wrap gap-x-2 gap-y-0.5 mt-0.5 text-[10px] text-muted-foreground">
+                                              {p.trackingId && <span>Trk: {p.trackingId}</span>}
+                                              {p.chequeNo && <span>Chq: {p.chequeNo}</span>}
+                                              {p.payOrderNo && <span>PO: {p.payOrderNo}</span>}
+                                            </div>
+                                          </div>
+                                        ))
+                                      ) : (
+                                        <span className="text-xs text-muted-foreground italic">No payments</span>
+                                      )}
+                                    </div>
                                   ) : (
-                                    <span className="text-xs text-muted-foreground italic">No payments</span>
+                                    <div className="flex flex-col border-l-2 border-green-500/30 pl-2 py-0.5">
+                                      <div className="flex items-center gap-2">
+                                        <span className="font-bold text-xs text-green-600">{entry.method || 'Payment'}</span>
+                                        {entry.paymentRef && (
+                                          <span className="text-[10px] bg-muted px-1 rounded font-mono">Ref: {entry.paymentRef}</span>
+                                        )}
+                                      </div>
+                                      <div className="flex flex-wrap gap-x-2 gap-y-0.5 mt-0.5 text-[10px] text-muted-foreground">
+                                        {entry.trackingId && <span>Trk: {entry.trackingId}</span>}
+                                        {entry.chequeNo && <span>Chq: {entry.chequeNo}</span>}
+                                        {entry.payOrderNo && <span>PO: {entry.payOrderNo}</span>}
+                                      </div>
+                                    </div>
                                   )}
                                 </div>
-                              ) : (
-                                <div className="flex flex-col border-l-2 border-green-500/30 pl-2 py-0.5">
-                                  <div className="flex items-center gap-2">
-                                    <span className="font-bold text-xs text-green-600">{entry.method || 'Payment'}</span>
-                                    {entry.paymentRef && (
-                                      <span className="text-[10px] bg-muted px-1 rounded font-mono">Ref: {entry.paymentRef}</span>
-                                    )}
+                              </TableCell>
+
+                              {/* 3. Job # */}
+                              <TableCell className="align-top pt-3">
+                                {entry.jobNumber ? (
+                                  <div className="flex flex-col gap-0.5">
+                                    <span className="font-mono text-xs font-semibold bg-primary/10 text-primary px-1.5 py-0.5 rounded w-fit">
+                                      {entry.jobNumber}
+                                    </span>
                                   </div>
-                                  <div className="flex flex-wrap gap-x-2 gap-y-0.5 mt-0.5 text-[10px] text-muted-foreground">
-                                    {entry.trackingId && <span>Trk: {entry.trackingId}</span>}
-                                    {entry.chequeNo && <span>Chq: {entry.chequeNo}</span>}
-                                    {entry.payOrderNo && <span>PO: {entry.payOrderNo}</span>}
-                                  </div>
-                                </div>
+                                ) : (
+                                  <span className="text-muted-foreground/30 text-xs">-</span>
+                                )}
+                              </TableCell>
+
+                              {/* 4. Bill Total */}
+                              <TableCell className="text-right text-sm align-top pt-3">
+                                {entry.debit > 0 ? (
+                                  <span className="text-destructive font-bold" title="Total Bill Amount">
+                                    {formatCurrency(entry.debit)}
+                                  </span>
+                                ) : (
+                                  <span className="text-muted-foreground/30">-</span>
+                                )}
+                              </TableCell>
+
+                              {/* 6. Paid */}
+                              <TableCell className="text-right text-sm align-top pt-3">
+                                {entry.paid > 0 ? (
+                                  <span className="text-green-600 font-bold" title="Payment Received">
+                                    {formatCurrency(entry.paid)}
+                                  </span>
+                                ) : (
+                                  <span className="text-muted-foreground/30">-</span>
+                                )}
+                              </TableCell>
+
+                              {/* 7. Adjustment */}
+                              <TableCell className="text-right text-sm align-top pt-3">
+                                {entry.adjustment > 0 ? (
+                                  <span className="text-amber-600 font-medium" title="Adjustment Made">
+                                    {formatCurrency(entry.adjustment)}
+                                  </span>
+                                ) : (
+                                  <span className="text-muted-foreground/30">-</span>
+                                )}
+                              </TableCell>
+
+                              {/* 8. Outstanding */}
+                              <TableCell className="text-right text-sm align-top pt-3 bg-blue-50/30 dark:bg-blue-900/10">
+                                {entry.outstanding > 0 ? (
+                                  <span className="text-blue-600 font-bold" title="Outstanding Bill Balance">
+                                    {formatCurrency(entry.outstanding)}
+                                  </span>
+                                ) : entry.type === 'BILL' ? (
+                                  <span className="text-muted-foreground/50 text-xs italic">Clear</span>
+                                ) : (
+                                  <span className="text-muted-foreground/30">-</span>
+                                )}
+                              </TableCell>
+
+                              {/* 9. Balance */}
+                              {selectedCompanyId !== 'all' && (
+                                <TableCell className="text-right font-mono text-sm align-top pt-3 bg-muted/10 font-bold">
+                                  {formatCurrency(entry.balance)}
+                                </TableCell>
                               )}
-                            </div>
-                          </TableCell>
+                            </TableRow>
 
-                          {/* 3. Job # */}
-                          <TableCell className="align-top pt-3">
-                            {entry.jobNumber ? (
-                              <div className="flex flex-col gap-0.5">
-                                <span className="font-mono text-xs font-semibold bg-primary/10 text-primary px-1.5 py-0.5 rounded w-fit">
-                                  {entry.jobNumber}
-                                </span>
-                              </div>
-                            ) : (
-                              <span className="text-muted-foreground/30 text-xs">-</span>
-                            )}
-                          </TableCell>
-
-                          {/* 4. Bill Total */}
-                          <TableCell className="text-right text-sm align-top pt-3">
-                            {entry.debit > 0 ? (
-                              <span className="text-destructive font-bold" title="Total Bill Amount">
-                                {formatCurrency(entry.debit)}
-                              </span>
-                            ) : (
-                              <span className="text-muted-foreground/30">-</span>
-                            )}
-                          </TableCell>
-
-                          {/* 5. Advance */}
-                          <TableCell className="text-right text-sm align-top pt-3">
-                            {entry.advance > 0 ? (
-                              <span className="text-muted-foreground font-medium" title="Advance Received">
-                                {formatCurrency(entry.advance)}
-                              </span>
-                            ) : (
-                              <span className="text-muted-foreground/30">-</span>
-                            )}
-                          </TableCell>
-
-                          {/* 6. Paid */}
-                          <TableCell className="text-right text-sm align-top pt-3">
-                            {entry.paid > 0 ? (
-                              <span className="text-green-600 font-bold" title="Payment Received">
-                                {formatCurrency(entry.paid)}
-                              </span>
-                            ) : (
-                              <span className="text-muted-foreground/30">-</span>
-                            )}
-                          </TableCell>
-
-                          {/* 7. Adjustment */}
-                          <TableCell className="text-right text-sm align-top pt-3">
-                            {entry.adjustment > 0 ? (
-                              <span className="text-amber-600 font-medium" title="Adjustment Made">
-                                {formatCurrency(entry.adjustment)}
-                              </span>
-                            ) : (
-                              <span className="text-muted-foreground/30">-</span>
-                            )}
-                          </TableCell>
-
-                          {/* 8. Outstanding */}
-                          <TableCell className="text-right text-sm align-top pt-3 bg-blue-50/30 dark:bg-blue-900/10">
-                            {entry.outstanding > 0 ? (
-                              <span className="text-blue-600 font-bold" title="Outstanding Bill Balance">
-                                {formatCurrency(entry.outstanding)}
-                              </span>
-                            ) : entry.type === 'BILL' ? (
-                              <span className="text-muted-foreground/50 text-xs italic">Clear</span>
-                            ) : (
-                              <span className="text-muted-foreground/30">-</span>
-                            )}
-                          </TableCell>
-
-                          {/* 9. Balance */}
-                          {selectedCompanyId !== 'all' && (
-                            <TableCell className="text-right font-mono text-sm align-top pt-3 bg-muted/10 font-bold">
-                              {formatCurrency(entry.balance)}
-                            </TableCell>
-                          )}
-                        </TableRow>
-
-                        {/* Expandable Sub-Row */}
-                        {entry.type === 'BILL' && expandedRows.has(entry.id) && (
-                          <TableRow className="bg-muted/5">
-                            <TableCell colSpan={selectedCompanyId !== 'all' ? 11 : 10} className="p-0 border-b">
-                              <div className="p-4 animate-in slide-in-from-top-2 fade-in duration-200">
-                                <div className="grid grid-cols-2 md:grid-cols-6 gap-4 text-xs">
-                                  <div>
-                                    <p className="text-muted-foreground font-semibold mb-1 uppercase tracking-wider">Via</p>
-                                    <p className="font-medium">{entry.via || '-'}</p>
+                            {/* Expandable Sub-Row */}
+                            {entry.type === 'BILL' && expandedRows.has(entry.id) && (
+                              <TableRow className="bg-muted/5">
+                                <TableCell colSpan={selectedCompanyId !== 'all' ? 10 : 9} className="p-0 border-b">
+                                  <div className="p-4 animate-in slide-in-from-top-2 fade-in duration-200">
+                                    <div className="grid grid-cols-2 md:grid-cols-6 gap-4 text-xs">
+                                      <div>
+                                        <p className="text-muted-foreground font-semibold mb-1 uppercase tracking-wider">Via</p>
+                                        <p className="font-medium">{entry.via || '-'}</p>
+                                      </div>
+                                      <div>
+                                        <p className="text-muted-foreground font-semibold mb-1 uppercase tracking-wider">Weight</p>
+                                        <p className="font-medium">{entry.weight ? `${entry.weight} KG` : '-'}</p>
+                                      </div>
+                                      <div>
+                                        <p className="text-muted-foreground font-semibold mb-1 uppercase tracking-wider">Packages</p>
+                                        <p className="font-medium">{entry.packages || '-'}</p>
+                                      </div>
+                                      <div>
+                                        <p className="text-muted-foreground font-semibold mb-1 uppercase tracking-wider">IGM</p>
+                                        <p className="font-medium">{entry.igm || '-'}</p>
+                                      </div>
+                                      <div>
+                                        <p className="text-muted-foreground font-semibold mb-1 uppercase tracking-wider">GD Number</p>
+                                        <p className="font-medium">{entry.gdNumber || '-'}</p>
+                                      </div>
+                                      <div>
+                                        <p className="text-muted-foreground font-semibold mb-1 uppercase tracking-wider">Total Bill</p>
+                                        <p className="font-medium text-primary font-bold">{formatCurrency(entry.debit)}</p>
+                                      </div>
+                                    </div>
                                   </div>
-                                  <div>
-                                    <p className="text-muted-foreground font-semibold mb-1 uppercase tracking-wider">Weight</p>
-                                    <p className="font-medium">{entry.weight ? `${entry.weight} KG` : '-'}</p>
-                                  </div>
-                                  <div>
-                                    <p className="text-muted-foreground font-semibold mb-1 uppercase tracking-wider">Packages</p>
-                                    <p className="font-medium">{entry.packages || '-'}</p>
-                                  </div>
-                                  <div>
-                                    <p className="text-muted-foreground font-semibold mb-1 uppercase tracking-wider">IGM</p>
-                                    <p className="font-medium">{entry.igm || '-'}</p>
-                                  </div>
-                                  <div>
-                                    <p className="text-muted-foreground font-semibold mb-1 uppercase tracking-wider">GD Number</p>
-                                    <p className="font-medium">{entry.gdNumber || '-'}</p>
-                                  </div>
-                                  <div>
-                                    <p className="text-muted-foreground font-semibold mb-1 uppercase tracking-wider">Total Bill</p>
-                                    <p className="font-medium text-primary font-bold">{formatCurrency(entry.debit)}</p>
-                                  </div>
-                                </div>
-                              </div>
-                            </TableCell>
-                          </TableRow>
-                        )}
-                      </React.Fragment>
-                    ))
-                  )}
+                                </TableCell>
+                              </TableRow>
+                            )}
+                          </React.Fragment>
+                        ))
+                      )}
                     </TableBody>
                   </Table>
                 </div>
