@@ -1,38 +1,45 @@
-<IfModule mod_rewrite.c>
-  RewriteEngine On
-  RewriteBase /
-
-  # Disable Apache directory listing to prevent 403 Forbidden
-  Options -Indexes
-
-  # 1. If it's an exact file (.css, .png, .js etc.), serve it directly
-  RewriteCond %{REQUEST_FILENAME} -f
-  RewriteRule ^ - [L]
-
-  # 2. Map root to index.html
-  RewriteRule ^$ index.html [L]
-
-  # 3. If a matching .html file exists, serve it
-  #    (e.g. /about -> about.html)
-  RewriteCond %{REQUEST_FILENAME} !-d
-  RewriteCond %{DOCUMENT_ROOT}/$1.html -f
-  RewriteRule ^(.*)$ $1.html [L]
-
-  # 4. If a directory has an index.html, serve that directly
-  #    (e.g. /admin/bills or /admin/bills/ -> admin/bills/index.html)
-  #    NOTE: no redirect here -- directly rewrite internally so the URL
-  #    in the browser never changes and no redirect loop can form.
-  RewriteCond %{DOCUMENT_ROOT}/$1/index.html -f
-  RewriteRule ^(.*?)/?$ $1/index.html [L]
-
-  # Fallback to 404
-  ErrorDocument 404 /404.html
-</IfModule>
-
-# Cache static files for performance
-<IfModule mod_expires.c>
-  ExpiresActive On
-  ExpiresDefault "access plus 1 month"
-  ExpiresByType text/html "access plus 0 seconds"
-  ExpiresByType application/json "access plus 0 seconds"
-</IfModule>
+ye mera current .htaccess ha     <IfModule mod_rewrite.c>
+      RewriteEngine On
+      RewriteBase /
+    
+      # Disable Apache directory listing to prevent 403 Forbidden
+      Options -Indexes
+    
+      # Strip trailing slash (except root) to normalize URLs
+      RewriteCond %{REQUEST_FILENAME} -d
+      RewriteRule ^(.+)/$ /$1 [L,R=301]
+    
+      # 1. If it's an exact file (.css, .png, etc.), serve it
+      RewriteCond %{REQUEST_FILENAME} -f
+      RewriteRule ^ - [L]
+    
+      # 2. Map root to index.html
+      RewriteRule ^$ index.html [L]
+    
+      # 3. IF THE HTML FILE EXISTS, serve it! 
+      # This ignores the existence of the directory with the same name.
+      RewriteCond %{DOCUMENT_ROOT}/$1.html -f
+      RewriteRule ^(.*)$ $1.html [L]
+    
+      # 4. If directory has an index.html, serve that
+      RewriteCond %{DOCUMENT_ROOT}/$1/index.html -f
+      RewriteRule ^(.*)$ $1/index.html [L]
+    
+      # Fallback to 404
+      ErrorDocument 404 /404.html
+    </IfModule>
+    
+    # Cache static files for performance
+    <IfModule mod_expires.c>
+      ExpiresActive On
+      ExpiresDefault "access plus 1 month"
+      ExpiresByType text/html "access plus 0 seconds"
+      ExpiresByType application/json "access plus 0 seconds"
+    </IfModule>
+    
+    # php -- BEGIN cPanel-generated handler, do not edit
+    # Set the “ea-php82” package as the default “PHP” programming language.
+    <IfModule mime_module>
+      AddHandler application/x-httpd-ea-php82 .php .php8 .phtml
+    </IfModule>
+    # php -- END cPanel-generated handler, do not edit
