@@ -1,33 +1,31 @@
-ye mera current .htaccess ha     <IfModule mod_rewrite.c>
-      RewriteEngine On
-      RewriteBase /
-    
-      # Disable Apache directory listing to prevent 403 Forbidden
-      Options -Indexes
-    
-      # Strip trailing slash (except root) to normalize URLs
-      RewriteCond %{REQUEST_FILENAME} -d
-      RewriteRule ^(.+)/$ /$1 [L,R=301]
-    
-      # 1. If it's an exact file (.css, .png, etc.), serve it
-      RewriteCond %{REQUEST_FILENAME} -f
-      RewriteRule ^ - [L]
-    
-      # 2. Map root to index.html
-      RewriteRule ^$ index.html [L]
-    
-      # 3. IF THE HTML FILE EXISTS, serve it! 
-      # This ignores the existence of the directory with the same name.
-      RewriteCond %{DOCUMENT_ROOT}/$1.html -f
-      RewriteRule ^(.*)$ $1.html [L]
-    
-      # 4. If directory has an index.html, serve that
-      RewriteCond %{DOCUMENT_ROOT}/$1/index.html -f
-      RewriteRule ^(.*)$ $1/index.html [L]
-    
-      # Fallback to 404
-      ErrorDocument 404 /404.html
-    </IfModule>
+# Configure Apache mod_rewrite for Next.js static routing with trailing slash
+<IfModule mod_rewrite.c>
+  RewriteEngine On
+  RewriteBase /
+
+  # Disable Apache directory listing to prevent 403 Forbidden
+  Options -Indexes
+
+  # Redirect non-trailing slash to trailing slash (except for files)
+  # This ensures URLs are normalized to have trailing slashes
+  RewriteCond %{REQUEST_FILENAME} !-f
+  RewriteCond %{REQUEST_URI} !(.*)/$
+  RewriteRule ^(.*)$ /$1/ [L,R=301]
+
+  # 1. If it's an exact file (.css, .png, etc.), serve it
+  RewriteCond %{REQUEST_FILENAME} -f
+  RewriteRule ^ - [L]
+
+  # 2. Map root to index.html
+  RewriteRule ^$ index.html [L]
+
+  # 3. If directory has an index.html, serve that internally
+  RewriteCond %{DOCUMENT_ROOT}/$1/index.html -f
+  RewriteRule ^(.*)/$ $1/index.html [L]
+
+  # Fallback to 404
+  ErrorDocument 404 /404.html
+</IfModule>
     
     # Cache static files for performance
     <IfModule mod_expires.c>

@@ -10,6 +10,7 @@ import { useAuth } from '@/context/auth-context';
 
 export function PublicNavbar() {
     const pathname = usePathname();
+    const normalizePath = (p: string) => p.replace(/\/$/, '') || '/';
     const { theme, setTheme } = useTheme();
     const { user, isHydrated } = useAuth();
     const [isScrolled, setIsScrolled] = useState(false);
@@ -53,7 +54,7 @@ export function PublicNavbar() {
                         <Link
                             key={link.name}
                             href={link.href}
-                            className={`text-sm font-medium transition-colors hover:text-primary ${pathname === link.href
+                            className={`text-sm font-medium transition-colors hover:text-primary ${normalizePath(pathname) === normalizePath(link.href)
                                 ? 'text-primary'
                                 : 'text-muted-foreground'
                                 }`}
@@ -99,7 +100,7 @@ export function PublicNavbar() {
                         <Link
                             key={link.name}
                             href={link.href}
-                            className={`text-sm font-medium p-2 rounded-md hover:bg-muted transition-colors ${pathname === link.href
+                            className={`text-sm font-medium p-2 rounded-md hover:bg-muted transition-colors ${normalizePath(pathname) === normalizePath(link.href)
                                 ? 'text-primary bg-muted/50'
                                 : 'text-muted-foreground'
                                 }`}

@@ -83,7 +83,8 @@ export function Sidebar({ user, onLogout }: SidebarProps) {
         <nav className="flex-1 px-4 py-2 space-y-2 overflow-y-auto custom-scrollbar">
           {links.map((link) => {
             const Icon = link.icon;
-            const isActive = pathname === link.href;
+            const normalizePath = (p: string) => p.replace(/\/$/, '') || '/';
+            const isActive = normalizePath(pathname) === normalizePath(link.href);
 
             return (
               <Link
