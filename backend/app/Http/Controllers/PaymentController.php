@@ -158,23 +158,16 @@ class PaymentController extends Controller
                     'adjustment' => $finalAdjustment,
                     'bill_id' => null,
                 ]);
-                $finalPayment = Payment::create($generalPaymentData);
-                
-                // Reevaluate all affected bills
-                foreach (array_unique($affectedBillIds) as $bId) {
-                    $this->reevaluateBillStatus($bId);
-                }
-                
-                return response()->json($finalPayment, 201);
+                $createdPayments[] = Payment::create($generalPaymentData);
             }
 
-            // Reevaluate all affected bills
+            // Reevaluate all affected bills (always, in one place)
             foreach (array_unique($affectedBillIds) as $bId) {
                 $this->reevaluateBillStatus($bId);
             }
 
-            // Return the first created payment or the summary of what happened
-            return response()->json($createdPayments[0] ?? null, 201);
+            // Return ALL created payments so the frontend can display them all
+            return response()->json($createdPayments, 201);
         });
     }
 

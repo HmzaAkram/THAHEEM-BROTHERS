@@ -23,8 +23,9 @@ class Payment extends Model
     ];
 
     protected $casts = [
-        'date' => 'date',
+        'date' => 'string',
         'amount' => 'decimal:2',
+        'adjustment' => 'decimal:2',
     ];
 
     public function company(): BelongsTo

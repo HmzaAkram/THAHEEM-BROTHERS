@@ -338,19 +338,29 @@ export function DataProvider({ children }: { children: ReactNode }) {
   const addPayment = async (paymentData: Omit<Payment, 'id' | 'createdAt'>) => {
     const token = sessionStorage.getItem('authToken');
 
-    // BUG FIX: Optimistic update with rollback to prevent race conditions
+    // Optimistic update with rollback
     const tempId = `temp_${Date.now()}_${Math.random()}`;
     const tempPayment = { ...paymentData, id: tempId, createdAt: new Date().toISOString() } as Payment;
 
-    // Optimistically add payment
     setPayments(prev => [...prev, tempPayment]);
 
     try {
       const result = await ApiService.post('/payments', paymentData, token);
 
       if (result.ok && result.data) {
-        // Replace temp payment with real one
-        setPayments(prev => prev.map(p => p.id === tempId ? result.data : p));
+        // Backend returns an array of payments — remove temp and add all real ones
+        const returnedPayments = Array.isArray(result.data) ? result.data : [result.data];
+        setPayments(prev => [
+          ...prev.filter(p => p.id !== tempId),
+          ...returnedPayments,
+        ]);
+
+        // Re-fetch full payments list for consistency
+        const paymentsRes = await ApiService.get('/payments?all=true', token);
+        if (paymentsRes.ok) {
+          const paymentsList = paymentsRes.data;
+          setPayments(Array.isArray(paymentsList) ? paymentsList : (paymentsList?.data || []));
+        }
 
         // Refresh bills to update their status
         const billsRes = await ApiService.get('/bills?all=true', token);
@@ -361,12 +371,10 @@ export function DataProvider({ children }: { children: ReactNode }) {
 
         return result;
       } else {
-        // Rollback on failure
         setPayments(prev => prev.filter(p => p.id !== tempId));
         return result;
       }
     } catch (error) {
-      // Rollback on exception
       setPayments(prev => prev.filter(p => p.id !== tempId));
       console.error('Payment creation failed:', error);
       throw error;
