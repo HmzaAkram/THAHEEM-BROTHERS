@@ -142,6 +142,15 @@ export const SaleTaxTemplate = forwardRef<HTMLDivElement, SaleTaxTemplateProps>(
         </div>
       )}
 
+      {/* Terms and Conditions / Disclaimer */}
+      <div className="mb-8 border-t border-slate-200 pt-3">
+        <p className="text-[9px] font-bold text-red-600/80 uppercase tracking-wide mb-1">Important Notice</p>
+        <p className="text-[9px] text-slate-500 leading-relaxed italic">
+          Any discrepancies or errors in this bill must be reported and resolved within one week (7 days) of issuance. 
+          The company will not be held responsible for any claims or corrections made after this period.
+        </p>
+      </div>
+
       {/* Footer */}
       <div className="absolute bottom-10 left-12 right-12">
         <div className="flex justify-between items-end pt-4 border-t-2 border-slate-800">
